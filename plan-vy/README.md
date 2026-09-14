@@ -31,9 +31,9 @@ webbläsaren skickar en OPTIONS-preflight först, och då faller anropet.
 
 ## Driftsättning på Netlify
 
-`netlify.toml` är färdig. Appen ligger i `plan-vy/`, så **base måste vara
-`plan-vy`** — pekar Netlify på repo-roten hittar den ingen `package.json` och
-bygget faller direkt.
+`netlify.toml` ligger i **repo-roten**, inte här — det är där Netlify letar.
+`base = "plan-vy"` flyttar bygget hit, och alla andra sökvägar i filen är
+relativa till base.
 
 | Inställning | Värde |
 |---|---|
@@ -45,8 +45,24 @@ bygget faller direkt.
 `@netlify/plugin-nextjs` deklareras i `netlify.toml` och installeras av Netlify
 själv. Lägg den **inte** i `package.json` också — det ger versionskonflikt.
 
-Ingen miljövariabel krävs. `NEXT_PUBLIC_PLAN_VY_API` är valfri och behövs bara
-om bygget ska peka mot något annat än skarp n8n-backend.
+### Lösenordsgrind
+
+Netlifys inbyggda lösenordsskydd kräver betalplan. `netlify/edge-functions/auth.ts`
+gör samma sak på gratisplanen och kräver två miljövariabler:
+
+| Variabel | Innehåll |
+|---|---|
+| `SITE_USER` | användarnamn |
+| `SITE_PASSWORD` | lösenord (markerad som secret i Netlify) |
+
+Funktionen **felar stängt**: saknas någon av dem svarar den 503 i stället för att
+släppa förbi. En felkonfiguration ska inte kunna lägga siffrorna öppet.
+
+Egna headers från `netlify.toml` gäller inte på vägar som en edge function
+serverar, så `X-Robots-Tag` med flera sätts i funktionen i stället.
+
+`NEXT_PUBLIC_PLAN_VY_API` är valfri och behövs bara om bygget ska peka mot något
+annat än skarp n8n-backend.
 
 CORS fungerar från vilken Netlify-domän som helst: respond-noden sätter
 `Access-Control-Allow-Origin: *`, och research-webhooken har dessutom
@@ -56,11 +72,11 @@ CORS fungerar från vilken Netlify-domän som helst: respond-noden sätter
 
 En Netlify-URL är öppen för alla som har länken. Två saker följer av det:
 
-1. **Dashboarden visar omsättning, marginaler och inköpspris.** `netlify.toml`
-   skickar `X-Robots-Tag: noindex, nofollow` så den inte hamnar i sökindex, men
-   det är inget lösenord. Vill du ha riktigt skydd: Netlify har
-   lösenordsskydd på betalplan, annars går det att lägga en edge function med
-   basic auth framför.
+1. **Dashboarden visar omsättning, marginaler och inköpspris.** Den ligger bakom
+   basic auth via edge function, och `X-Robots-Tag: noindex, nofollow` håller
+   den utanför sökindex. Basic auth skickar lösenordet base64-kodat, inte
+   hashat — det är TLS som skyddar det på vägen, så dela aldrig länken utan
+   `https://`.
 2. **Knappen "Generera idéer" träffar en oautentiserad webhook** som kostar
    OpenAI-krediter och skriver rader i `product_candidates`. Den som hittar
    sidan kan trycka på den hur många gånger som helst. Det är webhooken som

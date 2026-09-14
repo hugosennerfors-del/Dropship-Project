@@ -1,5 +1,8 @@
-# Appen ligger i plan-vy/, inte i repo-roten — därför base.
-# publish är relativ till base, så ".next" betyder plan-vy/.next.
+# Filen MÅSTE ligga i repo-roten — det är där Netlify letar. Ligger den i
+# plan-vy/ hittas den aldrig och bygget kör med tomma standardvärden.
+# base flyttar bygget in i plan-vy/; alla andra sökvägar här är relativa till
+# base, så ".next" betyder plan-vy/.next och edge functions hämtas från
+# plan-vy/netlify/edge-functions/.
 [build]
   base    = "plan-vy"
   command = "npm run build"
