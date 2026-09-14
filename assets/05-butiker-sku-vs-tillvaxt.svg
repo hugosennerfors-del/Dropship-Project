@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="520" viewBox="0 0 880 520" role="img" aria-label="Sortimentsbredd mot trafiktillväxt">
+<title>Sortimentsbredd mot trafiktillväxt</title>
+<rect width="880" height="520" rx="10" fill="#fcfcfb" stroke="#e7e6e2"/>
+<text x="28" y="36" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="17" font-weight="600" fill="#0b0b0b">Sortimentsbredd mot trafiktillväxt</text>
+<text x="28" y="57" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12.5" fill="#52514e">De 6 av 11 teardown-butikerna som har både SKU-antal och trafikriktning. Bubbla = antal aktiva Meta-annonser.</text>
+<text x="28" y="504" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11" fill="#52514e">Källa: brandsearch.co, 2026. Modellerade estimat. Hike Footwear kör 1 241 annonser — kapad bubbelskala.</text>
+<rect x="28.0" y="82.0" width="10" height="10" rx="2.5" fill="#2a78d6"/>
+<text x="44.0" y="91.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" fill="#52514e">Butik (bubbla = antal aktiva Meta-annonser)</text>
+<line x1="74.0" y1="116" x2="74.0" y2="438" stroke="#ecebe7" stroke-width="1"/>
+<text x="74.0" y="458" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="middle">0</text>
+<line x1="239.6" y1="116" x2="239.6" y2="438" stroke="#ecebe7" stroke-width="1"/>
+<text x="239.6" y="458" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="middle">40</text>
+<line x1="405.2" y1="116" x2="405.2" y2="438" stroke="#ecebe7" stroke-width="1"/>
+<text x="405.2" y="458" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="middle">80</text>
+<line x1="570.9" y1="116" x2="570.9" y2="438" stroke="#ecebe7" stroke-width="1"/>
+<text x="570.9" y="458" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="middle">120</text>
+<line x1="736.5" y1="116" x2="736.5" y2="438" stroke="#ecebe7" stroke-width="1"/>
+<text x="736.5" y="458" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="middle">160</text>
+<line x1="74" y1="438.0" x2="840" y2="438.0" stroke="#ecebe7" stroke-width="1"/>
+<text x="62" y="442.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="end">-60%</text>
+<line x1="74" y1="392.0" x2="840" y2="392.0" stroke="#ecebe7" stroke-width="1"/>
+<text x="62" y="396.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="end">-40%</text>
+<line x1="74" y1="346.0" x2="840" y2="346.0" stroke="#ecebe7" stroke-width="1"/>
+<text x="62" y="350.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="end">-20%</text>
+<line x1="74" y1="300.0" x2="840" y2="300.0" stroke="#ecebe7" stroke-width="1"/>
+<text x="62" y="304.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="end">+0%</text>
+<line x1="74" y1="254.0" x2="840" y2="254.0" stroke="#ecebe7" stroke-width="1"/>
+<text x="62" y="258.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="end">+20%</text>
+<line x1="74" y1="208.0" x2="840" y2="208.0" stroke="#ecebe7" stroke-width="1"/>
+<text x="62" y="212.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="end">+40%</text>
+<line x1="74" y1="162.0" x2="840" y2="162.0" stroke="#ecebe7" stroke-width="1"/>
+<text x="62" y="166.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="end">+60%</text>
+<line x1="74" y1="116.0" x2="840" y2="116.0" stroke="#ecebe7" stroke-width="1"/>
+<text x="62" y="120.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="11.5" fill="#52514e" text-anchor="end">+80%</text>
+<line x1="74" y1="300.0" x2="840" y2="300.0" stroke="#52514e" stroke-width="1" opacity="0.5"/>
+<text x="457" y="484" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" fill="#52514e" text-anchor="middle">Antal produkter i sortimentet</text>
+<text x="22" y="277" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" fill="#52514e" text-anchor="middle" transform="rotate(-90 22 277)">Trafikförändring</text>
+<circle cx="103.0" cy="187.5" r="15.6" fill="#2a78d6" fill-opacity="0.22" stroke="#2a78d6" stroke-width="2"/>
+<text x="103.0" y="227.5" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">Houndsy</text>
+<text x="103.0" y="241.5" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10.5" fill="#52514e" text-anchor="middle">7 SKU · 67 annonser</text>
+<circle cx="194.1" cy="143.1" r="15.9" fill="#2a78d6" fill-opacity="0.22" stroke="#2a78d6" stroke-width="2"/>
+<text x="194.1" y="107.1" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">Atlas Pet Company</text>
+<text x="194.1" y="121.1" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10.5" fill="#52514e" text-anchor="middle">29 SKU · 74 annonser</text>
+<circle cx="198.2" cy="422.6" r="17.8" fill="#2a78d6" fill-opacity="0.22" stroke="#2a78d6" stroke-width="2"/>
+<text x="198.2" y="462.6" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">Fera Pets</text>
+<text x="198.2" y="476.6" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10.5" fill="#52514e" text-anchor="middle">30 SKU · 112 annonser</text>
+<circle cx="363.8" cy="311.0" r="12.0" fill="#2a78d6" fill-opacity="0.22" stroke="#2a78d6" stroke-width="2"/>
+<text x="363.8" y="281.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">Fable Pets</text>
+<text x="363.8" y="295.0" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10.5" fill="#52514e" text-anchor="middle">70 SKU · 19 annonser</text>
+<circle cx="566.7" cy="281.1" r="24.0" fill="#2a78d6" fill-opacity="0.22" stroke="#2a78d6" stroke-width="2"/>
+<text x="566.7" y="235.1" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">Hike Footwear</text>
+<text x="566.7" y="249.1" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10.5" fill="#52514e" text-anchor="middle">119 SKU · 1241 annonser</text>
+<circle cx="786.2" cy="296.8" r="16.4" fill="#2a78d6" fill-opacity="0.22" stroke="#2a78d6" stroke-width="2"/>
+<text x="786.2" y="264.8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="12" font-weight="600" fill="#0b0b0b" text-anchor="middle">The Muzzle Movement</text>
+<text x="786.2" y="278.8" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif" font-size="10.5" fill="#52514e" text-anchor="middle">172 SKU · 83 annonser</text>
+</svg>

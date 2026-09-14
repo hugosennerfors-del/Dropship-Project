@@ -18,6 +18,9 @@ Det här kapitlet är det viktigaste i rapporten. Produktval spelar roll, men **
 
 **Slutsatsen är inte "sluta dropshippa".** Den är: *styckevis direktimport från Kina till slutkund är nu en strukturellt sämre modell än bulkimport till EU-lager.* Vid bulk deklarerar du en gång, inte per order.
 
+![Vertikal tidslinje över regelförändringar: GPSR dec 2024, batteriförordningen aug 2025, ångerknapp juni 2026, de-minimis-slopandet juli 2026, svenskt ombud aug 2026, hanteringsavgift nov 2026, Black Friday nov 2026, textil-EPR 2027-2028, övergångsregimen upphör juli 2028.](assets/06-tidslinje-regelverk.svg)
+
+
 ⚠️ **Motbevis jag hittade mot min egen slutsats:** flera analytiker menar att Temu och Shein anpassar sig snabbare än regeln biter — Shein certifierade europeiska lager i slutet av maj 2026 och Temu kör redan merparten av EU-ordrarna via ett kontinentalt lagernät. Det betyder att *de stora aktörernas* prisfördel inte försvinner. Din fördel ligger alltså inte i pris — den ligger i nisch, varumärke och leveranstid.
 
 ---
@@ -97,6 +100,9 @@ Reviderat avfallsdirektiv (EU) 2025/1892 antogs oktober 2025. Separat textilinsa
 
 **Läs CPM-siffran igen.** Att annonsera i Sverige kostar ungefär **hälften** av globalt snitt. Med 10–50 000 kr i budget är det inte en detalj — det är skillnaden mellan att få statistiskt läsbar data och att inte få det. En budget som ger dig 1 000 kunddata-punkter i Sverige ger dig ~450 i USA.
 
+![Tre statistikrutor: Sverige 9,10 till 13,50 dollar CPM, globalt snitt cirka 20,90 dollar, USA 22 till 23 dollar.](assets/04-cpm-per-marknad.svg)
+
+
 **Läs returgraden igen också.** 5,9 % totalt mot 22,8 % för mode. Varje produkt med storlekar bär i praktiken en fyrdubblad returrisk. Det är därför kläder, skor och storleksberoende produkter är systematiskt nedrankade i den här rapporten — och varför hundbadrock (som har storlekar!) måste hanteras med en mycket bra storleksguide.
 
 ### Nackdelar och krav
@@ -123,6 +129,9 @@ Global TikTok Shop-GMV: **$27,453 mdr under Q1 2026, +95 % YoY**; från **$66 md
 **Affiliateandel av topp-50:s GMV:** Spanien **87 %**, UK **82,0 %**, Frankrike **81,7 %**, Tyskland **71,8 %**, Italien **53,1 %**. Cirka **två tredjedelar** av GMV kommer från korta videor, inte livestreams.
 
 **Vad det betyder för dig.** Eftersom TikTok Shop inte finns i Sverige kan du inte använda den kanalen för svensk försäljning. Din TikTok-strategi måste vara **organiskt innehåll + Spark Ads → egen butik**, alternativt Meta. Det är mer friktion — men också mindre konkurrens, eftersom hela den affiliate-drivna TikTok Shop-vågen inte har nått Sverige än.
+
+![Stapeldiagram över TikTok Shop GMV i Europa under 90 dagar till 9 juli 2026: Tyskland 174,7 miljoner euro, Frankrike 132,8, Spanien 104,7, Italien 86,6, Sverige inte lanserad.](assets/07-tiktok-shop-europa.svg)
+
 
 **Och den viktigaste observationen:** titta på vad som faktiskt säljer bäst på TikTok Shop.
 

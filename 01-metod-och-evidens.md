@@ -94,7 +94,15 @@ Nej. Total frånvaro av konkurrens betyder oftast frånvaro av efterfrågan. Jag
 **4. "Vinnarprodukten finns i verktyget."**
 Verktygen (Minea, Sell The Trend, Winning Hunter, Dropship.io) visar vad som redan skalar — alltså vad som redan har konkurrens. De är användbara för validering, inte för upptäckt. Upptäckten i den här rapporten kom från korsningen *säsong × geografi × regelverk*, inte från en produktlista.
 
-## 1.7 Fakta vs. estimat — notationen i rapporten
+## 1.7 Diagrammen
+
+Alla åtta diagram genereras av [`tools/make_charts.py`](tools/make_charts.py) och skrivs till [`assets/`](assets/). Skriptet har inga beroenden — `python3 tools/make_charts.py` räcker. Varje siffra i varje diagram kommer från rådata-loggen, så du kan spåra den till källan.
+
+Färgerna är validerade för färgblindhet (adjacent ΔE 9,2 deutan, normalseende 27,6 — båda över golvet). Statisk SVG i GitHub-markdown kan inte bära hover, så identiteten bärs av legend och direktetiketter i stället för tooltip, och varje diagram har sin fullständiga tabell i rapporttexten.
+
+**Ett diagram byggdes om efter granskning:** tidslinjen ritades först horisontellt, men sex av elva händelser ligger inom tio månader under 2026 och etiketterna gick inte att separera. Den är nu vertikal.
+
+## 1.8 Fakta vs. estimat — notationen i rapporten
 
 - **Fet siffra med källnamn** = rapporterad av källan som fakta
 - *Kursiv* = mitt estimat eller min beräkning

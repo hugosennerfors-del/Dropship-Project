@@ -2,6 +2,11 @@
 
 > Notation: **fet siffra** = rapporterad av källa · *kursiv* = mitt estimat/min beräkning · `UNKNOWN` = ej verifierbart · ⚠️ = risk eller motstridiga källor
 
+![Liggande stapeldiagram över uppskattad månadsvolym för kategoriledaren på Amazon US, från 40 000 enheter för bildammsugare ned till 400 för värmeväst.](assets/02-amazon-manadsvolym.svg)
+
+*Kalibreringsbild för hela kapitlet. Lägg märke till skalan längst ned: **värmeväst 400 enheter mot värmestrumpor 8 000** — kategorierna har ungefär lika många spårade produkter. Det är fötterna som säljer, inte bålen.*
+
+
 ---
 
 ## #1 — Premium hundbadrock / torkrock

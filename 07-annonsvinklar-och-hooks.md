@@ -115,6 +115,9 @@ Ur teardown-datat i [kapitel 6](06-teardown-10-butiker.md):
 
 **Break-even ROAS = 1 ÷ bidragsmarginal.**
 
+![Staplat stapeldiagram som delar upp retailpriset i inköp, frakt ut och bidrag för fem produkter.](assets/03-enhetsekonomi.svg)
+
+
 | Produkt | Pris | Landad kostnad | Frakt ut | Bidrag | Bidragsmarginal | Break-even ROAS |
 |---|---|---|---|---|---|---|
 | Hundbadrock | €59 | *€13* | *€5* | *€41* | *69 %* | ***1,44×*** |

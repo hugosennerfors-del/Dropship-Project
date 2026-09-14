@@ -2,6 +2,9 @@
 
 **Läsanvisning.** `Score` = min bedömning enligt rubriken i [kapitel 1.4](01-metod-och-evidens.md). `Evidence` = hur starkt underlaget bakom den bedömningen är. Priser i EUR är *estimat* baserade på observerade marknadspriser; kostnader är *indikativa spann från leverantörslistningar, inte offerter*. Marginal = brutto före annonskostnad, efter produkt och frakt in.
 
+![Spridningsdiagram: Score på x-axeln, Evidence Confidence på y-axeln, för topp 20-produkterna.](assets/01-score-vs-evidence.svg)
+
+
 ## 3.1 Huvudtabell
 
 | # | Produkt | Score | Evid. | Trend | Pris (retail) | Est. kostnad | Marginal | Konkurrens | Varför |
@@ -28,6 +31,9 @@
 | 20 | **Sunset- / galaxprojektor** | **60** | 72 | **Mättad** | €29–49 | €9–15 | ~62–68 % | Mycket hög | 89 M TikTok-visningar och 8 000–10 000/mån — men *samma ASIN* dominerar tolv olika sökord. Ren råvara. Med här som varning, inte rekommendation. |
 
 ## 3.2 Fullständigt scoreblad
+
+![Värmekarta över poängsammansättningen för topp 10 produkter fördelat på åtta dimensioner.](assets/08-poangsammansattning.svg)
+
 
 Delpoäng, maxvikt inom parentes.
 

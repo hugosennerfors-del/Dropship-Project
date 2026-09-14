@@ -17,6 +17,13 @@ Det här är resultatet av en bred produktresearch för att svara på en enda fr
 
 Läs [02-marknadsvillkor-eu-sverige.md](02-marknadsvillkor-eu-sverige.md) först. Den ramen avgör mer av utfallet än produktvalet.
 
+![Score mot evidensstyrka för topp 20. Hundbadrock, omklädningsrock och pälsdammsugare är markerade som rekommenderade.](assets/01-score-vs-evidence.svg)
+
+*Varför den här bilden är den viktigaste i rapporten: **smart fågelmatare** ligger högst upp till höger — högst evidens, tredje högst score — och är ändå ett **NEJ**. Bird Buddy har ~$100 M i intäkt och står redan hos Elgiganten, Arken Zoo och VetZoo. Hög poäng är inte samma sak som rätt drag.*
+
+![Tidslinje över EU- och svenska regelförändringar 2024 till 2028, med dagens datum markerat.](assets/06-tidslinje-regelverk.svg)
+
+
 ## Innehåll
 
 | Fil | Innehåll |
@@ -34,6 +41,8 @@ Läs [02-marknadsvillkor-eu-sverige.md](02-marknadsvillkor-eu-sverige.md) först
 | [11-7-dagars-testplan.md](11-7-dagars-testplan.md) | Dag-för-dag-plan med exakta KILL / ITERATE / SCALE-trösklar |
 | [12-kallor.md](12-kallor.md) | Alla källor, vad var och en faktiskt visar, evidensnivå, och vad jag inte kunde nå |
 | [research/raw/00-notes.md](research/raw/00-notes.md) | Rådata-loggen: varje siffra jag hittade, med datum och källa |
+| [assets/](assets/) | Rapportens åtta diagram som SVG |
+| [tools/make_charts.py](tools/make_charts.py) | Genererar diagrammen. Kör `python3 tools/make_charts.py` — inga beroenden |
 
 ## Tre varningar innan du läser vidare
 

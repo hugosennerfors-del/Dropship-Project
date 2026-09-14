@@ -4,6 +4,11 @@
 
 ⚠️ **En generell varning om intäktsestimat:** för BURGA hittade jag påståenden om "$10+ miljoner", "$80M+" och "över $250M" i olika källor. Sådana spridningar är normala i den här typen av data. När källor spretar så mycket skriver jag `UNKNOWN` istället för att välja den som låter bäst.
 
+![Bubbeldiagram: antal produkter på x-axeln, trafikförändring på y-axeln, bubbelstorlek visar antal aktiva Meta-annonser.](assets/05-butiker-sku-vs-tillvaxt.svg)
+
+*Två mönster i en bild. **Houndsy** (7 SKU:er) och **Atlas Pet** (29) växer med +48,9 % respektive +68,2 %. **The Muzzle Movement** (172 SKU:er) står stilla på +1,4 %. Och **Fera Pets** kör 112 aktiva annonser med trafiken ned 53,3 % — annonsvolym är inget hälsotecken.*
+
+
 ---
 
 ## 1. Loop Earplugs (Belgien) — det bästa europeiska fallet
