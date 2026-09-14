@@ -41,7 +41,8 @@ Läs [02-marknadsvillkor-eu-sverige.md](02-marknadsvillkor-eu-sverige.md) först
 | [11-7-dagars-testplan.md](11-7-dagars-testplan.md) | Dag-för-dag-plan med exakta KILL / ITERATE / SCALE-trösklar |
 | [12-kallor.md](12-kallor.md) | Alla källor, vad var och en faktiskt visar, evidensnivå, och vad jag inte kunde nå |
 | [research/raw/00-notes.md](research/raw/00-notes.md) | Rådata-loggen: varje siffra jag hittade, med datum och källa |
-| [assets/](assets/) | Rapportens åtta diagram som SVG |
+| [PR-BESKRIVNING.md](PR-BESKRIVNING.md) | Hela arbetet förklarat på en sida, med alla åtta diagram — färdig att klistra in som PR-beskrivning |
+| [assets/](assets/) | Rapportens åtta diagram som SVG (och PNG under `assets/png/`) |
 | [tools/make_charts.py](tools/make_charts.py) | Genererar diagrammen. Kör `python3 tools/make_charts.py` — inga beroenden |
 
 ## Tre varningar innan du läser vidare
