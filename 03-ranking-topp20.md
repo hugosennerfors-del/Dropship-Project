@@ -1,5 +1,8 @@
 # 3. Ranking — Topp 20
 
+> ⚠️ **Reviderad 14 sep 2026.** En djupgranskning av hundbadrocken sänkte den från **Score 80 till 69** (Evidence 72 → 84). UK:s kategoriledare omsätter under £1M, den danska premiumförebilden har tappat ~91 % i bruttovinst sedan 2023, returgraden för hundkläder är 11 %, och Amazon.de-nischen scorar 29/100. Läs [13-fordjupning-hundbadrock.md](13-fordjupning-hundbadrock.md) innan du agerar på siffrorna nedan.
+
+
 **Läsanvisning.** `Score` = min bedömning enligt rubriken i [kapitel 1.4](01-metod-och-evidens.md). `Evidence` = hur starkt underlaget bakom den bedömningen är. Priser i EUR är *estimat* baserade på observerade marknadspriser; kostnader är *indikativa spann från leverantörslistningar, inte offerter*. Marginal = brutto före annonskostnad, efter produkt och frakt in.
 
 ![Spridningsdiagram: Score på x-axeln, Evidence Confidence på y-axeln, för topp 20-produkterna.](assets/01-score-vs-evidence.svg)

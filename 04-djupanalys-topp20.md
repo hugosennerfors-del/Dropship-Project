@@ -11,6 +11,8 @@
 
 ## #1 — Premium hundbadrock / torkrock
 **Score 80 · Evidence 72 · Seasonal (sep–mar) · Saturation: Medium**
+> ⚠️ **Överspelad.** Bedömningen nedan är den ursprungliga. [Kapitel 13](13-fordjupning-hundbadrock.md) sänker den till **Score 69 / Evidence 84** på hårdare bolags- och returdata. Där de två går isär gäller kapitel 13.
+
 
 ### Varför den är intressant
 Det här är en kategori där flera oberoende bolag redan tjänar pengar på premiumpositionering, men där ingen bygger ett modernt DTC-varumärke mot den svenska marknaden. Problemet den löser är konkret, återkommande och uppstår varje gång det regnar: en blöt, lerig hund i en hall eller en bil. Produkten är textil, vilket betyder att den slipper hela WEEE- och batteriregelverket, tål att postas i ett mjukt paket och aldrig går sönder i transport. Och den demonstrerar sig själv på åtta sekunder.

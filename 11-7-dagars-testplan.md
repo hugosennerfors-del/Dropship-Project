@@ -167,12 +167,14 @@ Sju dagar mäter om **annonsen och sidan** fungerar. De mäter inte det som avg�
 
 | Mäts först vecka | Metrik | Tröskel |
 |---|---|---|
-| 4–6 | **Returgrad** | <10 %, helst <8 % |
+| 4–6 | **Returgrad** | **<11 %** (kategorinormen för hundkläder). Se [kap. 13.4](13-fordjupning-hundbadrock.md) — mina gamla 8 % låg *under* branschsnittet |
 | 4–8 | Recensionsbetyg | >4,3 |
 | 6–10 | Andel återkommande kunder | >8 % |
 | 8–12 | Bidrag efter **alla** kostnader (annons, returer, frakt, EPR, transaktionsavgifter) | >35 % |
 
 **Returgraden är den siffra som dödar flest lönsamma-på-pappret produkter.** En produkt med 250 kr CPA och 18 % returgrad är en förlustaffär även när annonskontot ser grönt ut. Mät den, och mät den innan du beställer 300 enheter.
+
+⚠️ **Reviderat med hårda data:** hundkläder returneras i **11 %** av fallen mot **1,2 %** för husdjurstillbehör generellt, och **80 % av returerna beror på storlek** (Galaxus 2025). Nya trösklar: SCALE **<11 %**, ITERATE **11–18 %**, KILL **>18 %**. Mät dessutom **returorsak**, inte bara returgrad — storlek är åtgärdbart, dålig absorption är det inte.
 
 ---
 

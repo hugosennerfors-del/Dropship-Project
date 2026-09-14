@@ -1,5 +1,8 @@
 # 10. Slutrekommendation
 
+> ⚠️ **Reviderad 14 sep 2026.** En djupgranskning av hundbadrocken sänkte den från **Score 80 till 69** (Evidence 72 → 84). UK:s kategoriledare omsätter under £1M, den danska premiumförebilden har tappat ~91 % i bruttovinst sedan 2023, returgraden för hundkläder är 11 %, och Amazon.de-nischen scorar 29/100. Läs [13-fordjupning-hundbadrock.md](13-fordjupning-hundbadrock.md) innan du agerar på siffrorna nedan.
+
+
 **Förutsättning:** budget 10 000–50 000 kr, svensk operatör, start 14 september 2026, mål = bästa riskjusterade möjlighet.
 **Valutaomräkning:** ~11,2 SEK/EUR genomgående. Kontrollera dagskursen.
 
