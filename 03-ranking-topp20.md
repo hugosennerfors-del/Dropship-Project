@@ -1,6 +1,6 @@
 # 3. Ranking — Topp 20
 
-> ⚠️ **Reviderad 14 sep 2026 — guld och silver har bytt plats.** Två djupgranskningar ändrade toppen: hundbadrocken **80 → 69** ([kap. 13](13-fordjupning-hundbadrock.md)), omklädningsrocken **79 → 80** ([kap. 14](14-fordjupning-omkladningsrock.md)). Avgörande: kategoriledaren i omklädningsrock omsätter **£19,9–22M** mot hundbadrockens **<£1M**. Siffrorna nedan är de ursprungliga.
+> ⚠️ **Reviderad 14 sep 2026 — alla tre toppval omgranskade, två sänkta.** Omklädningsrocken **79 → 80** ([kap. 14](14-fordjupning-omkladningsrock.md)) och tar förstaplatsen; hundbadrocken **80 → 69** ([kap. 13](13-fordjupning-hundbadrock.md)); pälsdammsugaren **73 → 64** ([kap. 15](15-fordjupning-palsdammsugare.md)). Siffrorna nedan är de ursprungliga.
 
 
 **Läsanvisning.** `Score` = min bedömning enligt rubriken i [kapitel 1.4](01-metod-och-evidens.md). `Evidence` = hur starkt underlaget bakom den bedömningen är. Priser i EUR är *estimat* baserade på observerade marknadspriser; kostnader är *indikativa spann från leverantörslistningar, inte offerter*. Marginal = brutto före annonskostnad, efter produkt och frakt in.

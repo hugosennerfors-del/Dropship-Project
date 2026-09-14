@@ -364,3 +364,79 @@ Skiktning: premium teknisk (Dryrobe), prisvärt (Regatta), kustlivsstil (Saltroc
 - Kemisk lukt vid uppackning
 => ÖPPEN POSITION: varm nog för isvak, packbar nog för bilen/bryggan/promenaden hem.
    Marknaden tvingar folk välja mellan värme och användbarhet.
+
+## ========== FÖRDJUPNING PÄLSDAMMSUGARE (14 sep 2026) ==========
+## Resultat: Score 73 -> 64, Evidence 76 -> 80. Faller på INTRÄDESKOSTNADEN, ej efterfrågan.
+
+### CE / COMPLIANCE (nivå B) - DET AVGÖRANDE
+- CE-provning EMC + LVD + RoHS för liten hushållsapparat: $3,000-8,000 (~33 000-88 000 kr).
+  Enklare AC-produkt ~$860. Labbtid 2 dagar, 3-4 veckor till certifikat.
+  90% kan självdeklarera EFTER provning.
+- *** EU-IMPORTÖREN bär det juridiska ansvaret, INTE den kinesiska leverantören. ***
+- KRITISK NYANS:
+  DISTRIBUTÖR (säljer Neakasas produkt i deras förpackning) = lutar sig på tillverkarens DoC,
+    ingen provning. Kontrollera CE-märke, DoC, märkning.
+  PRIVATE LABEL = DU BLIR TILLVERKARE enligt EU-rätten. Full teknisk fil, provning, egen DoC,
+    eget CE-märke, fullt produktansvar.
+  => Varumärkestesen kräver private label => 33-88k kr innan man vet om produkten säljer.
+
+### EPR SVERIGE FÖR ELEKTRONIK (nivå A)
+- Naturvårdsverket EEB-register: 1 000 kr/år.
+- El-Kretsen: årsavgift + miljöavgift per enhet/kilo.
+- Batteriproducentansvar flyttat till Batterikretsen (dotterbolag till El-Kretsen) fr.o.m. 1 jan 2026.
+  ÅRSAVGIFT 15 000 kr + avgift i kr/kg. (Snippet något tvetydig - verifiera exakt konstruktion.)
+
+### SOURCING (nivå D)
+- MOQ pälsdammsugarkit: typiskt 500 st.
+  ODM (befintlig design + egen märkning): 100-300/SKU.
+  Full OEM (strukturändring, verktyg, elektronik): 200-500.
+- Styckpris UNKNOWN utan offert.
+- Tillverkare: Suzhou AZA Clean Electrical Technology, Peakvac-listade fabriker, Global Sources.
+- Vid MOQ 200 à ~EUR 38 = ~EUR 7 600 (~85 000 kr).
+
+### TOTAL INTRÄDESKOSTNAD (min beräkning)
+CE 33-88k + lager @MOQ200 85k + NV 1k + El-Kretsen/Batterikretsen ~15k+ = ~135 000-190 000 kr
+=> 3-4x användarens budget på 10-50k. GÅR INTE.
+
+### RETURER (nivå B)
+- Konsumentelektronik 10-11% (spann 5-15%). Lägre % än textil.
+- MEN: omvänd logistik + återställning $30-65/enhet (~330-720 kr).
+- ~95% av elektronikreturer är INTE defekter (ånger, felköp, installationsproblem).
+- EJ I STATISTIKEN: en returnerad pälsdammsugare är full av hundhår => rengöring, filterbyte,
+  sanering. Del av returerna osäljbara som nya.
+- Min kalkyl, 100 order @ EUR 119, COGS 39, frakt 10, bidrag 70, 11% retur, EUR 45 hantering:
+  +7000 | -770 | -495 | -129 (30% av returer osäljbara) = 5606
+  => Effektivt bidrag EUR 56/order, marginal 47%, BE-ROAS 2,13x.
+
+### BOLAGSDATA - FINNS INTE (nivå C)
+- Neakasa (f.d. Neabot), juridiskt Shenzhen Ganxiang Electronics Co Ltd. Grundat aug 2017.
+  Kontor Shenzhen / Los Angeles / Tokyo. 60+ länder.
+  Crunchbase + Tracxn: INGEN redovisad finansiering, INGA omsättningssiffror.
+=> Det test som avgjorde de två andra produkterna GÅR INTE ATT KÖRA här.
+   Därför lägst evidenshöjning av de tre (+4 mot +12 och +15).
+
+### AMAZON DE ANGRÄNSANDE NISCHER (nivå C) - svaga proxies, snittpris ~EUR 9
+- Tierhaarentferner: EUR 385K/år, 16 produkter, -6,2% 90 dagar, Skip it (48/100)
+- Zupfbürste Hund: EUR 77K/år, 37 produkter, Worth a look (54/100)
+- Hundekamm: EUR 52K/år, 96K sökningar/år, snittpris EUR 8,94, Skip it (46/100)
+- Ingen nischdata för själva pälsdammsugaren hittad. UNKNOWN.
+
+### LJUDNIVÅN BEKRÄFTAD SOM LUCKA (nivå C) - min hypotes i kap 4 stämde
+- "Ljudet får hundar att springa iväg"; "för rädda och försöker fly"
+- Svag sugkraft: inget hår från en schäfer hamnade i behållaren
+- Slangen känns billig, håller inte vid längre användning
+- Branschråd: justerbar sugstyrka, <=60 dB
+- oneisall positionerar "tystare, enklare" mot Neakasas "starkare sug" => marknaden vet,
+  men ingen har gjort tystnaden till HELA varumärket.
+
+### SVERIGE (nivå C)
+- Amazon.se: Neakasa P1 Pro, P0 Pro, oneisall hundhårdammsugare, Neakasa F1 hundfön
+- robot-dammsugaren.se: Neakasa P2 Pro
+=> Kategoriledaren står redan på svensk hylla, på samma marknadsplats du skulle sälja på.
+
+### SLUTSATS EFTER TRE GRANSKNINGAR
+1. Kategoritaket avgör mer än produkten (hundbadrocken har bättre logistik men förlorar ändå).
+2. Högt AOV gör hög returgrad överlevbar (omklädningsrock EUR 63 @ 25% > hundbadrock EUR 36 @ 11%).
+3. FASTA KOSTNADER FÖRE FÖRSTA FÖRSÄLJNINGEN begränsar en liten budget - inte annonspris, inte marginal.
+   Textil 15 000 kr. Elektronik 135 000 kr.
+4. Det som inte går att mäta ska SÄNKA poängen, inte utelämnas.

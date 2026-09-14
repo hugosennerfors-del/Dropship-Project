@@ -11,11 +11,17 @@ Det här är resultatet av en bred produktresearch för att svara på en enda fr
 |---|---|---|---|---|
 | 🥇 | **Omklädningsrock för vinterbad** | ~~79~~ **80** | ~~70~~ **85** | **Upphöjd efter granskning.** Dryrobe omsätter £19,9–22M med £13M i kassan — tjugo gånger hundbadrockens tak. MOQ från 10 st ⇒ testorder ~15 000 kr. Men 20–30 % returer och dokumenterad IP-risk. [Kapitel 14](14-fordjupning-omkladningsrock.md) |
 | 🥈 | **Premium hundbadrock / torkrock** | ~~80~~ **69** | ~~72~~ **84** | ⚠️ **Sänkt efter granskning.** Säsong, demo och logistik håller, men UK-ledaren omsätter <£1M, returgraden är 11 % och Tysklandsnischen krymper. [Kapitel 13](13-fordjupning-hundbadrock.md) |
-| 🥉 | **Pälsdammsugare / grooming-kit för hund** | 73 | 76 | Högst verifierad efterfrågan i hundsegmentet (~10 000 enheter/mån på Amazon US för etta), spektakulär demo, men elektronik = WEEE + returrisk |
+| 🥉 | **Pälsdammsugare / grooming-kit för hund** | ~~73~~ **64** | ~~76~~ **80** | ⚠️ **Sänkt efter granskning.** Demon är rapportens bästa och ljudnivån en bekräftad lucka — men CE-provning (33 000–88 000 kr) plus MOQ 100–500 ger en inträdeskostnad på **~135 000–190 000 kr**, tre till fyra gånger budgeten. [Kapitel 15](15-fordjupning-palsdammsugare.md) |
 
-> **Läs det här först — guld och silver har bytt plats.** Efter att rapporten skrevs djupgranskade jag de två toppvalen med samma metodik. Hundbadrocken **föll** (80 → 69): kategoriledaren i UK omsätter under £1M. Omklädningsrocken **höll** (79 → 80): dess kategoriledare omsätter **£19,9–22M**, alltså ungefär tjugo gånger så mycket.
+> **Läs det här först.** Alla tre toppvalen har djupgranskats med samma metodik efter att rapporten skrevs. **Två av tre sänktes.** Guld och silver bytte plats.
 >
-> **Omklädningsrocken är nu rapportens etta.** Se [kapitel 14](14-fordjupning-omkladningsrock.md) för head-to-head och [kapitel 13](13-fordjupning-hundbadrock.md) för varför hundbadrocken sänktes. Kapitel 3, 4, 10 och 11 skrevs före granskningarna.
+> | Produkt | Före | Efter | Vad som avgjorde |
+> |---|---|---|---|
+> | Omklädningsrock | 79 | **80** | Kategoriledaren omsätter £19,9–22M |
+> | Hundbadrock | 80 | **69** | Kategoriledaren omsätter <£1M |
+> | Pälsdammsugare | 73 | **64** | Inträdeskostnad ~135 000–190 000 kr |
+>
+> Den mest användbara lärdomen: **kostnaden före första försäljningen är det som faktiskt begränsar en liten budget** — inte annonspriset och inte marginalen. Textil kostar 15 000 kr att testa, elektronik 135 000 kr. Se [kapitel 15.7](15-fordjupning-palsdammsugare.md) för hela pallen jämförd. Kapitel 3, 4, 10 och 11 skrevs före granskningarna.
 
 **Den viktigaste strategiska slutsatsen är inte en produkt utan en position:** de tre största TikTok Shop-kategorierna (skincare, kosmetik, kosttillskott) är i praktiken *stängda* för ett snabbt svenskt test på grund av CPNP-registrering och EU Responsible Person. Samtidigt försvann EU:s €150-tullfrihet den 1 juli 2026. Tillsammans betyder det att den klassiska "AliExpress → Meta-ads → EU-konsument"-modellen är strukturellt sämre 2026 än 2024 — och att en **svensk, compliant, nischad operatör med EU-lager har en verklig fördel** som lata utländska dropshippers inte kan kopiera billigt.
 
@@ -46,6 +52,7 @@ Läs [02-marknadsvillkor-eu-sverige.md](02-marknadsvillkor-eu-sverige.md) först
 | [12-kallor.md](12-kallor.md) | Alla källor, vad var och en faktiskt visar, evidensnivå, och vad jag inte kunde nå |
 | [13-fordjupning-hundbadrock.md](13-fordjupning-hundbadrock.md) | **Djupgranskning av hundbadrocken — som sänkte den från 80 till 69.** Bolagsdata, returstatistik, konkurrensdjup |
 | [14-fordjupning-omkladningsrock.md](14-fordjupning-omkladningsrock.md) | **Samma granskning på omklädningsrocken — den höll (79 → 80) och är nu rapportens etta.** Head-to-head mot hundbadrocken |
+| [15-fordjupning-palsdammsugare.md](15-fordjupning-palsdammsugare.md) | **Tredje granskningen (73 → 64).** Faller inte på efterfrågan utan på CE-provning och MOQ. Innehåller **hela pallen jämförd** efter alla tre pass |
 | [research/raw/00-notes.md](research/raw/00-notes.md) | Rådata-loggen: varje siffra jag hittade, med datum och källa |
 | [PR-BESKRIVNING.md](PR-BESKRIVNING.md) | Hela arbetet förklarat på en sida, med alla åtta diagram — färdig att klistra in som PR-beskrivning |
 | [assets/](assets/) | Rapportens åtta diagram som SVG (och PNG under `assets/png/`) |

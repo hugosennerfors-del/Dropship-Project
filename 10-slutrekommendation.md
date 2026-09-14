@@ -1,6 +1,6 @@
 # 10. Slutrekommendation
 
-> ⚠️ **Reviderad 14 sep 2026 — guld och silver har bytt plats.** Två djupgranskningar ändrade toppen: hundbadrocken **80 → 69** ([kap. 13](13-fordjupning-hundbadrock.md)), omklädningsrocken **79 → 80** ([kap. 14](14-fordjupning-omkladningsrock.md)). Avgörande: kategoriledaren i omklädningsrock omsätter **£19,9–22M** mot hundbadrockens **<£1M**. Siffrorna nedan är de ursprungliga.
+> ⚠️ **Reviderad 14 sep 2026 — alla tre toppval omgranskade, två sänkta.** Omklädningsrocken **79 → 80** ([kap. 14](14-fordjupning-omkladningsrock.md)) och tar förstaplatsen; hundbadrocken **80 → 69** ([kap. 13](13-fordjupning-hundbadrock.md)); pälsdammsugaren **73 → 64** ([kap. 15](15-fordjupning-palsdammsugare.md)). Siffrorna nedan är de ursprungliga.
 
 
 **Förutsättning:** budget 10 000–50 000 kr, svensk operatör, start 14 september 2026, mål = bästa riskjusterade möjlighet.

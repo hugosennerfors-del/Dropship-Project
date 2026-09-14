@@ -258,6 +258,10 @@ Samma metod som för hundbadrocken. Det här är vad marknadens missnöjda kunde
 
 ---
 
+## 14.12b Tredje granskningen är också klar
+
+Pälsdammsugaren har nu genomgått samma pass — se [kapitel 15](15-fordjupning-palsdammsugare.md). Den sänktes **73 → 64** och faller på inträdeskostnaden (CE-provning plus MOQ ≈ 135 000–190 000 kr), inte på efterfrågan. [Kapitel 15.7](15-fordjupning-palsdammsugare.md) jämför hela pallen på samma evidensnivå.
+
 ## 14.13 Källor tillkomna i fördjupningen
 
 | Källa | Vad den visar | Nivå |
