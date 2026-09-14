@@ -1,6 +1,8 @@
 # Dropshipping Product Intelligence — produktresearch för Sverige/EU, september 2026
 
 > Den här filen är PR-beskrivningen i färdigt skick. Den förklarar hela arbetet och innehåller rapportens alla åtta diagram.
+>
+> **Bildlänkarna är avsiktligt absoluta och pekar på `main`.** Relativa sökvägar renderar i repo-vyn men *inte* när texten klistras in i en pull request eller ett issue, vilket är vad filen är till för. Absoluta `main`-URL:er fungerar i båda fallen och överlever att feature-branchen raderas.
 
 Bred produktresearch som svarar på en enda fråga:
 
@@ -35,7 +37,7 @@ Nästan allt i toppen är hudvård eller kosttillskott. Därför fungerar inte "
 
 Samtidigt försvann EU:s €150-tullfrihet den 1 juli 2026. Den klassiska "AliExpress → Meta-ads → EU-konsument"-modellen är strukturellt sämre 2026 än 2024.
 
-![Vertikal tidslinje över EU- och svenska regelförändringar 2024–2028 med dagens datum markerat](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/claude/eager-sagan-aybv9b/assets/png/06-tidslinje-regelverk.png)
+![Vertikal tidslinje över EU- och svenska regelförändringar 2024–2028 med dagens datum markerat](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/main/assets/png/06-tidslinje-regelverk.png)
 
 **Vad som ändrats, konkret:**
 
@@ -57,7 +59,7 @@ En €3-avgift på en typisk €30-order motsvarar ungefär **10 % tariff**. ~4,
 
 ## Varför Sverige, konkret
 
-![Tre statistikrutor: Sverige 9,10–13,50 dollar CPM, globalt snitt cirka 20,90 dollar, USA 22–23 dollar](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/claude/eager-sagan-aybv9b/assets/png/04-cpm-per-marknad.png)
+![Tre statistikrutor: Sverige 9,10–13,50 dollar CPM, globalt snitt cirka 20,90 dollar, USA 22–23 dollar](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/main/assets/png/04-cpm-per-marknad.png)
 
 Att annonsera i Sverige kostar ungefär **hälften** av globalt snitt. Med 10–50 000 kr i budget är det inte en detalj — det är skillnaden mellan att få statistiskt läsbar data och att inte få det.
 
@@ -70,7 +72,7 @@ Att annonsera i Sverige kostar ungefär **hälften** av globalt snitt. Med 10–
 - **Swish används av 91 %** (upp från 82 % 2023); Swish + Klarna är table stakes i kassan
 - **1 079 000 registrerade hundar**, **782 724 registrerade hundägare** (Jordbruksverket, sep 2026)
 
-![Stapeldiagram över TikTok Shop GMV i Europa 90 dagar till 9 juli 2026: Tyskland 174,7 M euro, Frankrike 132,8, Spanien 104,7, Italien 86,6, Sverige inte lanserad](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/claude/eager-sagan-aybv9b/assets/png/07-tiktok-shop-europa.png)
+![Stapeldiagram över TikTok Shop GMV i Europa 90 dagar till 9 juli 2026: Tyskland 174,7 M euro, Frankrike 132,8, Spanien 104,7, Italien 86,6, Sverige inte lanserad](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/main/assets/png/07-tiktok-shop-europa.png)
 
 TikTok Shop finns inte i Sverige och har ingen annonserad nordisk lansering. Din TikTok-strategi måste vara **organiskt innehåll + Spark Ads → egen butik**. Mer friktion — men också mindre konkurrens, eftersom hela den affiliate-drivna TikTok Shop-vågen inte nått hit.
 
@@ -78,13 +80,13 @@ TikTok Shop finns inte i Sverige och har ingen annonserad nordisk lansering. Din
 
 ## Rankingen
 
-![Spridningsdiagram med Score på x-axeln och Evidence Confidence på y-axeln för topp 20-produkterna](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/claude/eager-sagan-aybv9b/assets/png/01-score-vs-evidence.png)
+![Spridningsdiagram med Score på x-axeln och Evidence Confidence på y-axeln för topp 20-produkterna](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/main/assets/png/01-score-vs-evidence.png)
 
 **Den här bilden är den viktigaste i rapporten.** Titta uppe till höger: **smart fågelmatare** har högst evidens och tredje högst score — och är ändå ett **NEJ**. Sökningar på fågelmatare är upp **+233 % på sex månader** och svensk fågelmatning är en folkrörelse, men Bird Buddy har rapporterat ~$100 M i intäkt, sålt 100 000+ matare och står redan hos **Elgiganten, Arken Zoo, VetZoo, SmartaSaker och Pippifoder**. Att sälja en hårdvaruklon som kräver app, moln, artigenkänning och svensk support är inte ett produkttest — det är en produktutvecklingssatsning.
 
 Hög poäng är inte samma sak som rätt drag. Det är hela poängen med att ha två skalor.
 
-![Värmekarta över poängsammansättningen för topp 10 fördelat på åtta dimensioner](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/claude/eager-sagan-aybv9b/assets/png/08-poangsammansattning.png)
+![Värmekarta över poängsammansättningen för topp 10 fördelat på åtta dimensioner](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/main/assets/png/08-poangsammansattning.png)
 
 Viktningen är den som efterfrågades: Demand 20, Trend 20, Sales validation 15, Competition quality 10, Ad potential 10, Margin 10, Differentiation 10, Logistics 5.
 
@@ -94,7 +96,7 @@ Viktningen är den som efterfrågades: Demand 20, Trend 20, Sales validation 15,
 
 ## Efterfrågekalibrering
 
-![Liggande stapeldiagram över uppskattad månadsvolym för kategoriledaren på Amazon US, från 40 000 enheter ned till 400](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/claude/eager-sagan-aybv9b/assets/png/02-amazon-manadsvolym.png)
+![Liggande stapeldiagram över uppskattad månadsvolym för kategoriledaren på Amazon US, från 40 000 enheter ned till 400](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/main/assets/png/02-amazon-manadsvolym.png)
 
 Lägg märke till de två understa staplarna: **värmeväst 400 enheter mot värmestrumpor 8 000** — och kategorierna har ungefär lika många spårade produkter (135 mot 130). Det är fötterna som säljer, inte bålen. I princip hela marknadsrapportlitteraturen fokuserar på värmejackor. Den mäter en kategori där efterfrågan inte finns.
 
@@ -102,7 +104,7 @@ Lägg märke till de två understa staplarna: **värmeväst 400 enheter mot vär
 
 ## Enhetsekonomin
 
-![Staplat stapeldiagram som delar upp retailpriset i inköp, frakt ut och bidrag för fem produkter](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/claude/eager-sagan-aybv9b/assets/png/03-enhetsekonomi.png)
+![Staplat stapeldiagram som delar upp retailpriset i inköp, frakt ut och bidrag för fem produkter](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/main/assets/png/03-enhetsekonomi.png)
 
 Break-even ROAS = 1 ÷ bidragsmarginal. Snitt-ROAS i e-handel ligger runt **2,87:1**, så alla fem ligger under snittet — men marginalen är tunn.
 
@@ -112,7 +114,7 @@ Break-even ROAS = 1 ÷ bidragsmarginal. Snitt-ROAS i e-handel ligger runt **2,87
 
 ## Vad de vinnande butikerna faktiskt gör
 
-![Bubbeldiagram: antal produkter mot trafikförändring, bubbelstorlek visar antal aktiva Meta-annonser](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/claude/eager-sagan-aybv9b/assets/png/05-butiker-sku-vs-tillvaxt.png)
+![Bubbeldiagram: antal produkter mot trafikförändring, bubbelstorlek visar antal aktiva Meta-annonser](https://raw.githubusercontent.com/hugosennerfors-del/Dropship-Project/main/assets/png/05-butiker-sku-vs-tillvaxt.png)
 
 Två mönster i en bild:
 
