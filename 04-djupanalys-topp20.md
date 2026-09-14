@@ -255,6 +255,9 @@ Meta (åldersgruppen), och **Facebook-grupper för trädgård och fågelskådnin
 ## #4 — Pälsdammsugare / grooming-kit för hund
 **Score 73 · Evidence 76 · Stabil–svagt stigande · Saturation: Hög**
 
+> ⚠️ **Överspelad.** [Kapitel 15](15-fordjupning-palsdammsugare.md) sänker den till **Score 64 / Evidence 80**. Ljudnivåvinkeln bekräftas, men CE-provning och MOQ ger en inträdeskostnad långt över budget.
+
+
 ### Varför den är intressant
 Den högsta verifierade enhetsvolymen i hundsegmentet, kombinerad med den bästa produktdemonstrationen i hela listan: päls som sugs upp i realtid är hypnotiskt innehåll. AOV på €99–149 ger ett bidrag per order som tål betald trafik med god marginal. Motvikten är att kategorin är hårdvara med motor, filter och ljudnivå — tre saker som genererar returer.
 
