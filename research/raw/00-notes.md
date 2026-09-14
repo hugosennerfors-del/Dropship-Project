@@ -214,3 +214,78 @@ blog.lengow.com, explodingtopics.com, reddit.com. Only WebSearch available.
 - cordless spin scrubber: three ASINs at ~10,000/mo each; Leebein leader -20% MoM; Hoto leader -40% MoM
 - litter trapping mat 9,000/mo; honeycomb litter mat 10,000/mo; cat litter pad 20,000/mo (-50% MoM)
 - house robe 2,000/mo; towel dress 500-2,000/mo
+
+## ================= FÖRDJUPNING HUNDBADROCK (14 sep 2026) =================
+## Resultat: Score 80 -> 69, Evidence 72 -> 84. Mer data GÖR fallet SÄMRE.
+
+### BOLAGSDATA (nivå A)
+- Ruff & Tumble Dog Company Ltd, UK co.no 11097169, King's Lynn Norfolk, reg 2017-12-05.
+  MICRO ENTITY: turnover <GBP 1M, balance sheet <GBP 500k. Accounts 1 Jan-31 Dec 2024,
+  "Total Exemption Full". LinkedIn 7 anställda (aggregatorer säger 11-50 - motstridigt).
+  => Självutnämnd UK-marknadsledare i kategorin omsätter under 1 MGBP (~14 MSEK). TAKET ÄR LÅGT.
+  Trustpilot 5 stjärnor, ~1746-2275 recensioner (varierar per snapshot).
+- Siccaro = MARSCHALL INVENCO ApS, CVR 29917817, Ingemannsvej 15A, 4180 Sorø.
+  Grundare Lissen Marschall (2013); far uppfann Buster-kragen. Wet2Dry = BAMBUFIBER (ej PET-mikrofiber).
+  BRUTTOFORTJENESTE (ej omsättning): 2022 DKK 2,868,970 | 2023 DKK 2,829,989 |
+  2024 DKK 1,240,845 (-56%) | 2025 DKK 243,555 (-80%). 2023->2025 = -91%.
+  FÖRBEHÅLL: 2-3 anställda, klassad forskning/utveckling, trading kan ligga i annat bolag,
+  2025 kan vara brutet år. MEN: min premiumförebild kollapsar.
+- Non-stop dogwear AS, NO org 994194151, Brøttum, grundat 2009. SÄLJER TORKROCK.
+  Omsättning 2024 NOK 226,335,000. Rörelseresultat NOK 12,102,000. EK NOK 46,811,000.
+  39 anställda. 1000+ butiker i 22 länder.
+  FT Europe's Long-Term Growth Champions 2025: nr 83 totalt, NR 1 i apparel & fashion,
+  nr 2 bland norska bolag. Torkrock: 2-lager, innerlager absorberar 4 liter/m2.
+  => DEN SKALADE NORDISKA KONKURRENT JAG MISSADE.
+
+### RETURER (nivå B) - kvantifierar min utpekade huvudrisk
+- Galaxus schweizisk data 2025: husdjurstillbehör 1,2% retur. HUNDKLÄDER 11% (~9x).
+  STORLEK = 80% av returorsakerna på hundkläder.
+- 120+ hundraser utan storleksstandard -> ~17% produktionsspill/år i branschen.
+- Passform/fit-missar ~45% av alla returer i e-handeln brett.
+=> Mina gamla trösklar var fel: SCALE <8% låg UNDER branschsnittet; KILL >15% bara 4 p.e. över normen.
+   NYA: SCALE <11%, ITERATE 11-18%, KILL >18%. Mät RETURORSAK, inte bara returgrad.
+
+### AMAZON DE NISCHDATA (nivå C)
+- Flapen "hundebademantel": SCORE 29/100 = "SKIP IT".
+  Veckovis sökvolym -34,6% senaste 90 dagarna.
+  Topp sep-dec, 3,0x säsongsvariation.
+  ⚠️ INTERN SPÄNNING: samma källa säger både "topp börjar sep" och "-34,6% de 90 dagar som
+  leder fram till sep". Kan ej avgöras. Säsongsmönstret bekräftas; NIVÅN gör det inte.
+- Amazon.de recensionsdjup: Bella & Balu 930 rec; övriga 882 (4,6), 338 (4,6), 308 (4,4).
+  Märken: Petcomer, Tineer, PETTOM, Trixie, Rudelkönig (bomull), Nobleza (mikrofiber), Zellar.
+
+### SVERIGE (nivå C/D)
+- PriceRunner "hundbadrock": 1000+ produkter, ~300-900 kr.
+- Svenska testvinnare: Siccaro WetDog SupremePro (påstår 90% torr på 15 min),
+  Rukka Micro (budget), Cloud7 Föhr. Testsajter: hundnet.se, djurjohnny.se, testkollen.se.
+=> Mitt påstående i kap 4 att "ingen driver DTC-varumärke" är för generöst mot mig själv.
+
+### KUNDKLAGOMÅL = KRAVSPEC (nivå C/D)
+- "Kommer upp litet, ta större om osäker"
+- Två XXXL från olika märken: en gick knappt att stänga, en hade marginal
+- Labrador, storlek L: fel mått OCH för tunn för hur blöt hunden blir
+- Korthårig hund med tät underull: handduken för blöt för att återanvändas
+- Återkommande: svaga förslutningar; tyg tappar funktion efter tvätt; "mycket tunn jämfört med andra"
+
+### MATERIAL (nivå D - PARTISKA KÄLLOR)
+- Mikrofiber: absorberar upp till 7x egen vikt; 3x bomull; ~500 tvättar vs bomull ~80;
+  bomull förblir fuktig 48+ h. 400+ GSM för tjock päls, 300-400 GSM för korthårigt.
+  ⚠️ Siffrorna kommer från mikrofibersäljare.
+- MOTBEVIS: UK-ledaren Ruff & Tumble använder DUBBELLAGRAD BOMULLSFROTTÉ.
+  Siccaro använder BAMBU. Non-stop använder 2-lagerssystem.
+  => Tre olika material hos de tre mest framgångsrika. KONSTRUKTION/PASSFORM avgör, inte materialet.
+
+### SOURCING (nivå D)
+- Oya Textile (TURKIET), private label hundtorkrockar: MOQ 300/design/färg
+  (1000 för Pantone-matchat), gratis prover, ledtid ~6 veckor.
+  Erbjuder custom sizing, tygvikt, förslutning, brodyr, förpackning, märkning.
+- MOQ 300 > mina antagna 100-200. Vid ~EUR 13 = ~EUR 3900 (~44 000 kr) = ÖVER användarens budget.
+- MEN: Turkiet har tullunion med EU för industrivaror => INGEN EUR 3/rad, kortare ledtid.
+- Praktisk väg: validera på kinesisk MOQ 100-200, flytta till TR private label efter bevisad efterfrågan.
+
+### STORLEKSGUIDER (nivå C)
+- Rasbaserad storleksguide: ~10% relativ konverteringsförbättring (40 extra order, $2400) i ett fall.
+  Ingen isolerad lyft från enbart rasetiketter i forskningen.
+- Rassegmenterade mejl: 3,2x högre klickfrekvens, 2,1x högre konvertering.
+- Google Merchant Center med ras-/storleksattribut: ett fall $15,100 spend -> $208,000 conv value,
+  13,8x ROAS, +40% YoY.
