@@ -93,6 +93,9 @@ Sälj **tiden och hallen**, inte handduken. Den emotionella kroken i Norden är 
 ## #2 — Omklädningsrock för vinterbad
 **Score 79 · Evidence 70 · Rising trend · Saturation: Medium-Hög**
 
+> ⚠️ **Överspelad — uppåt.** [Kapitel 14](14-fordjupning-omkladningsrock.md) höjer den till **Score 80 / Evidence 85** och gör den till rapportens etta. Där de två går isär gäller kapitel 14.
+
+
 ### Varför den är intressant
 Det starkaste trendmomentumet jag hittade i hela urvalet, kombinerat med det högsta realistiska AOV:t bland de icke-elektriska produkterna. Kallbad har gått från särintresse till folkrörelse i Norden, och produkten är själva uniformen för den rörelsen. Marginalen är utmärkt och innehållet skriver sig självt — men kategorin har en dokumenterad, aggressivt försvarad varumärkesrätt som du måste navigera exakt rätt kring.
 

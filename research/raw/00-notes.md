@@ -289,3 +289,78 @@ blog.lengow.com, explodingtopics.com, reddit.com. Only WebSearch available.
 - Rassegmenterade mejl: 3,2x högre klickfrekvens, 2,1x högre konvertering.
 - Google Merchant Center med ras-/storleksattribut: ett fall $15,100 spend -> $208,000 conv value,
   13,8x ROAS, +40% YoY.
+
+## ============ FÖRDJUPNING OMKLÄDNINGSROCK (14 sep 2026) ============
+## Resultat: Score 79 -> 80, Evidence 70 -> 85. HÖLL. Blir rapportens etta.
+
+### BOLAGSDATA (nivå A/B) - kontrasten mot hundbadrocken
+- DRYROBE LIMITED, UK co.no 08782079, reg 2013-11-19, Devon EX33 2FB. Dir: Gideon Bright.
+  OMSÄTTNING GBP 19,9M (dec 2023). Nettotillgångar GBP 12,6M.
+  Kassa GBP 13,089,613 (2023) vs 10,574,925 (2022). 35 anställda per bokslut, "50+" per annan källa.
+  Senast rapporterat "just shy of GBP 22m".
+  BANA: 1M (2016) -> 1,5M (2017) -> 2M (~2018/19) -> 19,9M (2023) -> ~22M.
+  => 20x hundbadrockens kategoriledare (<GBP 1M). DET AVGÖRANDE FYNDET.
+  OBS: 19,9 -> 22M = ca +10%, klart långsammare än tidigare bana. Mognadssignal.
+- RED PADDLE CO LIMITED, co.no 01371094, Halwell Business Park, Totnes, Devon.
+  Omsättning GBP 8M, bruttovinst GBP 3M (rapport 2023-08-31). Senaste bokslut t.o.m. 2025-09-30.
+  Äger Red Original / Red Equipment (Pro Change Robe EVO).
+
+### RETURER (nivå B) - kategorins stora svaghet
+- YTTERPLAGG/JACKOR: 20-30% returgrad. Kläder generellt 30-40%. E-handel snitt ~20%.
+- Storlek/passform = 53% av klädreturer, färg 16%, skada 10%.
+- "Ytterplagg returneras oftare än kostymer, kjolar, underkläder" - svårt bedöma värme/vikt/passform.
+- Skrymmande förpackning fördyrar returlogistiken.
+- Jfr hundkläder 11%, svensk modehandel 22,8%.
+
+### RETURJUSTERAD KALKYL (min beräkning)
+Per 100 order @ EUR 129 retail, EUR 33 COGS, EUR 7 frakt ut, bidrag EUR 89, 25% returer:
+  +8900 brutto | -2225 (25 x 89 förlorat bidrag) | -300 (25 x 12 returfrakt, skrymmande)
+  | -82 (10% av returer osäljbara, 2,5 x 33) = NETTO 6293
+  => Effektivt bidrag EUR 63/order (ej 89). Bidragsmarginal 49%. BE-ROAS 2,05x (ej 1,45x).
+Jfr hundbadrock @ 11% returer: effektivt bidrag EUR 36, BE-ROAS 1,65x.
+=> NYCKELINSIKT: HÖGT AOV GÖR HÖG RETURGRAD ÖVERLEVBAR. 89 @ 25% slår 41 @ 11%.
+
+### SOURCING (nivå D) - motsatsen till hundbadrocken
+- Lebao Sport (CN), specialist på changing robes: MOQ FRÅN 10 ST/modell, 100+ för bättre pris.
+  Prov 7-14 dagar. PU-belagt nylon. Fodernivåer: lätt microfleece / 200gsm återvunnen borgfleece /
+  tung sherpa. Custom logo, nacketikett, vårdetikett.
+- LEAPY OEM: små provorder OK.
+- Prisindikation bransch: enkla plagg $8-12/st @ 25-50 st; komplexa $18-35.
+- => Testorder 40 st x ~EUR 33 = ~EUR 1320 (~15 000 kr). RYMS I BUDGET (vs hundbadrock 44 000 kr).
+- ⚠️ Turkisk motsvarighet ej verifierad för denna produkt. UNKNOWN.
+
+### KATEGORITILLVÄXT (nivå C) - motstridiga rapporter
+- Nischen "changing robes/dry robes" +14%/år sedan 2022.
+- Global outdoor changing robe: $0,15 mdr (2025) -> $0,3 mdr (2032), CAGR 8,5%.
+- ⚠️ ANNAN RAPPORT: NORDAMERIKA $1,2 mdr (2024) -> $2,1 mdr (2033). OFÖRENLIGT med global $0,15 mdr.
+  ANVÄND INGEN AV DEM. Bolagssiffrorna är värda mer.
+- UK: 13 nya officiella badvattenplatser 2026.
+- Mognadssignaler: "tillverkarna ökar dagligen"; "staple of British outdoor life"; DECATHLON har
+  egen kategorisida för changing robes.
+
+### KONKURRENTER (nivå C)
+Dryrobe, Red Equipment, Cosimac, Alpkit, Sundried, Passenger, Voited, Fourth Element,
+Robie Robes, Charlie McLeod, Regatta, Bleubird, Saltrock + Decathlon.
+Skiktning: premium teknisk (Dryrobe), prisvärt (Regatta), kustlivsstil (Saltrock, Bleubird).
+
+### SVENSK HYLLA (nivå C) - rättelse till kap 4
+- STADIUM.SE säljer NORDBAEK (Long Beach herr, Windy Ocean dam). Danskt premiummärke i stor SE-kedja.
+- JYSK: Vinterbadrock OSBY under varumärket KRONBORG (lågpris, brett distribuerat).
+- KALLBAD.NU: dedikerad svensk specialistbutik för vindtäta badrockar/kallbadstillbehör.
+- Watery.se: egen kollektion "badrockar för vinterbad". SURFMORE.se, EuroSkateShop: multi-brand.
+=> Mitt kap 4-påstående att ingen äger positionen var FÖR GENERÖST. Luckan finns men är smalare.
+
+### SVENSK PUBLIKSTORLEK (nivå B) - tunt
+- SVT: kallbadsgrupp i HALMSTAD nära 2 000 medlemmar på ett halvår, beskriven som
+  "en av Sveriges största samlingsplatser för kallbadare" (mars 2024).
+=> Om en av de största har 2 000 => svensk kärnpublik i TIOTUSENTALS, ej hundratusentals.
+   Sverige = testmarknad, ej slutmarknad. Planera DK/NO/FI från start.
+
+### KLAGOMÅLSSPEC (nivå C)
+- Skrymmande, "bulky to pack"; tjock sherpa opraktisk att ta med
+- "Too warm for the school run" - vill använda den mer än de kan
+- Vissa säljs i EN storlek: trång för stor vuxen, för lång för kortare
+- "Liten i storleken, särskilt över höfterna - ta större om du har kurvor"
+- Kemisk lukt vid uppackning
+=> ÖPPEN POSITION: varm nog för isvak, packbar nog för bilen/bryggan/promenaden hem.
+   Marknaden tvingar folk välja mellan värme och användbarhet.
