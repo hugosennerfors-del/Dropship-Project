@@ -1,0 +1,26 @@
+# Appen ligger i plan-vy/, inte i repo-roten — därför base.
+# publish är relativ till base, så ".next" betyder plan-vy/.next.
+[build]
+  base    = "plan-vy"
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  # Samma Node som bygget är testat på.
+  NODE_VERSION = "22"
+
+# Next.js App Router behöver körtidsplugin: /products/[sku] renderas on demand.
+# Netlify installerar paketet själv när det deklareras här — lägg det INTE i
+# package.json också, det ger versionskonflikter.
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Dashboarden visar omsättning, marginaler och inköpspris. Den ska inte
+# hamna i ett sökindex.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag           = "noindex, nofollow"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy        = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "frame-ancestors 'none'"
