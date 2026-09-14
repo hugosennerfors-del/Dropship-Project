@@ -170,7 +170,9 @@ Det här är inte en direkt konkurrent i betydelsen "torkrocksbolag" — de är 
 
 **Den hederliga formuleringen är:** hundbadrockens försprång har försvunnit, men ingen annan har bevisats bättre. Rankningen är nu ojämnt undersökt, och det är ett sämre läge än att ha en svag etta.
 
-**Vad jag rekommenderar:** kör samma granskning på omklädningsrocken innan du binder kapital i någondera. Den tar ungefär en arbetsdag och de avgörande frågorna är kända — bolagsdata på två eller tre konkurrenter, returstatistik för kategorin, recensionsdjup på Amazon.de, och en nischbedömning av sökvolymtrenden.
+**✅ Utfört.** Samma granskning kördes på omklädningsrocken — se [kapitel 14](14-fordjupning-omkladningsrock.md). Den **höll** (79 → 80, Evidence 70 → 85) och är nu rapportens etta.
+
+Avgörandet föll på exakt den punkt som fällde hundbadrocken: kategoriledaren i omklädningsrock, Dryrobe, omsätter **£19,9–22M** med £13M i kassan. Hundbadrockens kategoriledare omsätter **under £1M**. Samma fråga, tjugo gånger skillnad i svar.
 
 ---
 
