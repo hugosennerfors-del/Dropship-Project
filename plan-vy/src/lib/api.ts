@@ -58,7 +58,12 @@ async function getJson<T>(url: string, init: RequestInit, timeoutMs: number): Pr
 }
 
 /**
- * Hämtar hela datalagret för en månad.
+ * Hämtar datalagret för en månad.
+ *
+ * fast=true lägger på &ai=0, vilket får backenden att svara direkt från Postgres
+ * utan att vänta in språkmodellen. Skillnaden är inte marginell: 2 sekunder mot
+ * 71, och den långsamma vägen blir långsammare för varje kandidat som sparas
+ * eftersom hela listan går med i prompten. Därför laddas vyn i två steg.
  *
  * Skickar MEDVETET inga egna request-headers. Webhook-noden för /plan-vy-api
  * har ingen allowedOrigins satt — den sätter bara Access-Control-Allow-Origin
@@ -66,8 +71,13 @@ async function getJson<T>(url: string, init: RequestInit, timeoutMs: number): Pr
  * preflight. Lägger man till en icke-safelistad header börjar webbläsaren
  * skicka OPTIONS först, och då faller anropet.
  */
-export async function fetchPlanVy(month: string, timeoutMs = 60_000): Promise<ApiResponse> {
-  const url = `${API_URL}?month=${encodeURIComponent(normalizeMonth(month))}`;
+export async function fetchPlanVy(
+  month: string,
+  opts: { fast?: boolean; timeoutMs?: number } = {},
+): Promise<ApiResponse> {
+  const { fast = false, timeoutMs = fast ? 30_000 : 180_000 } = opts;
+  const url =
+    `${API_URL}?month=${encodeURIComponent(normalizeMonth(month))}` + (fast ? "&ai=0" : "");
   const data = await getJson<ApiResponse>(url, { method: "GET", cache: "no-store" }, timeoutMs);
   if (!data || typeof data !== "object") throw new ApiError("Oväntat svarsformat från API:t.");
   return data;

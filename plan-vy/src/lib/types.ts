@@ -161,6 +161,8 @@ export interface RiskItem {
 
 export interface ApiResponse {
   ok: boolean;
+  /** Sant när svaret kom från snabbvägen och AI-texten ännu inte hämtats. */
+  aiPending?: boolean;
   meta: {
     period: string | null;
     generatedAt: string;

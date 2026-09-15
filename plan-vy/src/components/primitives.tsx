@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Tooltip } from "./Tooltip";
+import { useData } from "./DataProvider";
 import { originMeta, type Meta } from "@/lib/ui";
 import type { Origin, SourceRef } from "@/lib/types";
 
@@ -194,12 +195,28 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
   );
 }
 
-/** Text som aldrig skriver ut "null" när AI-fältet saknas. */
+/**
+ * Text som aldrig skriver ut "null" när AI-fältet saknas.
+ *
+ * Skiljer på två tomma lägen: "hämtas fortfarande" och "kom aldrig". Utan den
+ * skillnaden ser en sida som laddar korrekt ut som en sida där AI:n misslyckats.
+ */
 export function AiText({ value, fallback = "Ingen analys genererad för den här perioden." }: {
   value: string | null | undefined;
   fallback?: string;
 }) {
+  const { aiLoading } = useData();
+
   if (!value || !value.trim()) {
+    if (aiLoading) {
+      return (
+        <div>
+          <Skeleton className="h-3.5 w-full" />
+          <Skeleton className="mt-2 h-3.5 w-[82%]" />
+          <p className="mt-2.5 text-[11.5px] text-[var(--text-muted)]">AI-analysen genereras…</p>
+        </div>
+      );
+    }
     return <p className="text-[13px] italic text-[var(--text-muted)]">{fallback}</p>;
   }
   return <p className="text-[13.5px] leading-relaxed text-[var(--text-secondary)]">{value}</p>;
