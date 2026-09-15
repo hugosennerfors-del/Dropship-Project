@@ -1,8 +1,10 @@
 # Filen ligger i samma mapp som appen. Inget "base": den indirektionen var det
 # som gjorde att bygget aldrig kördes — kör alltid netlify-kommandon härifrån.
 [build]
-  command = "npm run build"
-  publish = "out"
+  command       = "npm run build"
+  publish       = "out"
+  # Explicit, så katalogen inte beror på var kommandot råkar köras ifrån.
+  edge_functions = "netlify/edge-functions"
 
 [build.environment]
   NODE_VERSION = "22"
