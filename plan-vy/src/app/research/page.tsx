@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useData } from "@/components/DataProvider";
@@ -10,7 +11,7 @@ import { IconExternal } from "@/components/icons";
 import { ApiError, generateResearch } from "@/lib/api";
 import { dateLabel, kr, pct, x } from "@/lib/format";
 import { rankCandidates } from "@/lib/success";
-import { verdictMeta } from "@/lib/ui";
+import { candidateHref, verdictMeta } from "@/lib/ui";
 import type { Candidate } from "@/lib/types";
 
 function Row({ label, value, term, tone }: { label: string; value: string; term?: Parameters<typeof Term>[0]["k"]; tone?: "pos" | "neg" }) {
@@ -27,7 +28,7 @@ function Row({ label, value, term, tone }: { label: string; value: string; term?
   );
 }
 
-function CandidateCard({ c, index, rank, score }: { c: Candidate; index: number; rank?: number; score?: number }) {
+function CandidateCard({ c, index, rank, score, month }: { c: Candidate; index: number; rank?: number; score?: number; month: string }) {
   return (
     <motion.article
       initial={{ opacity: 0, y: 12 }}
@@ -43,7 +44,9 @@ function CandidateCard({ c, index, rank, score }: { c: Candidate; index: number;
                 {rank}
               </span>
             ) : null}
-            <span className="min-w-0">{c.name}</span>
+            <Link href={candidateHref(c.id, month)} className="min-w-0 hover:text-[var(--series)] hover:underline">
+              {c.name}
+            </Link>
           </h3>
           <p className="mt-1 text-[11.5px] text-[var(--text-muted)]">
             {c.source ?? "Okänd källa"}
@@ -71,6 +74,9 @@ function CandidateCard({ c, index, rank, score }: { c: Candidate; index: number;
       </dl>
 
       <footer className="mt-auto flex items-center justify-between gap-3 border-t border-[var(--hairline)] pt-3">
+        <Link href={candidateHref(c.id, month)} className="text-[12px] font-medium text-[var(--series)] hover:underline">
+          Öppna analys →
+        </Link>
         <span className="text-[11.5px] text-[var(--text-muted)]">
           {kr(c.inputs.costPerUnitInclVat)} → {kr(c.inputs.salePriceInclVat)} inkl moms
         </span>
@@ -90,7 +96,7 @@ function CandidateCard({ c, index, rank, score }: { c: Candidate; index: number;
 }
 
 export default function ResearchPage() {
-  const { data, loading, error, refetch } = useData();
+  const { data, loading, error, refetch, month } = useData();
   const [niche, setNiche] = useState("");
   const [busy, setBusy] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
@@ -137,7 +143,7 @@ export default function ResearchPage() {
       {/* Bästa chansen — rangordnar kandidaterna innan generatorn, så det första
           man ser är en slutsats och inte ett inmatningsfält. */}
       {!loading && data && worthTesting.length > 0 ? (
-        <BestBet candidates={worthTesting} />
+        <BestBet candidates={worthTesting} month={month} />
       ) : null}
 
       {/* Generator */}
@@ -233,7 +239,7 @@ export default function ResearchPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {ranked.map(({ candidate, result }, i) => (
-                <CandidateCard key={candidate.id} c={candidate} index={i} rank={i + 1} score={result.score} />
+                <CandidateCard key={candidate.id} c={candidate} index={i} rank={i + 1} score={result.score} month={month} />
               ))}
             </div>
           )}

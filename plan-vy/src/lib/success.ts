@@ -139,3 +139,49 @@ export function rankCandidates(list: Candidate[]): { candidate: Candidate; resul
       return b.result.score - a.result.score;
     });
 }
+
+/* ── Verklighetskoll mot dina egna liveprodukter ────────────────────────── */
+
+export interface RealityCheck {
+  /** Antagen CPA omräknad till ex moms, jämförbar med produkternas CAC. */
+  assumedCpaEx: number;
+  observedCacLow: number | null;
+  observedCacHigh: number | null;
+  observedMarginLow: number | null;
+  observedMarginHigh: number | null;
+  /** Sant när kandidaten antar en billigare order än något du faktiskt uppnått. */
+  cpaBelowAnythingAchieved: boolean;
+  /** Antagen marginal över allt du faktiskt haft. */
+  marginAboveAnythingAchieved: boolean;
+  basis: number;
+}
+
+/**
+ * Ställer kandidatens antaganden mot vad dina liveprodukter faktiskt presterar.
+ *
+ * ENHETER: produkternas cac är ex moms (ad_spend räknas rakt mot bruttovinsten
+ * i POAS), kandidatens expectedCpaInclVat är inkl moms. De måste räknas om
+ * innan de jämförs — annars ser varje kandidat 25 % dyrare ut än den är.
+ */
+export function realityCheck(c: Candidate, products: { financials: { cac: number; adSpend: number; grossMargin: number } }[]): RealityCheck {
+  const live = products.filter((p) => p.financials.adSpend > 0 && p.financials.cac > 0);
+  const cacs = live.map((p) => p.financials.cac);
+  const margins = live.map((p) => p.financials.grossMargin);
+  const assumedCpaEx = c.inputs.expectedCpaInclVat / (1 + VAT);
+
+  const low = cacs.length ? Math.min(...cacs) : null;
+  const high = cacs.length ? Math.max(...cacs) : null;
+  const mLow = margins.length ? Math.min(...margins) : null;
+  const mHigh = margins.length ? Math.max(...margins) : null;
+
+  return {
+    assumedCpaEx,
+    observedCacLow: low,
+    observedCacHigh: high,
+    observedMarginLow: mLow,
+    observedMarginHigh: mHigh,
+    cpaBelowAnythingAchieved: low != null && assumedCpaEx < low,
+    marginAboveAnythingAchieved: mHigh != null && c.calc.grossMargin > mHigh,
+    basis: live.length,
+  };
+}

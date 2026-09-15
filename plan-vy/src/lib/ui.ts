@@ -93,6 +93,13 @@ export const productHref = (p: Pick<Product, "sku">, month?: string): string | n
   return `/produkt?${q.toString()}`;
 };
 
+/** Research-kandidatens egen sida. Samma query-form som produktsidan. */
+export const candidateHref = (id: string, month?: string): string => {
+  const q = new URLSearchParams({ id });
+  if (month) q.set("month", month);
+  return `/kandidat?${q.toString()}`;
+};
+
 /* ── Ordlista för term-tooltips ────────────────────────────────────────── */
 
 export interface Term {

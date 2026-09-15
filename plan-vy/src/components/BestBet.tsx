@@ -1,69 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
+import { AxisBar, StressTable } from "./CandidateParts";
 import { Pill, ProvenanceBadge } from "./primitives";
 import { Term } from "./Term";
 import { kr, pct, x } from "@/lib/format";
-import { rankCandidates, type SuccessResult } from "@/lib/success";
-import { verdictMeta } from "@/lib/ui";
+import { rankCandidates } from "@/lib/success";
+import { candidateHref, verdictMeta } from "@/lib/ui";
 import type { Candidate } from "@/lib/types";
 
 const SERIES = "#4f46e5";
-
-function AxisBar({ label, value, weight, note }: { label: string; value: number; weight: number; note: string }) {
-  return (
-    <div>
-      <div className="flex items-baseline justify-between gap-3">
-        <dt className="text-[12.5px] text-[var(--text-secondary)]">
-          {label} <span className="text-[11px] text-[var(--text-muted)]">{Math.round(weight * 100)} %</span>
-        </dt>
-        <dd className="text-[12.5px] font-semibold tabular-nums text-[var(--text-primary)]">{Math.round(value)}</dd>
-      </div>
-      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-[#52606d]/10">
-        <div className="h-full rounded-full" style={{ width: `${Math.max(0, Math.min(value, 100))}%`, background: SERIES }} />
-      </div>
-      <p className="mt-1 text-[11.5px] leading-relaxed text-[var(--text-muted)]">{note}</p>
-    </div>
-  );
-}
-
-function StressTable({ result }: { result: SuccessResult }) {
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[320px] border-collapse text-[12.5px]">
-        <thead>
-          <tr className="border-b border-[var(--hairline)] text-[11.5px] text-[var(--text-muted)]">
-            <th scope="col" className="py-1.5 text-left font-medium">Om CPA blir</th>
-            <th scope="col" className="py-1.5 text-right font-medium">POAS</th>
-            <th scope="col" className="py-1.5 text-right font-medium">Netto/order</th>
-            <th scope="col" className="py-1.5 text-right font-medium">Bär sig</th>
-          </tr>
-        </thead>
-        <tbody>
-          {result.stress.map((s) => (
-            <tr key={s.bump} className="border-b border-[var(--hairline)] last:border-0">
-              <td className="py-2 text-[var(--text-secondary)]">
-                {s.bump === 0 ? "som gissat" : `+${Math.round(s.bump * 100)} %`}
-              </td>
-              <td className="py-2 text-right font-semibold tabular-nums"
-                  style={{ color: s.survives ? "var(--pos-ink)" : "var(--neg-ink)" }}>
-                {x(s.poas)}
-              </td>
-              <td className="py-2 text-right tabular-nums"
-                  style={{ color: s.netPerOrder >= 0 ? "var(--pos-ink)" : "var(--neg-ink)" }}>
-                {kr(s.netPerOrder)}
-              </td>
-              <td className="py-2 text-right font-medium"
-                  style={{ color: s.survives ? "var(--pos-ink)" : "var(--neg-ink)" }}>
-                {s.survives ? "Ja" : "Nej"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 /**
  * Rangordnar kandidaterna och lyfter fram den med högst chans.
@@ -72,7 +19,7 @@ function StressTable({ result }: { result: SuccessResult }) {
  * Men INDATA är AI-gissningar, och det står i kortet: modellen rangordnar
  * uppskattningar, inte uppmätt verklighet.
  */
-export function BestBet({ candidates }: { candidates: Candidate[] }) {
+export function BestBet({ candidates, month }: { candidates: Candidate[]; month: string }) {
   const ranked = rankCandidates(candidates);
   if (ranked.length === 0) return null;
 
@@ -108,7 +55,12 @@ export function BestBet({ candidates }: { candidates: Candidate[] }) {
           <div>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[17px] font-semibold leading-snug text-[var(--text-primary)]">{top.name}</p>
+                <Link
+                  href={candidateHref(top.id, month)}
+                  className="text-[17px] font-semibold leading-snug text-[var(--text-primary)] hover:text-[var(--series)] hover:underline"
+                >
+                  {top.name}
+                </Link>
                 <p className="mt-1 text-[12px] text-[var(--text-muted)]">
                   {kr(top.inputs.costPerUnitInclVat)} → {kr(top.inputs.salePriceInclVat)} inkl moms
                 </p>
@@ -164,7 +116,12 @@ export function BestBet({ candidates }: { candidates: Candidate[] }) {
               {runnersUp.map(({ candidate, result: r }, i) => (
                 <li key={candidate.id} className="flex items-center gap-3 text-[12.5px]">
                   <span className="w-4 shrink-0 tabular-nums text-[var(--text-muted)]">{i + 2}</span>
-                  <span className="min-w-0 flex-1 truncate text-[var(--text-secondary)]">{candidate.name}</span>
+                  <Link
+                    href={candidateHref(candidate.id, month)}
+                    className="min-w-0 flex-1 truncate text-[var(--text-secondary)] hover:text-[var(--series)] hover:underline"
+                  >
+                    {candidate.name}
+                  </Link>
                   <span className="shrink-0 tabular-nums text-[var(--text-muted)]">
                     <Term k="poas">{x(candidate.calc.expectedPoas)}</Term>
                   </span>

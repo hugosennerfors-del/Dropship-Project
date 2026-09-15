@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { poasAtBump, rankCandidates, successScore } from "./success.ts";
+import { poasAtBump, rankCandidates, realityCheck, successScore } from "./success.ts";
 import type { Candidate } from "./types.ts";
 
 const VAT = 1.25;
@@ -102,4 +102,22 @@ test("score håller sig i 0–100 även vid extremvärden", () => {
 test("vikterna summerar till 1", () => {
   const sum = successScore(make()).axes.reduce((a, x) => a + x.weight, 0);
   assert.ok(Math.abs(sum - 1) < 1e-9, `vikterna summerar till ${sum}`);
+});
+
+test("verklighetskollen räknar om moms innan den jämför", () => {
+  const c = make({ expectedCpaInclVat: 125 }); // 100 kr ex moms
+  const live = [{ financials: { cac: 105, adSpend: 4200, grossMargin: 0.4 } }];
+  const r = realityCheck(c, live);
+  assert.ok(Math.abs(r.assumedCpaEx - 100) < 0.01, `fick ${r.assumedCpaEx}, väntade 100`);
+  // 100 ex moms < 105 ex moms => under allt som uppnåtts.
+  assert.equal(r.cpaBelowAnythingAchieved, true);
+  // Utan omräkning hade 125 jämförts mot 105 och sett dyrare ut — fel slutsats.
+  assert.ok(r.assumedCpaEx < c.inputs.expectedCpaInclVat);
+});
+
+test("verklighetskollen klarar sig utan liveprodukter", () => {
+  const r = realityCheck(make(), []);
+  assert.equal(r.basis, 0);
+  assert.equal(r.observedCacLow, null);
+  assert.equal(r.cpaBelowAnythingAchieved, false);
 });
