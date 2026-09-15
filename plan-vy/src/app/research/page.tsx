@@ -4,10 +4,12 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useData } from "@/components/DataProvider";
 import { Term } from "@/components/Term";
+import { BestBet } from "@/components/BestBet";
 import { EmptyState, ErrorState, GlassCard, Pill, Section, Skeleton } from "@/components/primitives";
 import { IconExternal } from "@/components/icons";
 import { ApiError, generateResearch } from "@/lib/api";
 import { dateLabel, kr, pct, x } from "@/lib/format";
+import { rankCandidates } from "@/lib/success";
 import { verdictMeta } from "@/lib/ui";
 import type { Candidate } from "@/lib/types";
 
@@ -25,7 +27,7 @@ function Row({ label, value, term, tone }: { label: string; value: string; term?
   );
 }
 
-function CandidateCard({ c, index }: { c: Candidate; index: number }) {
+function CandidateCard({ c, index, rank, score }: { c: Candidate; index: number; rank?: number; score?: number }) {
   return (
     <motion.article
       initial={{ opacity: 0, y: 12 }}
@@ -35,13 +37,25 @@ function CandidateCard({ c, index }: { c: Candidate; index: number }) {
     >
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-[14.5px] font-semibold leading-snug text-[var(--text-primary)]">{c.name}</h3>
+          <h3 className="flex items-baseline gap-2 text-[14.5px] font-semibold leading-snug text-[var(--text-primary)]">
+            {rank ? (
+              <span className="shrink-0 text-[11.5px] font-semibold tabular-nums text-[var(--text-muted)]">
+                {rank}
+              </span>
+            ) : null}
+            <span className="min-w-0">{c.name}</span>
+          </h3>
           <p className="mt-1 text-[11.5px] text-[var(--text-muted)]">
             {c.source ?? "Okänd källa"}
             {c.createdAt ? ` · ${dateLabel(c.createdAt)}` : null}
           </p>
         </div>
-        <Pill meta={verdictMeta(c.verdict)} size="sm" />
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <Pill meta={verdictMeta(c.verdict)} size="sm" />
+          {score != null ? (
+            <span className="text-[11px] tabular-nums text-[var(--text-muted)]">Chans {score}</span>
+          ) : null}
+        </div>
       </header>
 
       {c.notes ? (
@@ -108,8 +122,16 @@ export default function ResearchPage() {
     }
   }
 
+  const ranked = data ? rankCandidates(data.candidates) : [];
+
   return (
     <div className="space-y-6">
+      {/* Bästa chansen — rangordnar kandidaterna innan generatorn, så det första
+          man ser är en slutsats och inte ett inmatningsfält. */}
+      {!loading && data && data.candidates.length > 0 ? (
+        <BestBet candidates={data.candidates} />
+      ) : null}
+
       {/* Generator */}
       <GlassCard>
         <h2 className="text-[15px] font-semibold tracking-tight text-[var(--text-primary)]">AI-produktresearch</h2>
@@ -173,12 +195,17 @@ export default function ResearchPage() {
           title={`Kandidater (${data.candidates.length})`}
           origin="real"
           note="Sparade rader i product_candidates. Kalkylen är beräknad, siffrorna i den är AI-uppskattade."
+          actions={
+            <span className="text-[11.5px] text-[var(--text-muted)]">Sorterade efter chansscore</span>
+          }
         >
           {data.candidates.length === 0 ? (
             <EmptyState title="Inga kandidater sparade än." body="Beskriv en nisch ovan och generera de första förslagen." />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {data.candidates.map((c, i) => <CandidateCard key={c.id} c={c} index={i} />)}
+              {ranked.map(({ candidate, result }, i) => (
+                <CandidateCard key={candidate.id} c={candidate} index={i} rank={i + 1} score={result.score} />
+              ))}
             </div>
           )}
         </Section>
