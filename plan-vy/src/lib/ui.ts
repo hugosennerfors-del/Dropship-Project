@@ -74,10 +74,19 @@ export const trendMeta = (t: Trend): { label: string; tone: Meta["tone"]; arrow:
 
 /**
  * Enda stället som får bygga en produkt-URL.
- * sku kan vara null från backend — då finns ingen sida att länka till.
+ *
+ * Returnerar hela adressen inklusive period, så att ingen anropare behöver
+ * klistra på "?month=" själv — sku ligger redan i query-strängen och en andra
+ * frågetecken hade spräckt länken.
+ *
+ * sku kan vara null från backend. Då finns ingen sida att länka till.
  */
-export const productHref = (p: Pick<Product, "sku">): string | null =>
-  p.sku ? `/products/${encodeURIComponent(p.sku)}` : null;
+export const productHref = (p: Pick<Product, "sku">, month?: string): string | null => {
+  if (!p.sku) return null;
+  const q = new URLSearchParams({ sku: p.sku });
+  if (month) q.set("month", month);
+  return `/products/detail?${q.toString()}`;
+};
 
 /* ── Ordlista för term-tooltips ────────────────────────────────────────── */
 

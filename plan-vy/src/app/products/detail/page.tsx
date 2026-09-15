@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { useData } from "@/components/DataProvider";
 import { DemandChart, PoasBar, ScoreMeter } from "@/components/charts";
 import { Term } from "@/components/Term";
@@ -61,8 +61,10 @@ function Bullets({ items, empty }: { items: string[]; empty: string }) {
 }
 
 export default function ProductPage() {
-  const params = useParams<{ sku: string }>();
-  const sku = typeof params.sku === "string" ? decodeURIComponent(params.sku) : "";
+  // sku kommer som query-parameter, inte som ruttsegment: statisk export kan
+  // inte generera sidor för sku den inte känner till vid bygget.
+  const searchParams = useSearchParams();
+  const sku = searchParams.get("sku") ?? "";
   const { data, loading, error, refetch, month } = useData();
 
   if (error) return <ErrorState message={error} onRetry={refetch} />;
@@ -86,7 +88,7 @@ export default function ProductPage() {
       <GlassCard>
         <EmptyState
           title="Produkten finns inte i den här perioden."
-          body={`Ingen produkt med SKU "${sku}" rapporterades för ${data.meta.period ?? month}.`}
+          body={sku ? `Ingen produkt med SKU "${sku}" rapporterades för ${data.meta.period ?? month}.` : "Ingen produkt vald."}
         />
         <div className="mt-4 text-center">
           <Link href={`/products?month=${month}`} className="text-[13px] font-medium text-[var(--series)] hover:underline">

@@ -26,6 +26,7 @@ const NAV = [
 ] as const;
 
 const CRUMB: Record<string, string> = {
+  detail: "Produkt",
   "": "Overview",
   products: "Products",
   research: "Research",
@@ -177,7 +178,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="mx-auto w-full max-w-[1320px] flex-1 px-4 py-6 sm:px-6 sm:py-8">
-          {/* Detaljsidor (t.ex. /products/[sku]) sätter sin egen rubrik — annars
+          {/* Detaljsidor (t.ex. /products/detail) sätter sin egen rubrik — annars
               skulle "Products" stå ovanför produktnamnet. */}
           {segments.length <= 1 ? (
             <div className="mb-6">

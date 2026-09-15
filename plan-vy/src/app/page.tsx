@@ -152,7 +152,7 @@ export default function OverviewPage() {
         ) : (
           <ul className="divide-y divide-[var(--hairline)]">
             {topProducts.map((p) => {
-              const href = productHref(p);
+              const href = productHref(p, month);
               const inner = (
                 <div className="flex items-center gap-4 py-3">
                   <div className="min-w-0 flex-1">
@@ -172,7 +172,7 @@ export default function OverviewPage() {
               return (
                 <li key={p.sku ?? p.name}>
                   {href ? (
-                    <Link href={`${href}?month=${month}`} className="-mx-2 block rounded-lg px-2 transition hover:bg-white/50">
+                    <Link href={href} className="-mx-2 block rounded-lg px-2 transition hover:bg-white/50">
                       {inner}
                     </Link>
                   ) : (
@@ -198,7 +198,7 @@ export default function OverviewPage() {
           ) : null
         }
       >
-        <AlertList alerts={alerts.slice(0, 5)} products={products} />
+        <AlertList alerts={alerts.slice(0, 5)} products={products} month={month} />
       </Section>
 
       {/* Datakällor */}

@@ -104,7 +104,7 @@ export function ProductTable({ products, month }: { products: Product[]; month: 
         <ul className="space-y-3 md:hidden">
           {rows.map((p) => {
             const f = p.financials;
-            const href = productHref(p);
+            const href = productHref(p, month);
             const t = trendMeta(p.demand.trend);
             const head = (
               <div className="flex items-start justify-between gap-3">
@@ -121,7 +121,7 @@ export function ProductTable({ products, month }: { products: Product[]; month: 
             return (
               <li key={p.sku ?? p.name} className="rounded-xl border border-white/60 bg-white/45 p-4">
                 {href ? (
-                  <Link href={`${href}?month=${month}`} className="block">{head}</Link>
+                  <Link href={href} className="block">{head}</Link>
                 ) : (
                   <div title="Saknar SKU — ingen egen sida">{head}</div>
                 )}
@@ -191,7 +191,7 @@ export function ProductTable({ products, month }: { products: Product[]; month: 
             <tbody>
               {rows.map((p, i) => {
                 const f = p.financials;
-                const href = productHref(p);
+                const href = productHref(p, month);
                 const t = trendMeta(p.demand.trend);
                 return (
                   <motion.tr
@@ -204,7 +204,7 @@ export function ProductTable({ products, month }: { products: Product[]; month: 
                     <td className="max-w-[260px] px-2.5 py-3">
                       {href ? (
                         <Link
-                          href={`${href}?month=${month}`}
+                          href={href}
                           className="block truncate font-medium text-[var(--text-primary)] hover:text-[var(--series)] hover:underline"
                         >
                           {p.name}

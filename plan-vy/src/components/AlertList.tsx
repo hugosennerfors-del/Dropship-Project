@@ -26,10 +26,10 @@ const STYLE = {
  * En rad per larm. Ikon + ord + färg, aldrig färg ensam — annars försvinner
  * skillnaden mellan kritisk och varning för den som inte ser röd/orange.
  */
-export function AlertRow({ alert, products, index = 0 }: { alert: Alert; products: Product[]; index?: number }) {
+export function AlertRow({ alert, products, month, index = 0 }: { alert: Alert; products: Product[]; month: string; index?: number }) {
   const s = STYLE[alert.severity] ?? STYLE.warning;
   const match = alert.product ? products.find((p) => p.name === alert.product) : undefined;
-  const href = match ? productHref(match) : null;
+  const href = match ? productHref(match, month) : null;
 
   return (
     <motion.li
@@ -64,14 +64,14 @@ export function AlertRow({ alert, products, index = 0 }: { alert: Alert; product
   );
 }
 
-export function AlertList({ alerts, products }: { alerts: Alert[]; products: Product[] }) {
+export function AlertList({ alerts, products, month }: { alerts: Alert[]; products: Product[]; month: string }) {
   if (!alerts.length) {
     return <EmptyState title="Inga larm den här perioden." body="Inga produkter under break-even, inga höga returgrader." />;
   }
   return (
     <ul className="space-y-2.5">
       {alerts.map((a, i) => (
-        <AlertRow key={`${a.type}-${a.product ?? "portfolio"}-${i}`} alert={a} products={products} index={i} />
+        <AlertRow key={`${a.type}-${a.product ?? "portfolio"}-${i}`} alert={a} products={products} month={month} index={i} />
       ))}
     </ul>
   );

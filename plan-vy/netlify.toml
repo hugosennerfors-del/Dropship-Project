@@ -1,0 +1,26 @@
+# Filen ligger i samma mapp som appen. Inget "base": den indirektionen var det
+# som gjorde att bygget aldrig kördes — kör alltid netlify-kommandon härifrån.
+[build]
+  command = "npm run build"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Backenden genererar länkar som "/products/SPC-001". Statisk export kan inte ha
+# dynamiska ruttsegment, så de pekas om till sidan som tar sku som parameter.
+# Netlify tar med den ursprungliga query-strängen, så ?month= följer med.
+# Statiska filer matchar före den här regeln, så /products/detail träffas inte.
+[[redirects]]
+  from   = "/products/:sku"
+  to     = "/products/detail?sku=:sku"
+  status = 302
+
+# Dashboarden visar omsättning, marginaler och inköpspris.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag            = "noindex, nofollow"
+    X-Content-Type-Options  = "nosniff"
+    Referrer-Policy         = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "frame-ancestors 'none'"

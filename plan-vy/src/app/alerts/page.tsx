@@ -5,7 +5,7 @@ import { AlertList } from "@/components/AlertList";
 import { EmptyState, ErrorState, Section, Skeleton } from "@/components/primitives";
 
 export default function AlertsPage() {
-  const { data, loading, error, refetch } = useData();
+  const { data, loading, error, refetch, month } = useData();
 
   if (error) return <ErrorState message={error} onRetry={refetch} />;
 
@@ -42,7 +42,7 @@ export default function AlertsPage() {
     <div className="space-y-6">
       {critical.length ? (
         <Section title={`Kritiskt (${critical.length})`} origin="computed" note="POAS < 0,80 eller negativ portföljmarginal.">
-          <AlertList alerts={critical} products={data.products} />
+          <AlertList alerts={critical} products={data.products} month={month} />
         </Section>
       ) : null}
       {warnings.length ? (
@@ -52,7 +52,7 @@ export default function AlertsPage() {
           note="POAS under 1,00, returgrad över 10 % eller fallande efterfrågan."
           delay={0.05}
         >
-          <AlertList alerts={warnings} products={data.products} />
+          <AlertList alerts={warnings} products={data.products} month={month} />
         </Section>
       ) : null}
     </div>

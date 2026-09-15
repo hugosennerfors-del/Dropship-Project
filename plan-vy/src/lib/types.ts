@@ -9,7 +9,7 @@
  *     Backend: poas>=1.5 -> 'scale', >=1 -> 'profit', >=0.8 -> 'watch', annars 'cut'.
  *     Värdet 'winner' skickas ALDRIG. En uppslagstabell på 'winner' ger tom pill.
  *  2. sku och campaign kan vara null (backend gör `r.sku || null`).
- *     sku används i URL:en /products/[sku] — därför får en produkt utan sku
+ *     sku används i produktsidans URL — därför får en produkt utan sku
  *     aldrig länkas. Se productHref().
  *  3. breakEvenRoas är null när bruttomarginalen <= 0 (division skulle spräcka).
  *  4. Hela ai-blocket är nullbart per fält (backend gör `a.verdict || null`).

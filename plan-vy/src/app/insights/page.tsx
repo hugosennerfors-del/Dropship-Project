@@ -28,7 +28,26 @@ function Level({ level }: { level: keyof typeof PRIORITY | string }) {
  * produktnamn och bara släpper igenom produkter som har en sku. Tom lista
  * betyder att det inte finns någon sida att länka till — då blir det ren text.
  * Frontenden gissar aldrig en egen /products/{namn}-URL.
+ *
+ * Backenden skriver fortfarande "/products/<sku>", den formen appen hade innan
+ * den blev statisk. Sku plockas ur den och adressen byggs om till dagens rutt.
+ * Det är ingen gissning — sku kommer från en länk backenden redan har verifierat
+ * mot produktlistan. netlify.toml pekar om den gamla formen också, men det är
+ * för länkar som kommer utifrån; internt slipper vi hoppet och de 404:or Next
+ * annars får när den förhämtar en rutt som inte finns.
  */
+const LEGACY_PRODUCT = /^\/products\/([^/?#]+)$/;
+
+function resolveHref(l: InsightLink, month: string): string {
+  const m = l.kind === "product" ? LEGACY_PRODUCT.exec(l.href) : null;
+  if (m) {
+    const q = new URLSearchParams({ sku: decodeURIComponent(m[1]), month });
+    return `/products/detail?${q.toString()}`;
+  }
+  const sep = l.href.includes("?") ? "&" : "?";
+  return `${l.href}${sep}month=${month}`;
+}
+
 function Links({ links, month }: { links: InsightLink[] | undefined; month: string }) {
   const list = links ?? [];
   if (list.length === 0) return null;
@@ -37,7 +56,7 @@ function Links({ links, month }: { links: InsightLink[] | undefined; month: stri
       {list.map((l, i) => (
         <Link
           key={`${l.href}-${i}`}
-          href={`${l.href}?month=${month}`}
+          href={resolveHref(l, month)}
           className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--series)]/25 bg-[var(--series)]/10 px-2.5 py-1 text-[12px] font-medium text-[#4338ca] transition hover:bg-[var(--series)]/18"
         >
           {l.label}

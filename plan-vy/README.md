@@ -31,19 +31,23 @@ webbläsaren skickar en OPTIONS-preflight först, och då faller anropet.
 
 ## Driftsättning på Netlify
 
-`netlify.toml` ligger i **repo-roten**, inte här — det är där Netlify letar.
-`base = "plan-vy"` flyttar bygget hit, och alla andra sökvägar i filen är
-relativa till base.
+`netlify.toml` ligger **här i appmappen**, utan `base`. Den låg först i
+repo-roten med `base = "plan-vy"`, men den indirektionen gjorde att bygget
+aldrig kördes — deployen laddade upp källfiler i stället och `0 edge functions`.
+Kör därför alltid netlify-kommandon från den här mappen.
+
+Appen är en **statisk export** (`output: "export"` i `next.config.ts`). Inget av
+innehållet renderas på en server: all data hämtas i webbläsaren från n8n. Bygget
+blir mappen `out/`, som går att lägga på vilken statisk värd som helst utan
+körtidsplugin.
 
 | Inställning | Värde |
 |---|---|
-| Base directory | `plan-vy` |
 | Build command | `npm run build` |
-| Publish directory | `.next` (relativt base) |
+| Publish directory | `out` |
 | Node | 22 |
 
-`@netlify/plugin-nextjs` deklareras i `netlify.toml` och installeras av Netlify
-själv. Lägg den **inte** i `package.json` också — det ger versionskonflikt.
+Inget `@netlify/plugin-nextjs` behövs — det finns ingen serverrendering kvar.
 
 ### Lösenordsgrind
 
@@ -62,7 +66,17 @@ Egna headers från `netlify.toml` gäller inte på vägar som en edge function
 serverar, så `X-Robots-Tag` med flera sätts i funktionen i stället.
 
 `NEXT_PUBLIC_PLAN_VY_API` är valfri och behövs bara om bygget ska peka mot något
-annat än skarp n8n-backend.
+annat än skarp n8n-backend. Den läses **vid bygget**, inte i webbläsaren.
+
+### Produktsidans adress
+
+Statisk export kan inte ha dynamiska ruttsegment: Next måste känna till varje
+sökväg vid bygget, och produkternas sku finns bara i API:t. Produktsidan tar
+därför sku som query-parameter.
+
+Backenden genererar fortfarande länkar på den gamla formen `/products/<sku>`.
+Två saker fångar upp det: `netlify.toml` pekar om formen med en 302, och
+Insights-vyn skriver om länkarna i frontend så interna klick slipper hoppet.
 
 CORS fungerar från vilken Netlify-domän som helst: respond-noden sätter
 `Access-Control-Allow-Origin: *`, och research-webhooken har dessutom
@@ -88,7 +102,7 @@ En Netlify-URL är öppen för alla som har länken. Två saker följer av det:
 |---|---|
 | `/` | Business Health Score, KPI:er, AI-sammanfattning, larm, datakällor |
 | `/products` | Sorterbar tabell (kort under `md`), filter vinnare/förlorare |
-| `/products/[sku]` | Produkten som nav: verdict → score → demand → kundröst → konkurrens → ads → financials → marknad → analys → möjligheter → risker → källor |
+| `/products/detail?sku=…` | Produkten som nav: verdict → score → demand → kundröst → konkurrens → ads → financials → marknad → analys → möjligheter → risker → källor |
 | `/research` | Kandidatkort med kalkyl och verdict, plus AI-generator |
 | `/alerts` | Larm grupperade på allvarlighetsgrad |
 | `/insights` | Narrativ, rekommendationer, risker, nästa steg |
