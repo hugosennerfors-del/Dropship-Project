@@ -9,13 +9,13 @@
 [build.environment]
   NODE_VERSION = "22"
 
-# Backenden genererar länkar som "/products/SPC-001". Statisk export kan inte ha
-# dynamiska ruttsegment, så de pekas om till sidan som tar sku som parameter.
-# Netlify tar med den ursprungliga query-strängen, så ?month= följer med.
-# Statiska filer matchar före den här regeln, så /products/detail träffas inte.
+# Backenden genererar länkar som "/products/SPC-001". Produktsidan ligger på
+# /produkt — utanför /products/ — just för att det här mönstret annars sväljer
+# allt under den sökvägen, inklusive Next egna datafiler (/products/detail.txt
+# gav sku="detail.txt" och en tom sida). Utanför prefixet kan det inte krocka.
 [[redirects]]
   from   = "/products/:sku"
-  to     = "/products/detail?sku=:sku"
+  to     = "/produkt?sku=:sku"
   status = 302
 
 # Dashboarden visar omsättning, marginaler och inköpspris.

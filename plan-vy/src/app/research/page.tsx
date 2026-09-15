@@ -93,6 +93,7 @@ export default function ResearchPage() {
   const { data, loading, error, refetch } = useData();
   const [niche, setNiche] = useState("");
   const [busy, setBusy] = useState(false);
+  const [showRejected, setShowRejected] = useState(false);
   const [note, setNote] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
   async function onGenerate(e: React.FormEvent) {
@@ -122,14 +123,21 @@ export default function ResearchPage() {
     }
   }
 
-  const ranked = data ? rankCandidates(data.candidates) : [];
+  const all = data?.candidates ?? [];
+  // UNDVIK betyder att bidraget inte täcker den förväntade annonskostnaden.
+  // De döljs som standard, men räknas fortfarande — hur många som föll bort
+  // säger något om kvaliteten på nischen man bad om.
+  const worthTesting = all.filter((c) => c.verdict !== "UNDVIK");
+  const rejectedCount = all.length - worthTesting.length;
+  const shown = showRejected ? all : worthTesting;
+  const ranked = rankCandidates(shown);
 
   return (
     <div className="space-y-6">
       {/* Bästa chansen — rangordnar kandidaterna innan generatorn, så det första
           man ser är en slutsats och inte ett inmatningsfält. */}
-      {!loading && data && data.candidates.length > 0 ? (
-        <BestBet candidates={data.candidates} />
+      {!loading && data && worthTesting.length > 0 ? (
+        <BestBet candidates={worthTesting} />
       ) : null}
 
       {/* Generator */}
@@ -192,15 +200,36 @@ export default function ResearchPage() {
         </div>
       ) : (
         <Section
-          title={`Kandidater (${data.candidates.length})`}
+          title={`Kandidater (${shown.length})`}
           origin="real"
           note="Sparade rader i product_candidates. Kalkylen är beräknad, siffrorna i den är AI-uppskattade."
           actions={
             <span className="text-[11.5px] text-[var(--text-muted)]">Sorterade efter chansscore</span>
           }
         >
-          {data.candidates.length === 0 ? (
+          {rejectedCount > 0 ? (
+            <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-white/60 bg-white/45 px-4 py-2.5">
+              <span className="text-[12.5px] text-[var(--text-secondary)]">
+                {rejectedCount} av {all.length} dolda — bidraget täcker inte den förväntade annonskostnaden.
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowRejected((v) => !v)}
+                aria-pressed={showRejected}
+                className="text-[12.5px] font-medium text-[var(--series)] hover:underline"
+              >
+                {showRejected ? "Dölj dem igen" : "Visa dem ändå"}
+              </button>
+            </div>
+          ) : null}
+
+          {all.length === 0 ? (
             <EmptyState title="Inga kandidater sparade än." body="Beskriv en nisch ovan och generera de första förslagen." />
+          ) : shown.length === 0 ? (
+            <EmptyState
+              title="Ingen kandidat nådde upp till TESTA."
+              body={`Alla ${all.length} föll på att bidraget inte täcker den förväntade annonskostnaden. Prova en nisch med högre prisläge — ett bidrag under ungefär 80 kr per order är svårt att bära på Meta i Sverige.`}
+            />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {ranked.map(({ candidate, result }, i) => (

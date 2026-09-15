@@ -42,7 +42,7 @@ function resolveHref(l: InsightLink, month: string): string {
   const m = l.kind === "product" ? LEGACY_PRODUCT.exec(l.href) : null;
   if (m) {
     const q = new URLSearchParams({ sku: decodeURIComponent(m[1]), month });
-    return `/products/detail?${q.toString()}`;
+    return `/produkt?${q.toString()}`;
   }
   const sep = l.href.includes("?") ? "&" : "?";
   return `${l.href}${sep}month=${month}`;

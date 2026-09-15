@@ -79,13 +79,18 @@ export const trendMeta = (t: Trend): { label: string; tone: Meta["tone"]; arrow:
  * klistra på "?month=" själv — sku ligger redan i query-strängen och en andra
  * frågetecken hade spräckt länken.
  *
+ * Sidan ligger på /produkt och INTE under /products/. Omdirigeringen för
+ * backendens gamla länkar matchar "/products/:sku", och det mönstret svalde
+ * allt som låg där — även Next egna datafiler som /products/detail.txt, vilket
+ * gav sku="detail.txt" och en tom sida. Utanför /products/ kan det inte hända.
+ *
  * sku kan vara null från backend. Då finns ingen sida att länka till.
  */
 export const productHref = (p: Pick<Product, "sku">, month?: string): string | null => {
   if (!p.sku) return null;
   const q = new URLSearchParams({ sku: p.sku });
   if (month) q.set("month", month);
-  return `/products/detail?${q.toString()}`;
+  return `/produkt?${q.toString()}`;
 };
 
 /* ── Ordlista för term-tooltips ────────────────────────────────────────── */
