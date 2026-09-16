@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import { useData } from "./DataProvider";
 import { monthLabel } from "@/lib/format";
 import {
@@ -37,8 +36,33 @@ const CRUMB: Record<string, string> = {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  /** Mobilens lådmeny. Egen state: "collapsed" styr bara bredden på skrivbordet. */
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();
   const { month, setMonth, loading, refetch, data } = useData();
+
+  // Stäng lådan när man navigerat, annars ligger den kvar över den nya sidan.
+  useEffect(() => setDrawerOpen(false), [pathname]);
+
+  // Lådan är utskjuten med transform när den är stängd, alltså fortfarande i
+  // DOM:en. Utan inert går den att tabba till fast den inte syns — en
+  // tangentbordsfälla. På skrivbordet ska menyn såklart förbli nåbar.
+  const [isDesktop, setIsDesktop] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const sync = () => setIsDesktop(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+  const navHidden = !isDesktop && !drawerOpen;
+
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawerOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawerOpen]);
 
   /** Alla interna länkar bär månaden vidare. */
   const withMonth = (href: string) => `${href}?month=${month}`;
@@ -47,20 +71,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen">
-      {/* Sidebar */}
-      <motion.aside
-        animate={{ width: collapsed ? 68 : 232 }}
-        transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-        className="sticky top-0 hidden h-screen shrink-0 flex-col border-r border-white/60 bg-white/60 backdrop-blur-[18px] md:flex"
-        style={{ backdropFilter: "blur(18px) saturate(140%)" }}
+      {/* Mörkläggning bakom lådan. Bara mobil. */}
+      {drawerOpen ? (
+        <button
+          type="button"
+          aria-label="Stäng menyn"
+          onClick={() => setDrawerOpen(false)}
+          className="fixed inset-0 z-40 bg-[#1f2933]/25 backdrop-blur-[2px] md:hidden"
+        />
+      ) : null}
+
+      {/* Sidomeny. Under md är den en låda som skjuts in; från md och upp en
+          vanlig sticky kolumn vars bredd fälls ihop. Tidigare var den helt
+          dold under md, så hamburgaren växlade något som inte fanns. */}
+      <aside
+        inert={navHidden ? true : undefined}
+        aria-hidden={navHidden || undefined}
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen shrink-0 flex-col border-r border-white/60 bg-white/80 backdrop-blur-[18px] transition-transform duration-300 md:sticky md:top-0 md:z-auto md:translate-x-0 md:bg-white/60 md:transition-[width] ${
+          drawerOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        style={{
+          width: collapsed ? 68 : 240,
+          backdropFilter: "blur(18px) saturate(140%)",
+        }}
       >
         <div className="flex h-16 items-center gap-2.5 px-4">
           <span aria-hidden className="h-7 w-[3px] shrink-0 rounded-full accent-rule" />
-          {!collapsed ? (
-            <span className="truncate text-[13.5px] font-semibold tracking-tight text-[var(--text-primary)]">
-              Plan-vy Intelligence
-            </span>
-          ) : null}
+          <span
+            className={`truncate text-[13.5px] font-semibold tracking-tight text-[var(--text-primary)] ${
+              collapsed ? "md:hidden" : ""
+            }`}
+          >
+            Plan-vy Intelligence
+          </span>
         </div>
 
         <nav className="flex-1 space-y-1 px-3 py-2">
@@ -85,7 +128,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   />
                 ) : null}
                 <Icon className="shrink-0" />
-                {!collapsed ? <span className="truncate">{label}</span> : null}
+                <span className={`truncate ${collapsed ? "md:hidden" : ""}`}>{label}</span>
               </Link>
             );
           })}
@@ -95,15 +138,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           type="button"
           onClick={() => setCollapsed((c) => !c)}
           aria-label={collapsed ? "Expandera sidomenyn" : "Fäll ihop sidomenyn"}
-          className="m-3 flex items-center justify-center gap-2 rounded-xl border border-white/70 bg-white/50 py-2 text-[12px] text-[var(--text-secondary)] transition hover:bg-white/80"
+          className="m-3 hidden items-center justify-center gap-2 rounded-xl border border-white/70 bg-white/50 py-2 text-[12px] text-[var(--text-secondary)] transition hover:bg-white/80 md:flex"
         >
           <IconChevron
             className="transition-transform"
             style={{ transform: collapsed ? "none" : "rotate(180deg)" }}
           />
-          {!collapsed ? <span>Fäll ihop</span> : null}
+          {collapsed ? null : <span>Fäll ihop</span>}
         </button>
-      </motion.aside>
+      </aside>
 
       {/* Huvudkolumn */}
       <div className="flex min-w-0 flex-1 flex-col">
@@ -111,8 +154,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex h-16 items-center gap-4 px-4 sm:px-6">
             <button
               type="button"
-              onClick={() => setCollapsed((c) => !c)}
-              aria-label="Växla sidomeny"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Öppna menyn"
+              aria-expanded={drawerOpen}
               className="rounded-lg p-2 text-[var(--text-secondary)] transition hover:bg-white/60 md:hidden"
             >
               <IconMenu />
