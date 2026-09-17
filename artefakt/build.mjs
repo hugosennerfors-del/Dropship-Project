@@ -3,7 +3,7 @@ const head = fs.readFileSync("head.html", "utf8");
 let body = fs.readFileSync("body.html", "utf8");
 const data = fs.readFileSync("data.js", "utf8");
 const app = fs.readFileSync("app.js", "utf8");
-const stamp = "16 september 2026 kl. 19.23";
+const stamp = "16 september 2026 kl. 20.32";
 body = body.replace(/hämtad \d+ \w+ \d{4} kl\. [\d.]+\./, `hämtad ${stamp}.`);
 fs.writeFileSync("body.html", body);
 fs.writeFileSync("index.html", head + body + "<script>\n" + data + "\n" + app + "</script>\n");

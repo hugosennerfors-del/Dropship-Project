@@ -65,7 +65,7 @@ function calcCandidate(row) {
   return {
     id, name, notes, created,
     country: MARKETS[country] ? country : HOME, market: m, cur: m.cur, mex,
-    ad: AD_PLANS[id] ?? null,
+    ad: PLANS[id] ?? null,
     inputs: { cost, sale, ship, fee, cpa, units: u },
     contribution, grossMargin, expectedPoas, verdict,
     breakEvenRoas: grossMargin > 0 ? 1 / grossMargin : null,
@@ -73,7 +73,30 @@ function calcCandidate(row) {
     cpaEx: mex(cpa),
   };
 }
-const CANDIDATES = RAW_CANDIDATES.map(calcCandidate);
+/* Kandidatlistan börjar i ögonblicksbilden från API:t, men sidan kan köra ny
+   research och lägga till rader. Därför är den föränderlig och byggs om i
+   stället för att räknas en gång vid start. */
+let RAW = RAW_CANDIDATES.slice();
+let PLANS = Object.assign({}, AD_PLANS);
+let CANDIDATES = RAW.map(calcCandidate);
+const rebuild = () => { CANDIDATES = RAW.map(calcCandidate); };
+
+/* Två rader är samma produkt om namnen är lika. Den inbakade raden vinner:
+   den kommer från databasen och bär dess riktiga id. */
+const nameKey = (s) => String(s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+function addRows(rows, plans) {
+  const seen = new Set(RAW.map((r) => nameKey(r[1])));
+  const added = [];
+  for (const r of rows) {
+    if (seen.has(nameKey(r[1]))) continue;
+    seen.add(nameKey(r[1]));
+    RAW.unshift(r);
+    if (plans[r[0]]) PLANS[r[0]] = plans[r[0]];
+    added.push(r);
+  }
+  if (added.length) rebuild();
+  return added;
+}
 
 /* ── Chansscore ──────────────────────────────────────────────────────────
    Fyra axlar. CPA-tolerans är INTE en egen: POAS faller till 1,00 exakt när
@@ -464,7 +487,7 @@ let countryFilter = "ALL";
 
 /* Länder som faktiskt förekommer i listan, i den ordning MARKETS räknar upp
    dem. Ett land utan kandidater får ingen knapp — annars vore hälften döda. */
-const COUNTRIES = Object.keys(MARKETS).filter((k) => RAW_CANDIDATES.some((r) => (r[10] ?? HOME) === k));
+const countries = () => Object.keys(MARKETS).filter((k) => CANDIDATES.some((c) => c.country === k));
 
 /* Sökning över namn, anteckning, land och annonsupplägg. Diakritiklös
    jämförelse, så "plånbok" hittas även när man skriver "planbok". Flera ord
@@ -481,6 +504,232 @@ function matches(c, q) {
   if (!terms.length) return true;
   const hay = haystack(c);
   return terms.every((t) => hay.includes(t));
+}
+
+/* ── Ny research på begäran ──────────────────────────────────────────────
+   En artefakt får inte göra nätverksanrop, så sidan kan inte ringa n8n:s
+   webhook direkt. Den går i stället via läsarens egen n8n-koppling: samma
+   arbetsflöde, samma databas, men med läsarens inloggning i stället för en
+   öppen adress. Nya kandidater sparas i sidans egen lagring så att de finns
+   kvar efter en omladdning — n8n har dem redan i product_candidates. */
+const RESEARCH = {
+  server: "n8n",
+  workflow: "jD6A7tOD1L8bdUd8",
+  trigger: "API: generera research",
+  node: "Dela upp kandidater",
+};
+
+/* window.claude finns bara inuti en publicerad artefakt. Öppnad som lokal
+   fil saknas den helt, och då ska sidan fungera utan att kasta. */
+const cap = async (name) => {
+  try { return window.claude && window.claude.use ? await window.claude.use(name) : null; }
+  catch (e) { return null; }
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* Varje kopplingsfel har sin egen rätta åtgärd. En gemensam "något gick
+   fel" döljer just den knapp som skulle laga sidan. */
+const MCP_FIX = {
+  server_not_connected: "Lägg till n8n under claude.ai → Inställningar → Kopplingar.",
+  needs_reauth: "n8n behöver återanslutas: claude.ai → Inställningar → Kopplingar.",
+  selection_required: "Du har flera n8n-kopplingar och har inte valt en. Välj i claude.ai och försök igen.",
+  not_in_manifest: "n8n är inte tillåtet för den här sidan. Tillåt kopplingen när sidan frågar.",
+  blocked_by_policy: "Organisationens policy blockerar det här n8n-verktyget.",
+  approval_required: "Anropet kräver ett godkännande som inte går att ge härifrån.",
+  not_granted: "Den här vyn har inte tillgång till dina kopplingar. Öppna sidan från claude.ai.",
+  capability_disabled: "Den här vyn kan inte nå kopplingar.",
+  capability_removed: "Den här vyn kan inte nå kopplingar.",
+  cancelled: "Körningen avbröts. Hann den starta kan kandidaterna ändå ligga i n8n.",
+  rate_limited: "För många anrop just nu. Vänta en stund och försök igen.",
+  server_unavailable: "n8n svarade inte. Försök igen om en stund.",
+  bad_request: "Anropet till n8n var felformat — det är en bugg i sidan.",
+};
+
+let rState = { status: "idle", niche: "", country: HOME, msg: "", added: 0, total: 0, fix: "" };
+let researchCountry = HOME;
+
+const paint = (msg) => {
+  rState.msg = msg;
+  const el = document.getElementById("rStatus");
+  if (el) el.textContent = msg; else render();
+};
+
+async function callN8n(mcp, tool, input, retry) {
+  try {
+    return await mcp.callTool(RESEARCH.server, tool, input, { cache: false });
+  } catch (e) {
+    // Bara läsningar får göras om, och bara en gång. En körning som redan
+    // startat får aldrig startas igen automatiskt.
+    if (retry && e && e.retryable === true) {
+      await sleep(Math.min(e.retryAfterMs || 2000, 8000) + Math.random() * 400);
+      return await mcp.callTool(RESEARCH.server, tool, input, { cache: false });
+    }
+    throw e;
+  }
+}
+
+function planFrom(p, name) {
+  const words = norm(name).replace(/[^a-z0-9 -]/g, " ").split(/[\s-]+/).filter((w) => w.length > 2);
+  const q = p && p.adLibraryQuery ? String(p.adLibraryQuery) : words.slice(0, 3).join(" ");
+  if (!p) return { q };
+  return {
+    q,
+    angle: p.angle || null, hook: p.hook || null, format: p.format || null,
+    script: Array.isArray(p.script) ? p.script.map(String) : [],
+    audience: p.audience || null, primaryText: p.primaryText || null, headline: p.headline || null,
+  };
+}
+
+/* Lagringen är en bekvämlighet, inte resultatet: går den fel står
+   kandidaterna kvar i vyn och i n8n:s databas ändå. */
+async function saveRows(rows, plans, niche) {
+  try {
+    const db = await cap("db");
+    if (!db) return;
+    for (const r of rows) {
+      await db.collection("candidates").doc(r[0]).set({
+        row: r, plan: plans[r[0]] || null, niche, country: r[10], addedAt: Date.now(),
+      });
+    }
+  } catch (e) { /* tyst: sidan visar dem redan */ }
+}
+
+async function loadSaved() {
+  try {
+    const db = await cap("db");
+    if (!db) return;
+    const snap = await db.collection("candidates").orderBy("addedAt", "desc").limit(500).get();
+    const rows = [], plans = {};
+    snap.docs.forEach((d) => {
+      const v = d.data() || {};
+      if (Array.isArray(v.row) && v.row.length >= 10) {
+        rows.push(v.row);
+        if (v.plan) plans[v.row[0]] = v.plan;
+      }
+    });
+    if (addRows(rows, plans).length) render();
+  } catch (e) { /* tyst: ögonblicksbilden räcker */ }
+}
+
+async function runResearch(niche, country) {
+  if (rState.status === "running") return;
+  rState = { status: "running", niche, country, msg: "Startar körningen…", added: 0, total: 0, fix: "" };
+  render();
+
+  const fail = (e) => {
+    const code = e && e.code ? String(e.code) : "upstream_error";
+    rState = {
+      status: "error", niche, country, added: 0, total: 0,
+      msg: code === "tool_error" && e.message ? e.message : "Research-körningen gick inte igenom.",
+      fix: MCP_FIX[code] || "Ladda om sidan och försök igen.",
+    };
+    render();
+  };
+
+  try {
+    const mcp = await cap("mcp");
+    if (!mcp) return fail({ code: "not_granted" });
+
+    const started = await callN8n(mcp, "execute_workflow", {
+      workflowId: RESEARCH.workflow,
+      executionMode: "production",
+      triggerNodeName: RESEARCH.trigger,
+      inputs: { webhookData: { method: "POST", body: { niche, country } } },
+    }, false);
+
+    const id = started && started.payload && started.payload.executionId;
+    if (!id) return fail({ code: "tool_error", message: "n8n svarade utan körnings-id." });
+
+    const t0 = Date.now();
+    let status = "running";
+    for (let i = 0; i < 45; i++) {
+      await sleep(i < 4 ? 2000 : 3500);
+      const st = await callN8n(mcp, "get_workflow_execution", {
+        workflowId: RESEARCH.workflow, executionId: String(id), includeData: false,
+      }, true);
+      status = String((st && st.payload && st.payload.execution && st.payload.execution.status) || "running");
+      if (status !== "running" && status !== "new" && status !== "waiting") break;
+      paint("Söker fram produkter i " + MARKETS[country].name + "… " + Math.round((Date.now() - t0) / 1000) + " s");
+    }
+    if (status !== "success") {
+      return fail({ code: "tool_error", message: 'Körningen slutade som "' + status + '".' });
+    }
+
+    paint("Hämtar resultatet…");
+    const full = await callN8n(mcp, "get_workflow_execution", {
+      workflowId: RESEARCH.workflow, executionId: String(id), includeData: true, nodeNames: [RESEARCH.node],
+    }, true);
+
+    const runData = full && full.payload && full.payload.data && full.payload.data.resultData
+      && full.payload.data.resultData.runData;
+    const run = runData && runData[RESEARCH.node] && runData[RESEARCH.node][0];
+    const items = (run && run.data && run.data.main && run.data.main[0]) || [];
+    if (!items.length) return fail({ code: "tool_error", message: "Körningen gav inga kandidater." });
+
+    const created = new Date().toISOString().slice(0, 19) + "Z";
+    const rows = [], plans = {};
+    items.forEach((it, i) => {
+      const j = (it && it.json) || {};
+      const rid = "n" + id + "-" + i;
+      rows.push([
+        rid, String(j.name || "Namnlös kandidat"), String(j.notes || ""),
+        Number(j.cost_per_unit_incl_vat) || 0, Number(j.sale_price_incl_vat) || 0,
+        Number(j.shipping_cost_per_order) || 0, Number(j.transaction_fee_per_order) || 0,
+        Number(j.expected_cpa_incl_vat) || 0, Number(j.expected_units_per_order) || 1,
+        created, country,
+      ]);
+      plans[rid] = planFrom(j.ad_plan, String(j.name || ""));
+    });
+
+    const added = addRows(rows, plans);
+    saveRows(added, plans, niche);
+    countryFilter = country;
+    query = "";
+    showRejected = false;
+    rState = { status: "done", niche, country, msg: "", added: added.length, total: rows.length, fix: "" };
+    render();
+  } catch (e) {
+    fail(e);
+  }
+}
+
+/* Panelen som kör research. Den syns alltid: sökfältet filtrerar det som
+   redan finns, den här knappen hämtar något nytt. */
+function researchPanel() {
+  const q = query.trim();
+  const running = rState.status === "running";
+  const market = MARKETS[researchCountry];
+  const opts = Object.keys(MARKETS)
+    .map((k) => '<option value="' + k + '"' + (k === researchCountry ? " selected" : "") + ">" + esc(MARKETS[k].name) + "</option>")
+    .join("");
+
+  const result = rState.status === "done"
+    ? '<p class="callout c-pos" style="margin:12px 0 0">' + (rState.added
+        ? "Klart: " + rState.added + " nya kandidater på ”" + esc(rState.niche) + "” i " + esc(MARKETS[rState.country].name) + ", med kalkyl och annonsupplägg. De ligger kvar i n8n:s databas."
+        : "Körningen gav " + rState.total + " förslag, men alla fanns redan i listan.") + "</p>"
+    : rState.status === "error"
+      ? '<div class="callout c-neg" style="margin:12px 0 0"><b>' + esc(rState.msg) + "</b><br>" + esc(rState.fix) + "</div>"
+      : "";
+
+  return '<div style="border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.45);border-radius:14px;padding:16px;margin-bottom:16px">'
+    + '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">'
+    +   '<div style="flex:1;min-width:210px">'
+    +     '<h3 style="font-size:13.5px;font-weight:600">Hittar du inte produkten?</h3>'
+    +     '<p class="muted" style="margin:4px 0 0">Skriv vilken nisch eller produkt du vill åt i sökfältet ovan, välj marknad och kör. '
+    +       'n8n tar fram fem nya kandidater med kalkyl och annonsupplägg — det tar ungefär 20 sekunder och kostar OpenAI-krediter.</p>'
+    +   '</div>'
+    +   '<label style="display:grid;gap:4px"><span class="muted">Marknad</span>'
+    +     '<select id="rCountry"' + (running ? " disabled" : "") + ' style="border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:7px 10px;font:inherit;font-size:12.5px;color:var(--ink)">'
+    +       opts + '</select></label>'
+    +   '<button id="runResearch" class="fbtn"' + (running || !q ? " disabled" : "") + ' aria-pressed="false"'
+    +     ' style="font-weight:600' + (running || !q ? ";opacity:.5" : ";border-color:rgba(79,70,229,.35);background:rgba(79,70,229,.12);color:var(--series-ink)") + '">'
+    +     (running ? "Kör…" : q ? "Kör research på ”" + esc(q) + "”" : "Skriv en sökning först") + "</button>"
+    + "</div>"
+    + '<p id="rStatus" class="note" style="margin:' + (running ? "12px" : "0") + ' 0 0;color:var(--ink2)">' + (running ? esc(rState.msg) : "") + "</p>"
+    + result
+    + '<p class="muted" style="margin-top:12px">Sidan når n8n genom din egen koppling i claude.ai — första gången frågar den om lov. '
+    +   'Resultatet sparas både i n8n och i sidan, så det finns kvar nästa gång du öppnar den.</p>'
+    + "</div>";
 }
 
 function viewResearch() {
@@ -578,8 +827,8 @@ function viewResearch() {
   return `${bestBet}
     <div style="margin-top:16px">
     ${sec(`Kandidater (${shown.length})`, "real", "Sparade rader i product_candidates. Kalkylen är beräknad, siffrorna i den är AI-uppskattade.",
-      `${COUNTRIES.length > 1 ? `<div class="filters" style="margin-bottom:12px">
-        ${[["ALL", "Alla marknader", CANDIDATES.length], ...COUNTRIES.map((k) =>
+      `${countries().length > 1 ? `<div class="filters" style="margin-bottom:12px">
+        ${[["ALL", "Alla marknader", CANDIDATES.length], ...countries().map((k) =>
           [k, MARKETS[k].name, CANDIDATES.filter((c) => c.country === k).length])].map(([k, l, cnt]) =>
           `<button class="fbtn" data-country="${k}" aria-pressed="${countryFilter === k}">${l} <span class="num" style="opacity:.7">(${cnt})</span></button>`).join("")}
         <span class="muted" style="margin-left:auto">Moms och valuta följer marknaden</span>
@@ -598,7 +847,8 @@ function viewResearch() {
           : countryFilter === "ALL" ? `${CANDIDATES.length} kandidater`
           : `${hits.length} kandidater i ${MARKETS[countryFilter].name}`}</span>
       </div>
-      ${query && hits.length === 0 ? emptyBox(`Inget matchar "${esc(query)}".`, "Prova ett kortare ord — sökningen träffar både produktnamn och anteckning.") : ""}
+      ${researchPanel()}
+      ${query && hits.length === 0 ? emptyBox(`Inget matchar "${esc(query)}".`, "Ingen sparad kandidat heter så — men du kan köra research på det direkt här ovanför.") : ""}
       ${rejected > 0 ? `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.45);border-radius:14px;padding:10px 16px;margin-bottom:16px">
         <span class="note">${rejected} av ${hits.length} dolda — bidraget täcker inte den förväntade annonskostnaden.</span>
         <button id="toggleRejected" style="border:0;background:0;padding:0;font-size:12.5px;font-weight:500;color:var(--series);text-decoration:underline">${showRejected ? "Dölj dem igen" : "Visa dem ändå"}</button>
@@ -871,12 +1121,27 @@ addEventListener("DOMContentLoaded", () => {
       return render();
     }
     if (e.target.id === "toggleRejected") { showRejected = !showRejected; return render(); }
+    if (e.target.closest("#runResearch")) {
+      const q = query.trim();
+      if (q) runResearch(q, researchCountry);
+      return;
+    }
     if (e.target.id === "clearQ") { query = ""; return render(); }
   });
 
   /* Sökfältet ritas om vid varje tangenttryck, så fokus och markörläge måste
      återställas efteråt — annars hoppar markören ur fältet efter första
      bokstaven. */
+  document.getElementById("view").addEventListener("change", (e) => {
+    if (e.target.id !== "rCountry") return;
+    researchCountry = e.target.value;
+    render();
+  });
+
+  /* Sparad research från tidigare körningar. Lagringen svarar först efter
+     första målningen, så listan byggs om när den kommer. */
+  loadSaved();
+
   let qTimer;
   document.getElementById("view").addEventListener("input", (e) => {
     if (e.target.id !== "q") return;

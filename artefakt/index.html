@@ -192,7 +192,7 @@ dl{margin:0}
       <div id="pageHead" class="page-h"></div>
       <div id="view"></div>
       <p class="muted" style="margin-top:40px;padding-top:20px;border-top:1px solid var(--hair)">
-        Ögonblicksbild från n8n-workflowet <b>Plan-vy · Intelligence-API</b>, hämtad 16 september 2026 kl. 19.23.
+        Ögonblicksbild från n8n-workflowet <b>Plan-vy · Intelligence-API</b>, hämtad 16 september 2026 kl. 20.32.
         Siffrorna uppdateras inte av sig själva — be om en ny körning när du vill ha färsk data.
       </p>
     </main>
@@ -200,12 +200,12 @@ dl{margin:0}
 </div>
 
 <script>
-/* Hämtat från n8n-workflowet "Plan-vy · Intelligence-API", körning 1387,
-   2026-09-16 19:22 UTC. Kandidaternas kalkyl räknas i sidan ur
+/* Hämtat från n8n-workflowet "Plan-vy · Intelligence-API", körningarna 1387 och 1389,
+   2026-09-16 20:32 UTC. Kandidaternas kalkyl räknas i sidan ur
    indata med samma formel som backenden, så talen inte kan glida isär. */
 const META = {
   period: "2026-09",
-  generatedAt: "2026-09-16T19:22:07.071Z",
+  generatedAt: "2026-09-16T20:32:37.345Z",
   currency: "SEK",
   vatRate: 0.25,
   sources: [
@@ -225,7 +225,7 @@ const OVERVIEW = {
     revenueExVat: 15200, orders: 70, units: 70, aov: 217.14, adSpend: 9400,
     contribution: 7850, netProfit: -1550, poas: 0.835, roas: 1.617,
     netMargin: -0.102, contribMargin: 0.5164, winners: 0, losers: 2,
-    productCount: 2, candidateCount: 40,
+    productCount: 2, candidateCount: 45,
   },
 };
 
@@ -278,106 +278,131 @@ const ALERTS = [
 /* [id, namn, anteckning, inköp, utpris, frakt, avgift, cpa, enheter, sparad, land]
    Belopp inkl moms i landets egen valuta. Kalkylen räknas fram i calcCandidate(). */
 const RAW_CANDIDATES = [
+["6a10ad3e","Kompakt hopprep med räknare","Bra impulsköp för hemmaträning, särskilt för enkel konditionsträning på liten yta. Visuellt lätt att demonstrera i kort video med fokus på enkelhet och platsbesparing.",68,249,39,7.47,115,1,"2026-09-16T19:55:42Z","SE"],
+["bf1e506e","Push-up bars med halkskydd","Låg inköpskostnad och enkel visuell demo gör den lämplig för impulsköp. Säljer bäst med vinkel om bättre grepp, enklare variation och kompakt hemmaträning.",59,229,35,6.87,98,1,"2026-09-16T19:55:42Z","SE"],
+["85b828ec","Portabel träningsmatta för hemmabruk","Bra som problemlösande produkt för svensk hemmaträning, särskilt i lägenhet där man vill ha en tydlig yta för yoga, stretch och kroppsvikt. Mindre impulsköp än små gadgets, men kan fungera med rätt visuell vinkling.",112,399,59,11.97,168,1,"2026-09-16T19:55:42Z","SE"],
+["c81a021a","Motståndsband-set med dörrankare","Mycket stark kandidat i Sverige eftersom den är billig, lätt att skicka och passar breddad hemmaträning. Bra för demo med flera övningar och tydlig funktion: träning utan stora vikter.",94,299,39,8.97,132,1,"2026-09-16T19:55:42Z","SE"],
+["c2dafae7","Maghjul med knästöd","Klassisk hemmaträningsprodukt som säljer via tydlig demo och enkel problemlösning: tränar kärna hemma utan maskiner. Fungerar bäst med nybörjarvänlig vinkel och upplevd kvalitet.",82,329,49,9.87,145,1,"2026-09-16T19:55:42Z","SE"],
 ["d496b8fa","Electric Milk Frother Mug (USB-C)","Passar UK bra som vardagslyx till kaffe/tea lovers. Visuellt stark demo, låg friktionsköp, lätt att visa 'barista-at-home' utan medicinska claims.",8.5,29.99,3.2,0.9,12.5,1,"2026-09-16T19:20:27Z","GB"],
-["5132940f","Clip-On Pot Strainer Lid","Strong problem-solver for small UK kitchens where cupboard space is tight. Easy before/after demo, low price point, and a very clear 'why didn’t I buy this sooner?' angle.",3.1,19.99,2.9,0.6,9.5,1,"2026-09-16T19:20:27Z","GB"],
-["627cb8a7","Adjustable Pan Lid and Steam Vent Set","Useful for UK shoppers with mixed-size pans and limited storage. The appeal is convenience and kitchen tidiness, not a flashy gadget, so the ad needs a strong visual demonstration.",6.8,24.99,3.4,0.75,11.8,1,"2026-09-16T19:20:27Z","GB"],
-["3c1cfa65","Automatic Pan Stirrer with Timer","Very demo-friendly and feels 'inventive', which can work well on Meta. Best angle in the UK is convenience for cooking sauces, risotto, gravy and soups without framing it as a premium appliance.",11.9,39.99,4.1,1.2,15.8,1,"2026-09-16T19:20:27Z","GB"],
 ["5cf49528","Rechargeable Electric Salt and Pepper Grinders Set","Popular giftable gadget in the UK, especially for people who like a neat kitchen and easier everyday use. However, competition is higher and creative needs to feel premium and gift-worthy.",14.2,44.99,4.5,1.35,18.9,1,"2026-09-16T19:20:27Z","GB"],
+["3c1cfa65","Automatic Pan Stirrer with Timer","Very demo-friendly and feels 'inventive', which can work well on Meta. Best angle in the UK is convenience for cooking sauces, risotto, gravy and soups without framing it as a premium appliance.",11.9,39.99,4.1,1.2,15.8,1,"2026-09-16T19:20:27Z","GB"],
+["627cb8a7","Adjustable Pan Lid and Steam Vent Set","Useful for UK shoppers with mixed-size pans and limited storage. The appeal is convenience and kitchen tidiness, not a flashy gadget, so the ad needs a strong visual demonstration.",6.8,24.99,3.4,0.75,11.8,1,"2026-09-16T19:20:27Z","GB"],
+["5132940f","Clip-On Pot Strainer Lid","Strong problem-solver for small UK kitchens where cupboard space is tight. Easy before/after demo, low price point, and a very clear 'why didn’t I buy this sooner?' angle.",3.1,19.99,2.9,0.6,9.5,1,"2026-09-16T19:20:27Z","GB"],
 ["9df592e2","Vattentät rabbit-vibrator med värmefunktion","Stark impulsköpsprodukt med tydlig demo (flera lägen, värme, vattentät). Bra hook: 'premiumkänsla hemma' och diskret leverans. Kan funka om kreativen är stilren och inte för explicit.",185,699,65,21,260,1,"2026-09-15T11:06:10Z","SE"],
-["f39b6dfd","Uppvärmd G-punktsstav med flexibelt huvud","Visuellt enkel att demonstrera med böjbart huvud och uppvärmning. Rimlig prispunkt för test. Vinkeln kan vara 'precision och komfort' snarare än hård säljkopia.",160,599,60,18,240,1,"2026-09-15T11:06:10Z","SE"],
-["8b0d63cd","Parvibrator med fjärrkontroll och app-styrning","Dyrare men ofta bättre AOV och stark differens via app/fjärr. Kan sälja på relation/kompispresent-vinkel. CPA tenderar högre eftersom målgruppen är mer konkurrensutsatt.",240,899,75,27,340,1,"2026-09-15T11:06:10Z","SE"],
-["2c7c22c0","Diskret mini-vibrator i lipstick-format","Bra entry product för Meta Ads eftersom den är liten, diskret och lätt att förstå visuellt. Kan ge bättre CTR, men också fler priskänsliga köpare och lägre marginal.",95,349,50,10,180,1,"2026-09-15T11:06:10Z","SE"],
 ["e6d6bc2a","Dubbeldesignad dildo av medicinsk silikon med sugkopp","Problem-/nyttodriven produkt med tydlig funktion och enkel demo via sugkopp och materialkänsla. Kan fungera bra om du säljer på kvalitet, stabilitet och 'handsfree'-vinkel.",175,649,70,19,290,1,"2026-09-15T11:06:10Z","SE"],
-["df04db79","Magnetisk mobilhållare till bil med stark sugkopp och vridbart huvud","Lätt att demonstrera i video: håller telefonen stabilt på ojämna vägar. Bra hook: \"ingen mer telefon som ramlar\". Impulsköp med bred målgrupp.",78,279,42,8.37,170,1,"2026-09-15T08:52:15Z","SE"],
+["2c7c22c0","Diskret mini-vibrator i lipstick-format","Bra entry product för Meta Ads eftersom den är liten, diskret och lätt att förstå visuellt. Kan ge bättre CTR, men också fler priskänsliga köpare och lägre marginal.",95,349,50,10,180,1,"2026-09-15T11:06:10Z","SE"],
+["8b0d63cd","Parvibrator med fjärrkontroll och app-styrning","Dyrare men ofta bättre AOV och stark differens via app/fjärr. Kan sälja på relation/kompispresent-vinkel. CPA tenderar högre eftersom målgruppen är mer konkurrensutsatt.",240,899,75,27,340,1,"2026-09-15T11:06:10Z","SE"],
+["f39b6dfd","Uppvärmd G-punktsstav med flexibelt huvud","Visuellt enkel att demonstrera med böjbart huvud och uppvärmning. Rimlig prispunkt för test. Vinkeln kan vara 'precision och komfort' snarare än hård säljkopia.",160,599,60,18,240,1,"2026-09-15T11:06:10Z","SE"],
 ["028f3063","LED väckarklocka med trådlös laddning och temperaturvisning","Visuellt stark produkt som löser skrivbords-/sängbordstrassel. Hook: \"en produkt som ersätter flera\". Kan funka bra i UGC för hemmakontor och sovrum.",165,549,58,16.47,240,1,"2026-09-15T08:52:15Z","SE"],
-["bcc6efcb","Rörelsestyrd LED-list för garderob och kök med USB-laddning","Enkel problemlösare med tydlig före/efter-effekt. Hook: \"ljus där du behöver det utan eldragning\". Bra för små ytor, bostadsrätter och hyrboenden.",92,329,45,9.87,145,1,"2026-09-15T08:52:15Z","SE"],
-["74538451","Mini Bluetooth-printer för etiketter och anteckningar","Visuellt demonstrerbar i kort video: printa etiketter från mobilen. Funkar för organisation, småföretag och studenter. Högre AOV men också högre CPA-risk.",240,799,69,23.97,330,1,"2026-09-15T08:52:15Z","SE"],
 ["1868deb3","USB-C hubb 6-i-1 med HDMI, kortläsare och laddning","Problemlösande för laptop-användare med få portar. Kan vinklas mot jobb, studier och resor. Mer rationell än impulsiv, men bra om kreativen visar \"saknade portar\"-problemet tydligt.",128,449,52,13.47,220,1,"2026-09-15T08:52:15Z","SE"],
+["74538451","Mini Bluetooth-printer för etiketter och anteckningar","Visuellt demonstrerbar i kort video: printa etiketter från mobilen. Funkar för organisation, småföretag och studenter. Högre AOV men också högre CPA-risk.",240,799,69,23.97,330,1,"2026-09-15T08:52:15Z","SE"],
+["bcc6efcb","Rörelsestyrd LED-list för garderob och kök med USB-laddning","Enkel problemlösare med tydlig före/efter-effekt. Hook: \"ljus där du behöver det utan eldragning\". Bra för små ytor, bostadsrätter och hyrboenden.",92,329,45,9.87,145,1,"2026-09-15T08:52:15Z","SE"],
+["df04db79","Magnetisk mobilhållare till bil med stark sugkopp och vridbart huvud","Lätt att demonstrera i video: håller telefonen stabilt på ojämna vägar. Bra hook: \"ingen mer telefon som ramlar\". Impulsköp med bred målgrupp.",78,279,42,8.37,170,1,"2026-09-15T08:52:15Z","SE"],
+["a2fec317","Electric Eyebrow Trimmer med LED-ljus","Liten, impulsiv och tydligt problemlösande för snabb ansiktsvård. Bra vinkel: smärtfri, exakt, portabel. Kan fungera bra i korta demoannonser.",31,129,26,3.87,72,1,"2026-09-15T08:50:34Z","SE"],
 ["dc37669c","Heatless Curling Rod Set i satin","Stark visuellt före/efter, lätt att demonstrera i video. Bra hook: 'få mjuka lockar utan värme och skador'. Ofta låg frakt, men konkurrensen är hög.",38,149,29,4.47,85,1,"2026-09-15T08:50:34Z","SE"],
 ["705e7f15","Silicone Face Ice Roller med refill-form","Tydlig problemlösare för puffighet och trötta morgonögon. Bra UGC-hook: '2 minuter på morgonen för fräschare look'. Risk: lägre AOV och lätt att price-competa.",22,99,24,2.97,55,1,"2026-09-15T08:50:34Z","SE"],
-["a2fec317","Electric Eyebrow Trimmer med LED-ljus","Liten, impulsiv och tydligt problemlösande för snabb ansiktsvård. Bra vinkel: smärtfri, exakt, portabel. Kan fungera bra i korta demoannonser.",31,129,26,3.87,72,1,"2026-09-15T08:50:34Z","SE"],
 ["9aa13261","Silicone Scalp Massager Shampoo Brush","Visuellt tillfredsställande och enkel att förstå. Hook: bättre hårbottenkänsla, mer schampo-effekt, avkoppling i duschen. Marginalen är tunn men CPA kan vara låg.",19,89,23,2.67,48,1,"2026-09-15T08:50:34Z","SE"],
 ["1abac359","Reusable Makeup Remover Pads med tvättpåse","Miljövinkeln kan konvertera, särskilt som bundle med flera pads. Bra för 'spara pengar och minska engångsrondeller'. Inte lika starkt som hår/skin-tools men stabil testprodukt.",24,109,25,3.27,60,1,"2026-09-15T08:50:34Z","SE"],
 ["4ee0a66d","RFID-blocker tunn plånbok i aluminium","Tydlig problemdriven vinkel: skyddar kort, är minimalistisk och lätt att demonstrera i video. Funkar ofta som impulsköp för män 25–55.",55,199,29,6,120,1,"2026-09-14T22:57:19Z","SE"],
-["d9c9b128","Magnetisk korthållare till mobil med plånboksfunktion","Bra för Meta Ads eftersom den kan visas på en iPhone/Android med snabb före-efter-demo. Stark hook: 'slipp plånboken, ha korten på mobilen'.",68,249,32,7.5,145,1,"2026-09-14T22:57:19Z","SE"],
-["87edf345","Slimmad anti-tjuv plånbok med dragkedja och myntfack","Lösningsorienterad för personer som vill ha säkrare förvaring och bättre organisation. Inte lika 'wow', men kan fungera med praktiska hooks kring vardagskaos och fickvänlighet.",82,289,35,8.7,165,1,"2026-09-14T22:57:19Z","SE"],
-["d0614843","Herrplånbok i äkta läder med pop-up kortfack","Klassisk produkt med högre upplevt värde, men konkurrensen är hård. Kan funka med premiumvinkel och gåvotema, men marginalen blir mer pressad.",98,349,39,10.5,190,1,"2026-09-14T22:57:19Z","SE"],
 ["9ae76b44","Tunn reseplånbok med passficka och RFID-skydd","Visuellt demonstrerbar för resor och vardagsbruk, särskilt mot säkerhets- och ordningsvinklar. Bra vid säsongstoppar, men inte alltid stark nog att bära hög CPA året runt.",74,279,36,8.4,160,1,"2026-09-14T22:57:19Z","SE"],
-["c77c8784","Elektrisk minihackare för vitlök och lök, uppladdningsbar","Tydlig demo: hackar vitlök/lök på sekunder. Funkar bra för ’slipp tårar och kladd’-vinkel, men konkurrensen är hög och returrisken medel.",58,199,39,6,95,1,"2026-09-14T22:56:57Z","SE"],
+["d0614843","Herrplånbok i äkta läder med pop-up kortfack","Klassisk produkt med högre upplevt värde, men konkurrensen är hård. Kan funka med premiumvinkel och gåvotema, men marginalen blir mer pressad.",98,349,39,10.5,190,1,"2026-09-14T22:57:19Z","SE"],
+["87edf345","Slimmad anti-tjuv plånbok med dragkedja och myntfack","Lösningsorienterad för personer som vill ha säkrare förvaring och bättre organisation. Inte lika 'wow', men kan fungera med praktiska hooks kring vardagskaos och fickvänlighet.",82,289,35,8.7,165,1,"2026-09-14T22:57:19Z","SE"],
+["d9c9b128","Magnetisk korthållare till mobil med plånboksfunktion","Bra för Meta Ads eftersom den kan visas på en iPhone/Android med snabb före-efter-demo. Stark hook: 'slipp plånboken, ha korten på mobilen'.",68,249,32,7.5,145,1,"2026-09-14T22:57:19Z","SE"],
 ["cbfe5e9a","Hopfällbar silikondurkslag i rostfritt handtag","Visuellt enkel produkt som löser förvaring i små kök. Bra hook: ’sparar skåpsplats’. Inte den mest sexiga produkten, så kräver starka kreativa.",42,159,35,5,78,1,"2026-09-14T22:56:57Z","SE"],
-["d8117098","Antislip-matta för skärbräda med sugproppar","Problemlösande för halkande skärbrädor och bättre säkerhet. Bra UGC-hook med före/efter, men låg impulsnivå och kräver pedagogisk annons.",31,129,32,4,68,1,"2026-09-14T22:56:57Z","SE"],
-["3c701278","Silicone air fryer liner med hög kant, 2-pack","Lätt att demonstrera: mindre rengöring och mindre fett i airfryern. Bra volymprodukt, men ofta prispressad och kräver paket/uppsidesförklaring.",36,149,34,4,72,1,"2026-09-14T22:56:57Z","SE"],
 ["d6bfaca8","Vakuumpump för vinflaska med 4 återanvändbara korkar","Bra present- och impulsprodukt med tydlig användning efter middagar. Kan fungera med kvälls- och helg-customer, men säljcykeln är smalare och CPA kan bli hög.",64,249,40,7,112,1,"2026-09-14T22:56:57Z","SE"],
-["0121df66","Laddningsbar rörelsesensor-lampa för garderob och kök under skåp","Bra impulsköp eftersom den löser ett tydligt problem: mörka garderober, köksskåp och hallskåp. Lätt att demonstrera i kort video med före/efter och rörelsesensor.",78,249,39,8,145,1,"2026-09-14T22:54:55Z","SE"],
+["3c701278","Silicone air fryer liner med hög kant, 2-pack","Lätt att demonstrera: mindre rengöring och mindre fett i airfryern. Bra volymprodukt, men ofta prispressad och kräver paket/uppsidesförklaring.",36,149,34,4,72,1,"2026-09-14T22:56:57Z","SE"],
+["d8117098","Antislip-matta för skärbräda med sugproppar","Problemlösande för halkande skärbrädor och bättre säkerhet. Bra UGC-hook med före/efter, men låg impulsnivå och kräver pedagogisk annons.",31,129,32,4,68,1,"2026-09-14T22:56:57Z","SE"],
+["c77c8784","Elektrisk minihackare för vitlök och lök, uppladdningsbar","Tydlig demo: hackar vitlök/lök på sekunder. Funkar bra för ’slipp tårar och kladd’-vinkel, men konkurrensen är hög och returrisken medel.",58,199,39,6,95,1,"2026-09-14T22:56:57Z","SE"],
 ["bd2fd38d","Trådlös vägglampa med uppladdningsbart batteri och touch-dimmer","Kan funka för hyresgäster och folk som inte vill dra el. Visuellt stark med enkel montering utan borrning och mysig kvällsbelysning.",132,449,49,13,210,1,"2026-09-14T22:54:55Z","SE"],
-["4d039e06","LED-spegelbelysning med självhäftande remsa för sminkbord och badrumsspegel","Låg tröskel och tydlig användningsnytta för smink/​hudvård. Meta-vänlig hook är bättre ljus för makeup på några sekunder, enkel före/efter.",64,199,35,6,110,1,"2026-09-14T22:54:55Z","SE"],
-["1231e9c8","Solcellsdriven utomhusvägglampa med rörelsesensor","Problemlösande för entré, garage och stuga utan eldragning. Bra visuell demo kvällstid med rörelsestyrt ljus och säkerhetsvinkel.",118,399,59,12,185,1,"2026-09-14T22:54:55Z","SE"],
 ["369a041b","Varmvit dimbar LED-girlanga för balkong och sovrum","Impulsvänlig inredningsprodukt med starkt visuellt uttryck. Fungerar bra i kreativa ads med mysig transformation av balkong, sovrum eller uteplats.",92,299,45,9,160,1,"2026-09-14T22:54:55Z","SE"],
-["41df9aba","Mikrovågslock med ångventil i silikon","Lätt att demonstrera visuellt: stänkfritt, återanvändbart och sparar tid vid uppvärmning. Bra hook: 'slipp mikrovågsskrubbet'.",18,149,22,4.5,85,1,"2026-09-14T22:54:50Z","SE"],
+["1231e9c8","Solcellsdriven utomhusvägglampa med rörelsesensor","Problemlösande för entré, garage och stuga utan eldragning. Bra visuell demo kvällstid med rörelsestyrt ljus och säkerhetsvinkel.",118,399,59,12,185,1,"2026-09-14T22:54:55Z","SE"],
+["4d039e06","LED-spegelbelysning med självhäftande remsa för sminkbord och badrumsspegel","Låg tröskel och tydlig användningsnytta för smink/​hudvård. Meta-vänlig hook är bättre ljus för makeup på några sekunder, enkel före/efter.",64,199,35,6,110,1,"2026-09-14T22:54:55Z","SE"],
+["0121df66","Laddningsbar rörelsesensor-lampa för garderob och kök under skåp","Bra impulsköp eftersom den löser ett tydligt problem: mörka garderober, köksskåp och hallskåp. Lätt att demonstrera i kort video med före/efter och rörelsesensor.",78,249,39,8,145,1,"2026-09-14T22:54:55Z","SE"],
 ["70e770a8","Vikbar diskho-sil / sink strainer i rostfritt stål","Problemlösande för matrester i vasken och enkel före/efter-demo. Funkar bra med vinkeln 'stoppa stopp i avloppet'.",42,189,29,5.7,110,1,"2026-09-14T22:54:50Z","SE"],
-["d5c093f4","Elektrisk mjölkskummare handhållen USB-uppladdningsbar","Impulsköp med tydlig demo: snabb skumning av kaffe på sekunder. Bra för reel/video med latte-inspirerad vardagslyx.",68,249,28,7.5,145,1,"2026-09-14T22:54:50Z","SE"],
-["7a71019e","Justerbar kylskåpsorganisatör med utdragbar låda","Visuellt starkt för 'före/efter'-organisering i kylskåpet. Kan funka men är mer konkurrensutsatt och kräver stark creative.",96,329,39,9.9,190,1,"2026-09-14T22:54:50Z","SE"],
 ["8eb9d1ce","Automatisk kryddburksöppnare för glasburkar","Problemlösande för personer med svag handstyrka och lätt att visa i video. Mer nischad, men tydlig pain-point och bra present-vinkel.",84,299,34,9,175,1,"2026-09-14T22:54:50Z","SE"],
+["7a71019e","Justerbar kylskåpsorganisatör med utdragbar låda","Visuellt starkt för 'före/efter'-organisering i kylskåpet. Kan funka men är mer konkurrensutsatt och kräver stark creative.",96,329,39,9.9,190,1,"2026-09-14T22:54:50Z","SE"],
+["d5c093f4","Elektrisk mjölkskummare handhållen USB-uppladdningsbar","Impulsköp med tydlig demo: snabb skumning av kaffe på sekunder. Bra för reel/video med latte-inspirerad vardagslyx.",68,249,28,7.5,145,1,"2026-09-14T22:54:50Z","SE"],
+["41df9aba","Mikrovågslock med ångventil i silikon","Lätt att demonstrera visuellt: stänkfritt, återanvändbart och sparar tid vid uppvärmning. Bra hook: 'slipp mikrovågsskrubbet'.",18,149,22,4.5,85,1,"2026-09-14T22:54:50Z","SE"],
 ];
 
 /* Annonsupplägg per kandidat. Egen kreativ, genererad av modellen — sökningen
    i Metas publika annonsbibliotek är till för att se vad som redan går. */
 const AD_PLANS = {
+  "6a10ad3e": { q: "jump rope",
+    angle: "Snabb kondition hemma utan att ta plats", hook: "Du behöver inte ett gym för att få upp pulsen hemma.", format: "UGC-demo 15 s, vertikal 9:16",
+    script: ["0–3 s: Visa ett stökigt vardagsrum och texten om att träna hemma utan dyr utrustning.","3–7 s: Snabb demo av hopprepet, hur räknaren visar antal hopp och hur lätt det är att använda.","7–11 s: Klipp med användning i hall/vardagsrum och när produkten läggs i en låda eller väska.","11–15 s: Close-up på funktioner och call to action: enkel start, liten plats, beställ idag."],
+    audience: "Vuxna 20–45 år i Sverige, intressen: hemmaträning, kondition, fitness, HIIT, yoga, träningsappar, fitness-gadgets.", primaryText: "En enkel träningsgrej som funkar hemma, kräver minimal plats och är lätt att ta fram när du vill få in ett snabbt pass. Perfekt för dig som vill hålla igång utan att bygga ett hemmagym.", headline: "Träna hemma på liten yta" },
+  "bf1e506e": { q: "push up bars",
+    angle: "Bättre grepp och enklare armhävningar hemma", hook: "Vanliga armhävningar känns tråkiga? Testa en enklare setup hemma.", format: "Före/efter split screen 12 s, vertikal 9:16",
+    script: ["0–3 s: Visa golv-armhävningar direkt mot golvytan och text om grepp och komfort.","3–6 s: Byt till push-up bars och visa hur händerna kommer upp från golvet.","6–9 s: Snabb demo av fler vinklar och övningar på samma produkt.","9–12 s: Close-up på halkskydd och enkel förvaring under soffa eller säng."],
+    audience: "Män 18–45 år i Sverige, intressen: styrketräning, calisthenics, hemmaträning, armhävningar, fitness, bodyweight training.", primaryText: "Ett enkelt tillbehör som gör hemmaträningen mer praktisk utan att ta plats. Bra för dig som vill träna överkropp hemma med stabilt grepp.", headline: "Stabilare armhävningar hemma" },
+  "85b828ec": { q: "exercise mat",
+    angle: "Skapa en tydlig träningsyta hemma på sekunder", hook: "Det tar bara några sekunder att göra golvet redo för träning.", format: "UGC-demo 15 s, vertikal 9:16",
+    script: ["0–3 s: Visa ett vanligt vardagsrumsgolv och text om att träna utan att flytta möbler.","3–7 s: Rulla ut mattan och visa storleken samt greppet mot golvet.","7–11 s: Demonstrera stretch, core och lätt kroppsviktsträning på mattan.","11–15 s: Rulla ihop den snabbt och visa enkel förvaring bakom dörr eller soffa."],
+    audience: "Kvinnor och män 20–45 år i Sverige, intressen: yoga, pilates, hemmaträning, mobility, stretching, fitness, lägenhetsliv.", primaryText: "Gör hemmaträningen enklare med en matta som skapar en tydlig plats för passet. Praktisk när du vill komma igång snabbt och hålla ytan ordnad.", headline: "Redo för träning på sekunder" },
+  "c81a021a": { q: "resistance bands",
+    angle: "Ett helt hemmagym i en påse", hook: "Det här lilla setet kan ersätta halva gymväskan hemma.", format: "UGC-demo 18 s, vertikal 9:16",
+    script: ["0–3 s: Visa alla band uppställda på ett bord med text om enkel hemmaträning.","3–8 s: Snabba klipp på rodd, press och benövningar med samma set.","8–13 s: Visa dörrankaret och hur det fästs i en vanlig dörr.","13–18 s: Packa ihop allt i påsen och avsluta med CTA om enkel träning hemma."],
+    audience: "Vuxna 20–50 år i Sverige, intressen: hemmaträning, styrketräning, pilates, yoga, rehab-träning, fitness, träningsband.", primaryText: "Ett kompakt träningsset för hemmabruk som är lätt att ta fram, lätt att förstå och lätt att förvara. Perfekt när du vill träna med motstånd utan stora redskap.", headline: "Hemmagym i en påse" },
+  "c2dafae7": { q: "ab wheel",
+    angle: "En enkel core-produkt för hemmaträning", hook: "Det här är ett av de enklaste sätten att göra hemmaträningen mer effektiv.", format: "UGC-demo 20 s, vertikal 9:16",
+    script: ["0–3 s: Visa produkten direkt på golvet med text om hemmaträning utan maskinpark.","3–8 s: Demonstrera rullningen framåt och tillbaka, gärna med knästöd för att signalera användarvänlighet.","8–14 s: Visa hur den packas undan snabbt och fungerar på liten yta.","14–20 s: Close-up på handtag, hjul och knäskydd, avsluta med enkel CTA."],
+    audience: "Män och kvinnor 18–44 år i Sverige, intressen: styrketräning, hemmagym, calisthenics, fitness, core-träning, träningsutrustning.", primaryText: "Vill du ha en liten träningsprodukt som faktiskt används hemma? Maghjulet är kompakt, enkelt att förstå och passar bra i ett snabbt hemmapass.", headline: "Kompakt core-träning hemma" },
   "d496b8fa": { q: "milk frother",
     angle: "Make café-style drinks at home in seconds", hook: "I didn’t expect a £30 gadget to make this much difference to my morning coffee.", format: "UGC-demo 15 s, vertical 9:16",
     script: ["0-3s: Close-up of flat milk in a mug; text overlay: 'Why does home coffee never feel like this?'","3-7s: Show the frother switched on in the mug, creating foam quickly.","7-11s: Pour the frothed milk into coffee; capture the texture and sound.","11-15s: Final shot of the finished drink beside a kitchen counter; CTA: 'Upgrade your routine'."],
     audience: "UK coffee drinkers, home workers, instant coffee buyers, interests: coffee, home brewing, kitchen gadgets, Starbucks, Nespresso", primaryText: "Turn your daily coffee into a café-style drink at home in seconds. A simple kitchen upgrade for anyone who wants better mornings without the café price tag.", headline: "Café Coffee at Home" },
-  "5132940f": { q: "pot strainer",
-    angle: "Stops spills and saves space in small kitchens", hook: "This tiny kitchen tool saves me from making a mess every single night.", format: "Problem-solution demo 12 s, vertical 9:16",
-    script: ["0-3s: Show someone trying to drain pasta with a lid slipping off; messy water splash.","3-6s: Introduce the clip-on strainer lid clipped onto the pan.","6-9s: Pour out water smoothly with no extra colander.","9-12s: End on tidy countertop and pan; text overlay: 'One less thing to wash'."],
-    audience: "Home cooks, renters, students, small flat kitchens, interests: cooking, meal prep, kitchen organisation, homeware", primaryText: "A simple way to strain pasta, veg or potatoes without reaching for a bulky colander. Ideal for smaller UK kitchens where space and cleanup both matter.", headline: "Strain Without the Mess" },
-  "627cb8a7": { q: "adjustable lid",
-    angle: "One lid that fits more than one pan", hook: "If your cupboard is full of random lids, this solves the chaos.", format: "UGC kitchen hack demo 18 s, vertical 9:16",
-    script: ["0-4s: Show a messy stack of different pan lids sliding around in a cupboard.","4-8s: Reveal the adjustable lid and demonstrate it fitting two different pans.","8-13s: Show steam vent in use while cooking on the hob.","13-18s: Finish with a neat cupboard shot and text overlay: 'Less clutter, more use'."],
-    audience: "UK homeowners, renters, organisation shoppers, interests: kitchen organisation, home improvement, cooking, compact living", primaryText: "Replace the random stack of lids with one adjustable solution. A smart kitchen buy for everyday cooking and tidier storage.", headline: "One Lid, More Pans" },
-  "3c1cfa65": { q: "automatic stirrer",
-    angle: "Hands-free stirring for busy home cooks", hook: "This is the closest thing to having an extra hand in the kitchen.", format: "Kitchen demo 20 s, vertical 9:16",
-    script: ["0-4s: Show sauce or risotto simmering while the cook steps away briefly.","4-8s: Place the automatic stirrer in the pan and switch it on.","8-14s: Show consistent stirring while the person preps another ingredient.","14-20s: End with a smooth finished dish and text overlay: 'Stay focused on the rest of dinner'."],
-    audience: "Busy parents, home cooks, meal prep buyers, interests: cooking, kitchen gadgets, air fryers, recipe content, home convenience", primaryText: "Keep things moving while you prep the rest of dinner. A clever kitchen helper for sauces, soups and slow-cook style recipes.", headline: "Hands-Free Stirring" },
   "5cf49528": { q: "electric grinder",
     angle: "A cleaner, easier upgrade for everyday seasoning", hook: "These are the kitchen upgrade I didn’t know I wanted until I used them.", format: "Premium UGC demo 15 s, vertical 9:16",
     script: ["0-3s: Show manual grinder twisting effortlessly replaced by a one-button electric grinder.","3-7s: Close-up of fresh seasoning falling onto food.","7-11s: Show the set on a clean dining table or beside the hob.","11-15s: End with both grinders charging neatly; text overlay: 'Simple, tidy, giftable'."],
     audience: "Gift buyers, home cooks, new homeowners, interests: kitchenware, home gifts, cooking, dining, home decor", primaryText: "A simple everyday upgrade that looks great on the counter and works with one touch. A practical gift idea for any UK kitchen.", headline: "Easy One-Touch Grinding" },
+  "3c1cfa65": { q: "automatic stirrer",
+    angle: "Hands-free stirring for busy home cooks", hook: "This is the closest thing to having an extra hand in the kitchen.", format: "Kitchen demo 20 s, vertical 9:16",
+    script: ["0-4s: Show sauce or risotto simmering while the cook steps away briefly.","4-8s: Place the automatic stirrer in the pan and switch it on.","8-14s: Show consistent stirring while the person preps another ingredient.","14-20s: End with a smooth finished dish and text overlay: 'Stay focused on the rest of dinner'."],
+    audience: "Busy parents, home cooks, meal prep buyers, interests: cooking, kitchen gadgets, air fryers, recipe content, home convenience", primaryText: "Keep things moving while you prep the rest of dinner. A clever kitchen helper for sauces, soups and slow-cook style recipes.", headline: "Hands-Free Stirring" },
+  "627cb8a7": { q: "adjustable lid",
+    angle: "One lid that fits more than one pan", hook: "If your cupboard is full of random lids, this solves the chaos.", format: "UGC kitchen hack demo 18 s, vertical 9:16",
+    script: ["0-4s: Show a messy stack of different pan lids sliding around in a cupboard.","4-8s: Reveal the adjustable lid and demonstrate it fitting two different pans.","8-13s: Show steam vent in use while cooking on the hob.","13-18s: Finish with a neat cupboard shot and text overlay: 'Less clutter, more use'."],
+    audience: "UK homeowners, renters, organisation shoppers, interests: kitchen organisation, home improvement, cooking, compact living", primaryText: "Replace the random stack of lids with one adjustable solution. A smart kitchen buy for everyday cooking and tidier storage.", headline: "One Lid, More Pans" },
+  "5132940f": { q: "pot strainer",
+    angle: "Stops spills and saves space in small kitchens", hook: "This tiny kitchen tool saves me from making a mess every single night.", format: "Problem-solution demo 12 s, vertical 9:16",
+    script: ["0-3s: Show someone trying to drain pasta with a lid slipping off; messy water splash.","3-6s: Introduce the clip-on strainer lid clipped onto the pan.","6-9s: Pour out water smoothly with no extra colander.","9-12s: End on tidy countertop and pan; text overlay: 'One less thing to wash'."],
+    audience: "Home cooks, renters, students, small flat kitchens, interests: cooking, meal prep, kitchen organisation, homeware", primaryText: "A simple way to strain pasta, veg or potatoes without reaching for a bulky colander. Ideal for smaller UK kitchens where space and cleanup both matter.", headline: "Strain Without the Mess" },
   "9df592e2": { q: "vattentät rabbit vibrator" },
-  "f39b6dfd": { q: "uppvärmd punktsstav flexibelt" },
-  "8b0d63cd": { q: "parvibrator fjärrkontroll app" },
-  "2c7c22c0": { q: "diskret mini vibrator" },
   "e6d6bc2a": { q: "dubbeldesignad dildo medicinsk" },
-  "df04db79": { q: "magnetisk mobilhållare bil" },
+  "2c7c22c0": { q: "diskret mini vibrator" },
+  "8b0d63cd": { q: "parvibrator fjärrkontroll app" },
+  "f39b6dfd": { q: "uppvärmd punktsstav flexibelt" },
   "028f3063": { q: "led väckarklocka trådlös" },
-  "bcc6efcb": { q: "rörelsestyrd led list" },
-  "74538451": { q: "mini bluetooth printer" },
   "1868deb3": { q: "usb hubb hdmi" },
+  "74538451": { q: "mini bluetooth printer" },
+  "bcc6efcb": { q: "rörelsestyrd led list" },
+  "df04db79": { q: "magnetisk mobilhållare bil" },
+  "a2fec317": { q: "electric eyebrow trimmer" },
   "dc37669c": { q: "heatless curling rod" },
   "705e7f15": { q: "silicone face ice" },
-  "a2fec317": { q: "electric eyebrow trimmer" },
   "9aa13261": { q: "silicone scalp massager" },
   "1abac359": { q: "reusable makeup remover" },
   "4ee0a66d": { q: "rfid blocker tunn" },
-  "d9c9b128": { q: "magnetisk korthållare mobil" },
-  "87edf345": { q: "slimmad anti tjuv" },
-  "d0614843": { q: "herrplånbok äkta läder" },
   "9ae76b44": { q: "tunn reseplånbok passficka" },
-  "c77c8784": { q: "elektrisk minihackare för" },
+  "d0614843": { q: "herrplånbok äkta läder" },
+  "87edf345": { q: "slimmad anti tjuv" },
+  "d9c9b128": { q: "magnetisk korthållare mobil" },
   "cbfe5e9a": { q: "hopfällbar silikondurkslag rostfritt" },
-  "d8117098": { q: "antislip matta för" },
-  "3c701278": { q: "silicone air fryer" },
   "d6bfaca8": { q: "vakuumpump för vinflaska" },
-  "0121df66": { q: "laddningsbar rörelsesensor lampa" },
+  "3c701278": { q: "silicone air fryer" },
+  "d8117098": { q: "antislip matta för" },
+  "c77c8784": { q: "elektrisk minihackare för" },
   "bd2fd38d": { q: "trådlös vägglampa uppladdningsbart" },
-  "4d039e06": { q: "led spegelbelysning självhäftande" },
-  "1231e9c8": { q: "solcellsdriven utomhusvägglampa rörelsesensor" },
   "369a041b": { q: "varmvit dimbar led" },
-  "41df9aba": { q: "mikrovågslock ångventil silikon" },
+  "1231e9c8": { q: "solcellsdriven utomhusvägglampa rörelsesensor" },
+  "4d039e06": { q: "led spegelbelysning självhäftande" },
+  "0121df66": { q: "laddningsbar rörelsesensor lampa" },
   "70e770a8": { q: "vikbar diskho sil" },
-  "d5c093f4": { q: "elektrisk mjölkskummare handhållen" },
-  "7a71019e": { q: "justerbar kylskåpsorganisatör utdragbar" },
   "8eb9d1ce": { q: "automatisk kryddburksöppnare för" },
+  "7a71019e": { q: "justerbar kylskåpsorganisatör utdragbar" },
+  "d5c093f4": { q: "elektrisk mjölkskummare handhållen" },
+  "41df9aba": { q: "mikrovågslock ångventil silikon" },
 };
 
 const AI = {
@@ -463,7 +488,7 @@ function calcCandidate(row) {
   return {
     id, name, notes, created,
     country: MARKETS[country] ? country : HOME, market: m, cur: m.cur, mex,
-    ad: AD_PLANS[id] ?? null,
+    ad: PLANS[id] ?? null,
     inputs: { cost, sale, ship, fee, cpa, units: u },
     contribution, grossMargin, expectedPoas, verdict,
     breakEvenRoas: grossMargin > 0 ? 1 / grossMargin : null,
@@ -471,7 +496,30 @@ function calcCandidate(row) {
     cpaEx: mex(cpa),
   };
 }
-const CANDIDATES = RAW_CANDIDATES.map(calcCandidate);
+/* Kandidatlistan börjar i ögonblicksbilden från API:t, men sidan kan köra ny
+   research och lägga till rader. Därför är den föränderlig och byggs om i
+   stället för att räknas en gång vid start. */
+let RAW = RAW_CANDIDATES.slice();
+let PLANS = Object.assign({}, AD_PLANS);
+let CANDIDATES = RAW.map(calcCandidate);
+const rebuild = () => { CANDIDATES = RAW.map(calcCandidate); };
+
+/* Två rader är samma produkt om namnen är lika. Den inbakade raden vinner:
+   den kommer från databasen och bär dess riktiga id. */
+const nameKey = (s) => String(s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+function addRows(rows, plans) {
+  const seen = new Set(RAW.map((r) => nameKey(r[1])));
+  const added = [];
+  for (const r of rows) {
+    if (seen.has(nameKey(r[1]))) continue;
+    seen.add(nameKey(r[1]));
+    RAW.unshift(r);
+    if (plans[r[0]]) PLANS[r[0]] = plans[r[0]];
+    added.push(r);
+  }
+  if (added.length) rebuild();
+  return added;
+}
 
 /* ── Chansscore ──────────────────────────────────────────────────────────
    Fyra axlar. CPA-tolerans är INTE en egen: POAS faller till 1,00 exakt när
@@ -862,7 +910,7 @@ let countryFilter = "ALL";
 
 /* Länder som faktiskt förekommer i listan, i den ordning MARKETS räknar upp
    dem. Ett land utan kandidater får ingen knapp — annars vore hälften döda. */
-const COUNTRIES = Object.keys(MARKETS).filter((k) => RAW_CANDIDATES.some((r) => (r[10] ?? HOME) === k));
+const countries = () => Object.keys(MARKETS).filter((k) => CANDIDATES.some((c) => c.country === k));
 
 /* Sökning över namn, anteckning, land och annonsupplägg. Diakritiklös
    jämförelse, så "plånbok" hittas även när man skriver "planbok". Flera ord
@@ -879,6 +927,232 @@ function matches(c, q) {
   if (!terms.length) return true;
   const hay = haystack(c);
   return terms.every((t) => hay.includes(t));
+}
+
+/* ── Ny research på begäran ──────────────────────────────────────────────
+   En artefakt får inte göra nätverksanrop, så sidan kan inte ringa n8n:s
+   webhook direkt. Den går i stället via läsarens egen n8n-koppling: samma
+   arbetsflöde, samma databas, men med läsarens inloggning i stället för en
+   öppen adress. Nya kandidater sparas i sidans egen lagring så att de finns
+   kvar efter en omladdning — n8n har dem redan i product_candidates. */
+const RESEARCH = {
+  server: "n8n",
+  workflow: "jD6A7tOD1L8bdUd8",
+  trigger: "API: generera research",
+  node: "Dela upp kandidater",
+};
+
+/* window.claude finns bara inuti en publicerad artefakt. Öppnad som lokal
+   fil saknas den helt, och då ska sidan fungera utan att kasta. */
+const cap = async (name) => {
+  try { return window.claude && window.claude.use ? await window.claude.use(name) : null; }
+  catch (e) { return null; }
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/* Varje kopplingsfel har sin egen rätta åtgärd. En gemensam "något gick
+   fel" döljer just den knapp som skulle laga sidan. */
+const MCP_FIX = {
+  server_not_connected: "Lägg till n8n under claude.ai → Inställningar → Kopplingar.",
+  needs_reauth: "n8n behöver återanslutas: claude.ai → Inställningar → Kopplingar.",
+  selection_required: "Du har flera n8n-kopplingar och har inte valt en. Välj i claude.ai och försök igen.",
+  not_in_manifest: "n8n är inte tillåtet för den här sidan. Tillåt kopplingen när sidan frågar.",
+  blocked_by_policy: "Organisationens policy blockerar det här n8n-verktyget.",
+  approval_required: "Anropet kräver ett godkännande som inte går att ge härifrån.",
+  not_granted: "Den här vyn har inte tillgång till dina kopplingar. Öppna sidan från claude.ai.",
+  capability_disabled: "Den här vyn kan inte nå kopplingar.",
+  capability_removed: "Den här vyn kan inte nå kopplingar.",
+  cancelled: "Körningen avbröts. Hann den starta kan kandidaterna ändå ligga i n8n.",
+  rate_limited: "För många anrop just nu. Vänta en stund och försök igen.",
+  server_unavailable: "n8n svarade inte. Försök igen om en stund.",
+  bad_request: "Anropet till n8n var felformat — det är en bugg i sidan.",
+};
+
+let rState = { status: "idle", niche: "", country: HOME, msg: "", added: 0, total: 0, fix: "" };
+let researchCountry = HOME;
+
+const paint = (msg) => {
+  rState.msg = msg;
+  const el = document.getElementById("rStatus");
+  if (el) el.textContent = msg; else render();
+};
+
+async function callN8n(mcp, tool, input, retry) {
+  try {
+    return await mcp.callTool(RESEARCH.server, tool, input, { cache: false });
+  } catch (e) {
+    // Bara läsningar får göras om, och bara en gång. En körning som redan
+    // startat får aldrig startas igen automatiskt.
+    if (retry && e && e.retryable === true) {
+      await sleep(Math.min(e.retryAfterMs || 2000, 8000) + Math.random() * 400);
+      return await mcp.callTool(RESEARCH.server, tool, input, { cache: false });
+    }
+    throw e;
+  }
+}
+
+function planFrom(p, name) {
+  const words = norm(name).replace(/[^a-z0-9 -]/g, " ").split(/[\s-]+/).filter((w) => w.length > 2);
+  const q = p && p.adLibraryQuery ? String(p.adLibraryQuery) : words.slice(0, 3).join(" ");
+  if (!p) return { q };
+  return {
+    q,
+    angle: p.angle || null, hook: p.hook || null, format: p.format || null,
+    script: Array.isArray(p.script) ? p.script.map(String) : [],
+    audience: p.audience || null, primaryText: p.primaryText || null, headline: p.headline || null,
+  };
+}
+
+/* Lagringen är en bekvämlighet, inte resultatet: går den fel står
+   kandidaterna kvar i vyn och i n8n:s databas ändå. */
+async function saveRows(rows, plans, niche) {
+  try {
+    const db = await cap("db");
+    if (!db) return;
+    for (const r of rows) {
+      await db.collection("candidates").doc(r[0]).set({
+        row: r, plan: plans[r[0]] || null, niche, country: r[10], addedAt: Date.now(),
+      });
+    }
+  } catch (e) { /* tyst: sidan visar dem redan */ }
+}
+
+async function loadSaved() {
+  try {
+    const db = await cap("db");
+    if (!db) return;
+    const snap = await db.collection("candidates").orderBy("addedAt", "desc").limit(500).get();
+    const rows = [], plans = {};
+    snap.docs.forEach((d) => {
+      const v = d.data() || {};
+      if (Array.isArray(v.row) && v.row.length >= 10) {
+        rows.push(v.row);
+        if (v.plan) plans[v.row[0]] = v.plan;
+      }
+    });
+    if (addRows(rows, plans).length) render();
+  } catch (e) { /* tyst: ögonblicksbilden räcker */ }
+}
+
+async function runResearch(niche, country) {
+  if (rState.status === "running") return;
+  rState = { status: "running", niche, country, msg: "Startar körningen…", added: 0, total: 0, fix: "" };
+  render();
+
+  const fail = (e) => {
+    const code = e && e.code ? String(e.code) : "upstream_error";
+    rState = {
+      status: "error", niche, country, added: 0, total: 0,
+      msg: code === "tool_error" && e.message ? e.message : "Research-körningen gick inte igenom.",
+      fix: MCP_FIX[code] || "Ladda om sidan och försök igen.",
+    };
+    render();
+  };
+
+  try {
+    const mcp = await cap("mcp");
+    if (!mcp) return fail({ code: "not_granted" });
+
+    const started = await callN8n(mcp, "execute_workflow", {
+      workflowId: RESEARCH.workflow,
+      executionMode: "production",
+      triggerNodeName: RESEARCH.trigger,
+      inputs: { webhookData: { method: "POST", body: { niche, country } } },
+    }, false);
+
+    const id = started && started.payload && started.payload.executionId;
+    if (!id) return fail({ code: "tool_error", message: "n8n svarade utan körnings-id." });
+
+    const t0 = Date.now();
+    let status = "running";
+    for (let i = 0; i < 45; i++) {
+      await sleep(i < 4 ? 2000 : 3500);
+      const st = await callN8n(mcp, "get_workflow_execution", {
+        workflowId: RESEARCH.workflow, executionId: String(id), includeData: false,
+      }, true);
+      status = String((st && st.payload && st.payload.execution && st.payload.execution.status) || "running");
+      if (status !== "running" && status !== "new" && status !== "waiting") break;
+      paint("Söker fram produkter i " + MARKETS[country].name + "… " + Math.round((Date.now() - t0) / 1000) + " s");
+    }
+    if (status !== "success") {
+      return fail({ code: "tool_error", message: 'Körningen slutade som "' + status + '".' });
+    }
+
+    paint("Hämtar resultatet…");
+    const full = await callN8n(mcp, "get_workflow_execution", {
+      workflowId: RESEARCH.workflow, executionId: String(id), includeData: true, nodeNames: [RESEARCH.node],
+    }, true);
+
+    const runData = full && full.payload && full.payload.data && full.payload.data.resultData
+      && full.payload.data.resultData.runData;
+    const run = runData && runData[RESEARCH.node] && runData[RESEARCH.node][0];
+    const items = (run && run.data && run.data.main && run.data.main[0]) || [];
+    if (!items.length) return fail({ code: "tool_error", message: "Körningen gav inga kandidater." });
+
+    const created = new Date().toISOString().slice(0, 19) + "Z";
+    const rows = [], plans = {};
+    items.forEach((it, i) => {
+      const j = (it && it.json) || {};
+      const rid = "n" + id + "-" + i;
+      rows.push([
+        rid, String(j.name || "Namnlös kandidat"), String(j.notes || ""),
+        Number(j.cost_per_unit_incl_vat) || 0, Number(j.sale_price_incl_vat) || 0,
+        Number(j.shipping_cost_per_order) || 0, Number(j.transaction_fee_per_order) || 0,
+        Number(j.expected_cpa_incl_vat) || 0, Number(j.expected_units_per_order) || 1,
+        created, country,
+      ]);
+      plans[rid] = planFrom(j.ad_plan, String(j.name || ""));
+    });
+
+    const added = addRows(rows, plans);
+    saveRows(added, plans, niche);
+    countryFilter = country;
+    query = "";
+    showRejected = false;
+    rState = { status: "done", niche, country, msg: "", added: added.length, total: rows.length, fix: "" };
+    render();
+  } catch (e) {
+    fail(e);
+  }
+}
+
+/* Panelen som kör research. Den syns alltid: sökfältet filtrerar det som
+   redan finns, den här knappen hämtar något nytt. */
+function researchPanel() {
+  const q = query.trim();
+  const running = rState.status === "running";
+  const market = MARKETS[researchCountry];
+  const opts = Object.keys(MARKETS)
+    .map((k) => '<option value="' + k + '"' + (k === researchCountry ? " selected" : "") + ">" + esc(MARKETS[k].name) + "</option>")
+    .join("");
+
+  const result = rState.status === "done"
+    ? '<p class="callout c-pos" style="margin:12px 0 0">' + (rState.added
+        ? "Klart: " + rState.added + " nya kandidater på ”" + esc(rState.niche) + "” i " + esc(MARKETS[rState.country].name) + ", med kalkyl och annonsupplägg. De ligger kvar i n8n:s databas."
+        : "Körningen gav " + rState.total + " förslag, men alla fanns redan i listan.") + "</p>"
+    : rState.status === "error"
+      ? '<div class="callout c-neg" style="margin:12px 0 0"><b>' + esc(rState.msg) + "</b><br>" + esc(rState.fix) + "</div>"
+      : "";
+
+  return '<div style="border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.45);border-radius:14px;padding:16px;margin-bottom:16px">'
+    + '<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">'
+    +   '<div style="flex:1;min-width:210px">'
+    +     '<h3 style="font-size:13.5px;font-weight:600">Hittar du inte produkten?</h3>'
+    +     '<p class="muted" style="margin:4px 0 0">Skriv vilken nisch eller produkt du vill åt i sökfältet ovan, välj marknad och kör. '
+    +       'n8n tar fram fem nya kandidater med kalkyl och annonsupplägg — det tar ungefär 20 sekunder och kostar OpenAI-krediter.</p>'
+    +   '</div>'
+    +   '<label style="display:grid;gap:4px"><span class="muted">Marknad</span>'
+    +     '<select id="rCountry"' + (running ? " disabled" : "") + ' style="border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:7px 10px;font:inherit;font-size:12.5px;color:var(--ink)">'
+    +       opts + '</select></label>'
+    +   '<button id="runResearch" class="fbtn"' + (running || !q ? " disabled" : "") + ' aria-pressed="false"'
+    +     ' style="font-weight:600' + (running || !q ? ";opacity:.5" : ";border-color:rgba(79,70,229,.35);background:rgba(79,70,229,.12);color:var(--series-ink)") + '">'
+    +     (running ? "Kör…" : q ? "Kör research på ”" + esc(q) + "”" : "Skriv en sökning först") + "</button>"
+    + "</div>"
+    + '<p id="rStatus" class="note" style="margin:' + (running ? "12px" : "0") + ' 0 0;color:var(--ink2)">' + (running ? esc(rState.msg) : "") + "</p>"
+    + result
+    + '<p class="muted" style="margin-top:12px">Sidan når n8n genom din egen koppling i claude.ai — första gången frågar den om lov. '
+    +   'Resultatet sparas både i n8n och i sidan, så det finns kvar nästa gång du öppnar den.</p>'
+    + "</div>";
 }
 
 function viewResearch() {
@@ -976,8 +1250,8 @@ function viewResearch() {
   return `${bestBet}
     <div style="margin-top:16px">
     ${sec(`Kandidater (${shown.length})`, "real", "Sparade rader i product_candidates. Kalkylen är beräknad, siffrorna i den är AI-uppskattade.",
-      `${COUNTRIES.length > 1 ? `<div class="filters" style="margin-bottom:12px">
-        ${[["ALL", "Alla marknader", CANDIDATES.length], ...COUNTRIES.map((k) =>
+      `${countries().length > 1 ? `<div class="filters" style="margin-bottom:12px">
+        ${[["ALL", "Alla marknader", CANDIDATES.length], ...countries().map((k) =>
           [k, MARKETS[k].name, CANDIDATES.filter((c) => c.country === k).length])].map(([k, l, cnt]) =>
           `<button class="fbtn" data-country="${k}" aria-pressed="${countryFilter === k}">${l} <span class="num" style="opacity:.7">(${cnt})</span></button>`).join("")}
         <span class="muted" style="margin-left:auto">Moms och valuta följer marknaden</span>
@@ -996,7 +1270,8 @@ function viewResearch() {
           : countryFilter === "ALL" ? `${CANDIDATES.length} kandidater`
           : `${hits.length} kandidater i ${MARKETS[countryFilter].name}`}</span>
       </div>
-      ${query && hits.length === 0 ? emptyBox(`Inget matchar "${esc(query)}".`, "Prova ett kortare ord — sökningen träffar både produktnamn och anteckning.") : ""}
+      ${researchPanel()}
+      ${query && hits.length === 0 ? emptyBox(`Inget matchar "${esc(query)}".`, "Ingen sparad kandidat heter så — men du kan köra research på det direkt här ovanför.") : ""}
       ${rejected > 0 ? `<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.45);border-radius:14px;padding:10px 16px;margin-bottom:16px">
         <span class="note">${rejected} av ${hits.length} dolda — bidraget täcker inte den förväntade annonskostnaden.</span>
         <button id="toggleRejected" style="border:0;background:0;padding:0;font-size:12.5px;font-weight:500;color:var(--series);text-decoration:underline">${showRejected ? "Dölj dem igen" : "Visa dem ändå"}</button>
@@ -1269,12 +1544,27 @@ addEventListener("DOMContentLoaded", () => {
       return render();
     }
     if (e.target.id === "toggleRejected") { showRejected = !showRejected; return render(); }
+    if (e.target.closest("#runResearch")) {
+      const q = query.trim();
+      if (q) runResearch(q, researchCountry);
+      return;
+    }
     if (e.target.id === "clearQ") { query = ""; return render(); }
   });
 
   /* Sökfältet ritas om vid varje tangenttryck, så fokus och markörläge måste
      återställas efteråt — annars hoppar markören ur fältet efter första
      bokstaven. */
+  document.getElementById("view").addEventListener("change", (e) => {
+    if (e.target.id !== "rCountry") return;
+    researchCountry = e.target.value;
+    render();
+  });
+
+  /* Sparad research från tidigare körningar. Lagringen svarar först efter
+     första målningen, så listan byggs om när den kommer. */
+  loadSaved();
+
   let qTimer;
   document.getElementById("view").addEventListener("input", (e) => {
     if (e.target.id !== "q") return;
