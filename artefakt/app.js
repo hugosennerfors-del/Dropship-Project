@@ -1056,6 +1056,158 @@ function viewCandidate(id) {
   </div>`;
 }
 
+/* ── Kalendern: vad som bör researchas, och senast när ───────────────────
+   Samma tabell som n8n-arbetsflödet bär. Den är INTE trenddata: det finns
+   ingen gratis daglig visningsdata för svensk e-handel, och Google Trends
+   dagliga flöde testades och dög inte — kategorifiltret ignoreras och
+   listan är nyheter, inte produkter.
+
+   Viktigare: dagens trend är per definition sen, toppen är redan där.
+   Kalendern siktar därför FRAMÅT. Research körs LEDTID veckor före toppen,
+   så annonserna hinner testas färdigt innan efterfrågan kommer. */
+const LEDTID = 6;
+
+const KALENDER = [
+  { fran: 1,  till: 6,  teman: ["träning och nystart hemma", "torr inomhusluft och vinterhud", "förvaring och ordning efter julen"] },
+  { fran: 7,  till: 11, teman: ["vinterfriluftsliv och kyla utomhus", "hemmakontor och ergonomi", "vinterbilen och skrapa, halka, kyla"] },
+  { fran: 12, till: 16, teman: ["vårstädning och fönsterputs", "odling och plantering på balkong", "allergi, pollen och luftrening"] },
+  { fran: 17, till: 21, teman: ["uteplats, utemöbler och altan", "grillning och utomhusmatlagning", "cykel och utomhusträning"] },
+  { fran: 22, till: 26, teman: ["resa, packning och flyg", "sol, bad och strand", "camping och friluftsliv"] },
+  { fran: 27, till: 31, teman: ["värme inomhus och svala sovrum", "husdjur under sommaren", "utomhuslek och barn på semestern"] },
+  { fran: 32, till: 36, teman: ["skolstart och barnfamiljens vardag", "hemmakontor och skrivbordet", "höststädning och förvaring"] },
+  { fran: 37, till: 41, teman: ["höstmörker och belysning i hemmet", "regn, väta och ytterkläder", "inomhusträning när det blir kallt"] },
+  { fran: 42, till: 45, teman: ["däckbyte och bilen inför vintern", "kalla fötter, värme och filtar", "mörkerkörning, reflexer och synlighet"] },
+  { fran: 46, till: 48, teman: ["presenter och julklappar till vuxna", "mys, levande ljus och stämning inomhus", "köksprylar inför julmaten"] },
+  { fran: 49, till: 53, teman: ["julklappar i sista minuten", "julbord, dukning och servering", "nyår, fest och mellandagar"] },
+];
+
+const BREDD = [
+  "laddning, kablar och mobiltillbehör",
+  "städning och smarta förvaringslösningar i hemmet",
+  "kök och matlagning",
+  "husdjursprodukter för hund och katt",
+  "sömn och återhämtning i sovrummet",
+  "bilinredning och bilvård",
+  "hårvård och styling hemma",
+  "hemmakontor och ergonomi vid skrivbordet",
+  "träning och rehab hemma",
+  "resa, packning och pendling",
+  "småbarnsföräldrar och barnfamiljens vardag",
+  "avkoppling, massage och stel nacke efter jobbet",
+  "verktyg och fix hemma",
+  "organisering av garderob och kläder",
+];
+
+const DAG = 86400000;
+function isoVecka(d) {
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dag = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - dag);
+  const start = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t - start) / DAG + 1) / 7);
+}
+/* Måndagen i en given ISO-vecka. */
+function veckansMandag(ar, v) {
+  const fjarde = new Date(Date.UTC(ar, 0, 4));
+  const mandagV1 = new Date(fjarde.getTime() - ((fjarde.getUTCDay() || 7) - 1) * DAG);
+  return new Date(mandagV1.getTime() + (v - 1) * 7 * DAG);
+}
+const kortDatum = (d) => new Intl.DateTimeFormat(L, { day: "numeric", month: "short", timeZone: "UTC" }).format(d);
+
+/* Har nischen körts? Exakt träff på normaliserad sträng, eller att det ena
+   ordsetet ryms i det andra. Avsiktligt snålt — hellre säga "inte gjord" än
+   påstå täckning som inte finns. */
+const ord = (s) => new Set(norm(s).replace(/[^a-z0-9åäö ]/g, " ").split(/\s+/).filter((w) => w.length > 3));
+function gjord(tema) {
+  const a = ord(tema);
+  const traffar = CANDIDATES.filter((c) => {
+    if (!c.niche) return false;
+    if (norm(c.niche) === norm(tema)) return true;
+    const b = ord(c.niche);
+    if (!a.size || !b.size) return false;
+    const delad = [...a].filter((w) => b.has(w)).length;
+    return delad === a.size || delad === b.size;
+  });
+  if (!traffar.length) return null;
+  const dagar = traffar.map((c) => c.dag).filter(Boolean).sort();
+  return { antal: traffar.length, senast: dagar[dagar.length - 1] || null, nisch: traffar[0].niche };
+}
+
+function viewKalender() {
+  const nu = new Date();
+  const idagUtc = new Date(Date.UTC(nu.getUTCFullYear(), nu.getUTCMonth(), nu.getUTCDate()));
+  const malvecka = isoVecka(new Date(idagUtc.getTime() + LEDTID * 7 * DAG));
+  const fonsterFor = (v) => KALENDER.find((k) => v >= k.fran && v <= k.till) || KALENDER[KALENDER.length - 1];
+
+  const knapp = (tema) => {
+    const g = gjord(tema);
+    const klar = Boolean(g);
+    return `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--hair)">
+      <div style="min-width:0;flex:1">
+        <p style="margin:0;font-size:13.5px;font-weight:500">${esc(tema)}</p>
+        <p class="muted" style="margin:3px 0 0">${klar
+          ? `Researchad — ${g.antal} kandidater, senast ${esc(g.senast || "okänt datum")}`
+          : "Inte researchad än"}</p>
+      </div>
+      ${klar
+        ? `<a class="chip" href="#/research" data-sok="${esc(tema)}">Visa kandidaterna &rarr;</a>`
+        : `<button class="fbtn" data-kor="${esc(tema)}" style="font-weight:600;border-color:rgba(79,70,229,.35);background:rgba(79,70,229,.12);color:var(--series-ink)">Kör research</button>`}
+    </div>`;
+  };
+
+  /* Kommande toppar, med sista rimliga researchdag för var och en. */
+  const rader = [];
+  for (let i = 0; i < 16; i++) {
+    const m = new Date(idagUtc.getTime() + i * 7 * DAG);
+    const v = isoVecka(m);
+    const ar = m.getUTCFullYear();
+    const start = veckansMandag(ar, v);
+    const senast = new Date(start.getTime() - LEDTID * 7 * DAG);
+    const teman = fonsterFor(v).teman;
+    const klara = teman.filter((t) => gjord(t)).length;
+    rader.push({ v, start, slut: new Date(start.getTime() + 6 * DAG), senast, teman, klara,
+      forsenad: senast < idagUtc && klara < teman.length, arMal: v === malvecka });
+  }
+
+  const dagensTeman = fonsterFor(malvecka).teman;
+
+  return `<div style="display:grid;gap:16px">
+    ${sec("Kör detta nu", "computed", `Efterfrågetoppen ligger i vecka ${malvecka}. Research ${LEDTID} veckor före ger annonserna tid att testas färdigt.`, `
+      <p class="note" style="margin:0 0 4px">Temana nedan toppar omkring <b>vecka ${malvecka}</b>
+      (från ${kortDatum(veckansMandag(idagUtc.getUTCFullYear(), malvecka))}). Kör dem nu, inte då.</p>
+      ${dagensTeman.map(knapp).join("")}`)}
+
+    ${sec("Kommande toppar", null, null, `
+      <p class="muted" style="margin:-8px 0 14px">Sista researchdag är veckans start minus ${LEDTID} veckor.
+      Har den passerat utan att temat körts står det <b>försenad</b> — då hinner annonserna inte testas klart.</p>
+      <div class="scroll"><table style="min-width:560px">
+        <thead><tr><th>Vecka</th><th>Toppar</th><th>Researcha senast</th><th>Teman</th><th class="r">Klart</th></tr></thead>
+        <tbody>${rader.map((r) => `<tr${r.arMal ? ' style="background:rgba(79,70,229,.07)"' : ""}>
+          <td class="num" style="font-weight:600">v.${r.v}</td>
+          <td class="muted">${kortDatum(r.start)}&ndash;${kortDatum(r.slut)}</td>
+          <td class="num"${r.forsenad ? ' style="color:var(--neg-ink);font-weight:600"' : ""}>${kortDatum(r.senast)}${r.forsenad ? " · försenad" : ""}</td>
+          <td style="font-size:12.5px">${r.teman.map(esc).join("<br>")}</td>
+          <td class="r num">${r.klara}/${r.teman.length}</td>
+        </tr>`).join("")}</tbody>
+      </table></div>`)}
+
+    ${sec("Bredd året om", null, null, `
+      <p class="muted" style="margin:-8px 0 4px">Nischer utan säsong, som bär volym hela året. De finns här för att
+      täckningen ska växa i stället för att stå still — kör dem när det inte är bråttom med en säsong.</p>
+      ${BREDD.map(knapp).join("")}`)}
+
+    ${sec("Varför kalender och inte trenddata", null, null, `
+      <p class="note" style="margin:0">Det finns ingen gratis daglig visningsdata för svensk e-handel. Google Trends
+      dagliga flöde testades: kategorifiltret ignoreras — tolv kategorier gav identisk lista — och innehållet är
+      nyheter, inte produkter. Den 21 september 2026 bestod listan av kändisar, ett läkemedel och ett spelbolag.</p>
+      <p class="note" style="margin:10px 0 0">Dessutom är dagens trend per definition sen: när en sökning toppar är
+      boomen redan igång. Kalendern siktar i stället ${LEDTID} veckor framåt, vilket är det närmaste man kommer att
+      vara tidig utan att betala för en trendtjänst.</p>
+      <p class="muted" style="margin:12px 0 0;border-top:1px solid var(--hair);padding-top:12px">Ingenting här körs
+      automatiskt. Varje knapp är ett anrop som du startar, och som kostar OpenAI-krediter.</p>`)}
+  </div>`;
+}
+
 function viewAlerts() {
   const crit = ALERTS.filter((a) => a[0] === "critical"), warn = ALERTS.filter((a) => a[0] === "warning");
   if (!ALERTS.length) return sec("Larm", "computed", "Beräknade tröskelvärden i backenden.", emptyBox("Inga larm den här perioden."));
@@ -1098,10 +1250,11 @@ const NAV = [
   ["/", "Overview", '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>'],
   ["/products", "Products", '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>'],
   ["/research", "Research", '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>'],
+  ["/kalender", "Kalender", '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h2M14 14h2M8 18h2"/>'],
   ["/alerts", "Alerts", '<path d="M12 3a6 6 0 0 0-6 6c0 4-1.5 5.5-2 6h16c-.5-.5-2-2-2-6a6 6 0 0 0-6-6z"/><path d="M10 20a2 2 0 0 0 4 0"/>'],
   ["/insights", "AI Insights", '<path d="M12 3v1M4.9 6.3l.7.7M3 13.5h1M20 13.5h1M18.4 7l.7-.7"/><path d="M9 17.5a5 5 0 1 1 6 0c-.6.5-.9 1-1 1.8h-4c-.1-.8-.4-1.3-1-1.8z"/><path d="M10 21h4"/>'],
 ];
-const TITLES = { "/": "Overview", "/products": "Products", "/research": "Research", "/alerts": "Alerts", "/insights": "AI Insights", "/produkt": "Produkt", "/kandidat": "Kandidat" };
+const TITLES = { "/": "Overview", "/products": "Products", "/research": "Research", "/kalender": "Kalender", "/alerts": "Alerts", "/insights": "AI Insights", "/produkt": "Produkt", "/kandidat": "Kandidat" };
 
 function parseHash() {
   const raw = (location.hash || "#/").slice(1);
@@ -1137,6 +1290,7 @@ function render() {
     case "/produkt": html = viewProduct(params.get("sku") ?? ""); break;
     case "/research": html = viewResearch(); break;
     case "/kandidat": html = viewCandidate(params.get("id") ?? ""); break;
+    case "/kalender": html = viewKalender(); break;
     case "/alerts": html = viewAlerts(); break;
     case "/insights": html = viewInsights(); break;
     default: html = viewOverview();
@@ -1175,6 +1329,16 @@ addEventListener("DOMContentLoaded", () => {
     if (cf) { countryFilter = cf.dataset.country; return render(); }
     const df = e.target.closest("[data-day]");
     if (df) { dayFilter = df.dataset.day; return render(); }
+    const sok = e.target.closest("[data-sok]");
+    if (sok) { query = sok.dataset.sok; countryFilter = "ALL"; dayFilter = "ALL"; return; }
+    const kor = e.target.closest("[data-kor]");
+    if (kor) {
+      const tema = kor.dataset.kor;
+      query = tema; researchCountry = HOME; countryFilter = "ALL"; dayFilter = "ALL";
+      location.hash = "#/research";
+      setTimeout(() => runResearch(tema, HOME), 0);
+      return;
+    }
     const s = e.target.closest("[data-sort]");
     if (s) {
       if (sortKey === s.dataset.sort) sortDir = sortDir === "asc" ? "desc" : "asc";

@@ -1,7 +1,13 @@
 # Daglig säsongsresearch
 
-Arbetsflödet `Plan-vy · Daglig säsongsresearch` (n8n `lpM9ISs0ak8Q9esT`) kör
-varje morgon 06:00 svensk tid. `daglig-valj-nischer.js` är innehållet i dess
+**Schemat är avstängt.** Arbetsflödet `Plan-vy · Daglig säsongsresearch`
+(n8n `lpM9ISs0ak8Q9esT`) är avaktiverat och kör ingenting av sig självt —
+varje anrop mot OpenAI kostar pengar, och de ska startas medvetet. Kalendern
+lever i stället i appens Kalender-flik, som visar vad som bör researchas och
+låter dig trycka på det.
+
+Arbetsflödet finns kvar och kan aktiveras igen i n8n om du vill ha det
+automatiskt. Det kördes `daglig-valj-nischer.js` är innehållet i dess
 Code-nod och är den enda del som bestämmer vad som researchas.
 
 ```
@@ -28,11 +34,21 @@ Två av dagens tre nischer kommer ur säsongsfönstret, den tredje ur en rotatio
 av nischer som bär volym året om, så att täckningen växer i stället för att
 stå still.
 
-## Kostnad och reglage
+## Kostnad
 
-Tre nischer per dag är tre LLM-anrop, ungefär 90 i månaden. `PER_DAG` och
-`LEDTID` överst i filen styr det. Pausa hela schemat genom att avaktivera
-arbetsflödet i n8n.
+Tre nischer per körning är tre LLM-anrop mot OpenAI:s API, debiterade per
+token. En ChatGPT-prenumeration täcker inte detta — API och prenumeration är
+skilda konton. Sätt ett tak under platform.openai.com → Settings → Limits.
+
+`PER_DAG` och `LEDTID` överst i filen styr antalet nischer respektive hur
+långt före toppen researchen körs.
+
+## Fallgrop
+
+En avstängd nod i n8n släpper igenom sin indata till nästa nod. Att stänga av
+väljarnoden stoppar alltså inte HTTP-anropet — det avfyras ändå, med tomt
+innehåll, och generatorn faller tillbaka på standardnischen. Stäng av
+HTTP-noden i stället.
 
 ## Härkomst per kandidat
 

@@ -147,4 +147,44 @@ const st2 = await dp.textContent("#view");
 T("sökning når nischen", !st2.includes("Inget matchar"), st2.slice(0, 160));
 await dp.close();
 
+
+
+// ── 9. Kalendervyn ──────────────────────────────────────────────────────
+const kp = await b.newPage({ viewport: { width: 1440, height: 1200 } });
+kp.on("pageerror", (e) => console.log("PAGEERROR:", e.message));
+await kp.goto(url + "#/kalender");
+await kp.waitForTimeout(500);
+const kt = await kp.textContent("#view");
+T("kalendervyn renderas", kt.includes("Kör detta nu") && kt.includes("Kommande toppar"), kt.slice(0, 160));
+T("navet har en kalenderflik", (await kp.$$eval("#nav a", (a) => a.map((x) => x.textContent.trim()))).includes("Kalender"));
+T("siktar framåt, inte på i dag", /toppar omkring vecka \d+/.test(kt) && /Kör dem nu, inte då/.test(kt), kt.slice(0, 200));
+
+const korKnappar = await kp.$$eval("[data-kor]", (n) => n.map((x) => x.getAttribute("data-kor")));
+const visaLankar = await kp.$$eval("[data-sok]", (n) => n.map((x) => x.getAttribute("data-sok")));
+T("teman som körts visas som klara", visaLankar.length >= 8, visaLankar.length + " klara");
+T("teman som inte körts har en knapp", korKnappar.length >= 3, korKnappar.length + " oklara");
+console.log("   researchade:", visaLankar.slice(0, 4).join(" · "));
+console.log("   kvar att köra:", korKnappar.slice(0, 4).join(" · "));
+
+// Täckningen får inte ljuga: varje "klar" ska ha kandidater i listan
+const ljuger = await kp.evaluate((teman) => teman.filter((t) => !CANDIDATES.some((c) => c.niche &&
+  (c.niche.toLowerCase() === t.toLowerCase() ||
+   [...new Set(t.toLowerCase().split(/[^a-zåäö0-9]+/).filter((w) => w.length > 3))]
+     .every((w) => c.niche.toLowerCase().includes(w))))), visaLankar);
+T("inget tema påstås klart utan kandidater", ljuger.length === 0, JSON.stringify(ljuger));
+
+// Deadline-kolumnen
+T("tabellen visar sista researchdag", kt.includes("Researcha senast"), "");
+const forsenade = await kp.$$eval("td", (t) => t.filter((x) => x.textContent.includes("försenad")).length);
+console.log("   försenade toppar:", forsenade);
+
+// Klick på "Visa kandidaterna" ska landa i Research med sökningen satt
+await kp.click('[data-sok]');
+await kp.waitForTimeout(500);
+const rt = await kp.textContent("#view");
+T("visa-länken hoppar till Research", (await kp.evaluate(() => location.hash)) === "#/research", await kp.evaluate(() => location.hash));
+T("sökningen är förifylld", (await kp.inputValue("#q")).length > 3, await kp.inputValue("#q"));
+T("och ger träffar", !rt.includes("Inget matchar"), rt.slice(0, 160));
+await kp.close();
+
 await b.close();
