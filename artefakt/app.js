@@ -47,8 +47,11 @@ const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "
    för att talet är litet. De är grovt kalibrerade mot prisnivån i landet,
    inte mot dagsfärsk växelkurs — betyg jämförs därför inom en marknad. */
 const MARKETS = {
-  SE: { name: "Sverige", cur: "SEK", vat: 0.25, cpaBand: [60, 160], bufBand: [40, 450] },
+  US: { name: "USA", cur: "USD", vat: 0, cpaBand: [6, 18], bufBand: [4, 45] },
   GB: { name: "Storbritannien", cur: "GBP", vat: 0.2, cpaBand: [4.5, 12], bufBand: [3, 34] },
+  AU: { name: "Australien", cur: "AUD", vat: 0.1, cpaBand: [9, 25], bufBand: [6, 65] },
+  EU: { name: "EU", cur: "EUR", vat: 0.21, cpaBand: [5, 14], bufBand: [3.5, 39] },
+  SE: { name: "Sverige", cur: "SEK", vat: 0.25, cpaBand: [60, 160], bufBand: [40, 450] },
   NO: { name: "Norge", cur: "NOK", vat: 0.25, cpaBand: [65, 175], bufBand: [45, 490] },
   DK: { name: "Danmark", cur: "DKK", vat: 0.25, cpaBand: [42, 112], bufBand: [28, 315] },
   DE: { name: "Tyskland", cur: "EUR", vat: 0.19, cpaBand: [5, 14], bufBand: [3.5, 39] },
@@ -581,7 +584,7 @@ const MCP_FIX = {
 };
 
 let rState = { status: "idle", niche: "", country: HOME, msg: "", added: 0, total: 0, fix: "" };
-let researchCountry = HOME;
+let researchCountry = "US";
 
 const paint = (msg) => {
   rState.msg = msg;
@@ -1057,29 +1060,88 @@ function viewCandidate(id) {
 }
 
 /* ── Kalendern: vad som bör researchas, och senast när ───────────────────
-   Samma tabell som n8n-arbetsflödet bär. Den är INTE trenddata: det finns
-   ingen gratis daglig visningsdata för svensk e-handel, och Google Trends
-   dagliga flöde testades och dög inte — kategorifiltret ignoreras och
-   listan är nyheter, inte produkter.
+   Riktad mot köpstarka marknader — USA, Storbritannien, Australien och EU
+   som en enhet — inte mot Sverige. Sverige finns kvar sist eftersom det är
+   där liveprodukterna faktiskt säljs och verklighetskollen fungerar.
 
-   Viktigare: dagens trend är per definition sen, toppen är redan där.
-   Kalendern siktar därför FRAMÅT. Research körs LEDTID veckor före toppen,
-   så annonserna hinner testas färdigt innan efterfrågan kommer. */
+   Kalendern är INTE annonsdata. Metas annonsbibliotek går inte att läsa
+   automatiskt: Graph API:ts ads_archive kräver en godkänd utvecklarapp, och
+   den publika sidan svarar 403 med en bot-utmaning. Varje tema har därför en
+   länk du själv klickar på för att se vad som faktiskt körs just nu.
+
+   Dagens trend är dessutom sen — toppen är redan där. Kalendern siktar
+   LEDTID veckor framåt, så annonserna hinner testas klart före volymen. */
 const LEDTID = 6;
+const ADLIB = { US: "US", GB: "GB", AU: "AU", EU: "DE", SE: "SE" };
 
-const KALENDER = [
-  { fran: 1,  till: 6,  teman: ["träning och nystart hemma", "torr inomhusluft och vinterhud", "förvaring och ordning efter julen"] },
-  { fran: 7,  till: 11, teman: ["vinterfriluftsliv och kyla utomhus", "hemmakontor och ergonomi", "vinterbilen och skrapa, halka, kyla"] },
-  { fran: 12, till: 16, teman: ["vårstädning och fönsterputs", "odling och plantering på balkong", "allergi, pollen och luftrening"] },
-  { fran: 17, till: 21, teman: ["uteplats, utemöbler och altan", "grillning och utomhusmatlagning", "cykel och utomhusträning"] },
-  { fran: 22, till: 26, teman: ["resa, packning och flyg", "sol, bad och strand", "camping och friluftsliv"] },
-  { fran: 27, till: 31, teman: ["värme inomhus och svala sovrum", "husdjur under sommaren", "utomhuslek och barn på semestern"] },
-  { fran: 32, till: 36, teman: ["skolstart och barnfamiljens vardag", "hemmakontor och skrivbordet", "höststädning och förvaring"] },
-  { fran: 37, till: 41, teman: ["höstmörker och belysning i hemmet", "regn, väta och ytterkläder", "inomhusträning när det blir kallt"] },
-  { fran: 42, till: 45, teman: ["däckbyte och bilen inför vintern", "kalla fötter, värme och filtar", "mörkerkörning, reflexer och synlighet"] },
-  { fran: 46, till: 48, teman: ["presenter och julklappar till vuxna", "mys, levande ljus och stämning inomhus", "köksprylar inför julmaten"] },
-  { fran: 49, till: 53, teman: ["julklappar i sista minuten", "julbord, dukning och servering", "nyår, fest och mellandagar"] },
-];
+const SASONG = {
+  US: [
+    { fran: 1,  till: 6,  teman: ["nystart, träning och organisering hemma", "torr vinterluft och inomhusklimat", "hemmakontor och skrivbordet"] },
+    { fran: 7,  till: 11, teman: ["alla hjärtans dag och present till partner", "vinterbilen och kyla", "matlagning och köksprylar"] },
+    { fran: 12, till: 16, teman: ["vårstädning och förvaring", "allergi, pollen och luftrening", "trädgård och odling"] },
+    { fran: 17, till: 21, teman: ["mors dag och present till mamma", "grillning och uteplats", "camping och friluftsliv"] },
+    { fran: 22, till: 26, teman: ["fars dag och present till pappa", "pool, bad och sommarvärme", "bilresor och packning"] },
+    { fran: 27, till: 31, teman: ["kylning och het sommar inomhus", "utomhuslek och barn på lovet", "husdjur i värmen"] },
+    { fran: 32, till: 36, teman: ["back to school och studentrum", "barnfamiljens vardag och morgonrutin", "förvaring i små utrymmen"] },
+    { fran: 37, till: 41, teman: ["höst, mörker och belysning hemma", "halloween och utklädnad", "mysiga kvällar och filtar"] },
+    { fran: 42, till: 46, teman: ["black friday-produkter med hög upplevd rabatt", "thanksgiving, matlagning och dukning", "värme och kalla golv"] },
+    { fran: 47, till: 50, teman: ["julklappar till vuxna", "julpynt och stämningsljus", "present till den som har allt"] },
+    { fran: 51, till: 53, teman: ["julklappar i sista minuten", "nyår och fest", "mellandagar och nystart"] },
+  ],
+  GB: [
+    { fran: 1,  till: 6,  teman: ["nystart, träning och organisering hemma", "kyla, drag och uppvärmningskostnad", "hemmakontor och skrivbordet"] },
+    { fran: 7,  till: 11, teman: ["alla hjärtans dag och present till partner", "mothering sunday och present till mamma", "vinterbilen och kyla"] },
+    { fran: 12, till: 16, teman: ["vårstädning och fönsterputs", "påsk, ägg och familjefest", "trädgård och odling"] },
+    { fran: 17, till: 21, teman: ["uteplats, utemöbler och altan", "grillning och utomhusmatlagning", "bank holiday och utflykt"] },
+    { fran: 22, till: 26, teman: ["resa, packning och flyg", "sol, bad och strand", "cykel och utomhusträning"] },
+    { fran: 27, till: 31, teman: ["sommarvärme och svala sovrum", "festival och camping", "utomhuslek och barn på lovet"] },
+    { fran: 32, till: 36, teman: ["back to school och skolstart", "höststädning och förvaring", "hemmakontor och ergonomi"] },
+    { fran: 37, till: 41, teman: ["regn, väta och ytterkläder", "höstmörker och belysning i hemmet", "halloween och utklädnad"] },
+    { fran: 42, till: 46, teman: ["bonfire night och mörkerkvällar", "black friday-produkter med hög upplevd rabatt", "värme, filtar och kalla fötter"] },
+    { fran: 47, till: 50, teman: ["julklappar till vuxna", "julpynt och stämningsljus", "köksprylar inför julmaten"] },
+    { fran: 51, till: 53, teman: ["julklappar i sista minuten", "boxing day och rea", "nyår och fest"] },
+  ],
+  AU: [
+    { fran: 1,  till: 6,  teman: ["sommarvärme, kylning och svala sovrum", "strand, pool och utomhusliv", "back to school i januari"] },
+    { fran: 7,  till: 12, teman: ["sensommar och uteplats", "grillning och utomhusmatlagning", "husdjur i värmen"] },
+    { fran: 13, till: 18, teman: ["höst och svalare kvällar", "påsk och familjefest", "städning och förvaring inomhus"] },
+    { fran: 19, till: 26, teman: ["vinterkyla och uppvärmning inomhus", "EOFY-rea och avdragsgilla inköp", "filtar, värme och mysiga kvällar"] },
+    { fran: 27, till: 35, teman: ["vinter inomhus och torr luft", "hemmaträning när det är kallt", "hemmakontor och skrivbordet"] },
+    { fran: 36, till: 41, teman: ["vår, trädgård och odling", "allergi, pollen och luftrening", "vårstädning och fönsterputs"] },
+    { fran: 42, till: 47, teman: ["sommarförberedelse och strandsaker", "black friday-produkter med hög upplevd rabatt", "melbourne cup och fest"] },
+    { fran: 48, till: 53, teman: ["jul i sommarvärme och utomhusfest", "julklappar till vuxna", "semester, resa och packning"] },
+  ],
+  EU: [
+    { fran: 1,  till: 6,  teman: ["nystart, träning och organisering hemma", "torr vinterluft och inomhusklimat", "hemmakontor och skrivbordet"] },
+    { fran: 7,  till: 11, teman: ["alla hjärtans dag och present till partner", "vinterbilen och kyla", "karneval och fest"] },
+    { fran: 12, till: 16, teman: ["vårstädning och fönsterputs", "påsk och familjefest", "allergi, pollen och luftrening"] },
+    { fran: 17, till: 21, teman: ["uteplats, utemöbler och altan", "trädgård och odling på balkong", "grillning och utomhusmatlagning"] },
+    { fran: 22, till: 26, teman: ["resa, packning och flyg", "sol, bad och strand", "camping och friluftsliv"] },
+    { fran: 27, till: 33, teman: ["sommarsemester och långa resor", "värme inomhus och svala sovrum", "utomhuslek och barn på lovet"] },
+    { fran: 34, till: 38, teman: ["skolstart och barnfamiljens vardag", "höststädning och förvaring", "hemmakontor och ergonomi"] },
+    { fran: 39, till: 43, teman: ["höstmörker och belysning i hemmet", "regn, väta och ytterkläder", "inomhusträning när det blir kallt"] },
+    { fran: 44, till: 47, teman: ["värme, filtar och kalla fötter", "black friday-produkter med hög upplevd rabatt", "mörkerkörning och synlighet"] },
+    { fran: 48, till: 51, teman: ["julklappar till vuxna", "julpynt och stämningsljus", "köksprylar inför julmaten"] },
+    { fran: 52, till: 53, teman: ["julklappar i sista minuten", "nyår och fest", "mellandagar och nystart"] },
+  ],
+  SE: [
+    { fran: 1,  till: 6,  teman: ["träning och nystart hemma", "torr inomhusluft och vinterhud", "förvaring och ordning efter julen"] },
+    { fran: 7,  till: 11, teman: ["vinterfriluftsliv och kyla utomhus", "hemmakontor och ergonomi", "vinterbilen och skrapa, halka, kyla"] },
+    { fran: 12, till: 16, teman: ["vårstädning och fönsterputs", "odling och plantering på balkong", "allergi, pollen och luftrening"] },
+    { fran: 17, till: 21, teman: ["uteplats, utemöbler och altan", "grillning och utomhusmatlagning", "cykel och utomhusträning"] },
+    { fran: 22, till: 26, teman: ["resa, packning och flyg", "sol, bad och strand", "camping och friluftsliv"] },
+    { fran: 27, till: 31, teman: ["värme inomhus och svala sovrum", "husdjur under sommaren", "utomhuslek och barn på semestern"] },
+    { fran: 32, till: 36, teman: ["skolstart och barnfamiljens vardag", "hemmakontor och skrivbordet", "höststädning och förvaring"] },
+    { fran: 37, till: 41, teman: ["höstmörker och belysning i hemmet", "regn, väta och ytterkläder", "inomhusträning när det blir kallt"] },
+    { fran: 42, till: 45, teman: ["däckbyte och bilen inför vintern", "kalla fötter, värme och filtar", "mörkerkörning, reflexer och synlighet"] },
+    { fran: 46, till: 48, teman: ["presenter och julklappar till vuxna", "mys, levande ljus och stämning inomhus", "köksprylar inför julmaten"] },
+    { fran: 49, till: 53, teman: ["julklappar i sista minuten", "julbord, dukning och servering", "nyår, fest och mellandagar"] },
+  ],
+};
+
+/* Marknaderna i prioritetsordning. Sverige sist: det är hemmamarknaden där
+   siffrorna kan kontrolleras, inte den som ska driva urvalet. */
+const KAL_MARKNADER = ["US", "GB", "AU", "EU", "SE"];
 
 const BREDD = [
   "laddning, kablar och mobiltillbehör",
@@ -1106,7 +1168,6 @@ function isoVecka(d) {
   const start = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
   return Math.ceil(((t - start) / DAG + 1) / 7);
 }
-/* Måndagen i en given ISO-vecka. */
 function veckansMandag(ar, v) {
   const fjarde = new Date(Date.UTC(ar, 0, 4));
   const mandagV1 = new Date(fjarde.getTime() - ((fjarde.getUTCDay() || 7) - 1) * DAG);
@@ -1114,14 +1175,15 @@ function veckansMandag(ar, v) {
 }
 const kortDatum = (d) => new Intl.DateTimeFormat(L, { day: "numeric", month: "short", timeZone: "UTC" }).format(d);
 
-/* Har nischen körts? Exakt träff på normaliserad sträng, eller att det ena
+/* Har temat körts? Exakt träff på normaliserad sträng, eller att det ena
    ordsetet ryms i det andra. Avsiktligt snålt — hellre säga "inte gjord" än
    påstå täckning som inte finns. */
 const ord = (s) => new Set(norm(s).replace(/[^a-z0-9åäö ]/g, " ").split(/\s+/).filter((w) => w.length > 3));
-function gjord(tema) {
+function gjord(tema, marknad) {
   const a = ord(tema);
   const traffar = CANDIDATES.filter((c) => {
     if (!c.niche) return false;
+    if (marknad && c.country !== marknad) return false;
     if (norm(c.niche) === norm(tema)) return true;
     const b = ord(c.niche);
     if (!a.size || !b.size) return false;
@@ -1130,56 +1192,72 @@ function gjord(tema) {
   });
   if (!traffar.length) return null;
   const dagar = traffar.map((c) => c.dag).filter(Boolean).sort();
-  return { antal: traffar.length, senast: dagar[dagar.length - 1] || null, nisch: traffar[0].niche };
+  return { antal: traffar.length, senast: dagar[dagar.length - 1] || null };
 }
 
+/* Två-tre ord ur temat duger som sökning i annonsbiblioteket. */
+const STOPP = new Set(["och", "eller", "till", "inför", "under", "hemma", "inomhus", "produkter", "present", "till"]);
+const adlibOrd = (tema) => norm(tema).replace(/[^a-z0-9åäö ]/g, " ").split(/\s+/)
+  .filter((w) => w.length > 3 && !STOPP.has(w)).slice(0, 2).join(" ");
+const adlibUrl = (tema, marknad) => adLibraryUrl(adlibOrd(tema), ADLIB[marknad] || "US");
+
+let kalMarknad = "US";
+
 function viewKalender() {
+  const M = MARKETS[kalMarknad];
   const nu = new Date();
   const idagUtc = new Date(Date.UTC(nu.getUTCFullYear(), nu.getUTCMonth(), nu.getUTCDate()));
   const malvecka = isoVecka(new Date(idagUtc.getTime() + LEDTID * 7 * DAG));
-  const fonsterFor = (v) => KALENDER.find((k) => v >= k.fran && v <= k.till) || KALENDER[KALENDER.length - 1];
+  const tabell = SASONG[kalMarknad] || SASONG.EU;
+  const fonsterFor = (v) => tabell.find((k) => v >= k.fran && v <= k.till) || tabell[tabell.length - 1];
 
-  const knapp = (tema) => {
-    const g = gjord(tema);
-    const klar = Boolean(g);
+  const rad = (tema, marknad) => {
+    const g = gjord(tema, marknad);
     return `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;padding:10px 0;border-top:1px solid var(--hair)">
       <div style="min-width:0;flex:1">
         <p style="margin:0;font-size:13.5px;font-weight:500">${esc(tema)}</p>
-        <p class="muted" style="margin:3px 0 0">${klar
-          ? `Researchad — ${g.antal} kandidater, senast ${esc(g.senast || "okänt datum")}`
-          : "Inte researchad än"}</p>
+        <p class="muted" style="margin:3px 0 0">${g
+          ? `Researchad i ${esc(MARKETS[marknad].name)} — ${g.antal} kandidater, senast ${esc(g.senast || "okänt datum")}`
+          : `Inte researchad i ${esc(MARKETS[marknad].name)}`}</p>
       </div>
-      ${klar
-        ? `<a class="chip" href="#/research" data-sok="${esc(tema)}">Visa kandidaterna &rarr;</a>`
-        : `<button class="fbtn" data-kor="${esc(tema)}" style="font-weight:600;border-color:rgba(79,70,229,.35);background:rgba(79,70,229,.12);color:var(--series-ink)">Kör research</button>`}
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="chip" href="${esc(adlibUrl(tema, marknad))}" target="_blank" rel="noopener noreferrer">Se annonserna</a>
+        ${g
+          ? `<a class="chip" href="#/research" data-sok="${esc(tema)}">Kandidaterna &rarr;</a>`
+          : `<button class="fbtn" data-kor="${esc(tema)}" data-land="${marknad}" style="font-weight:600;border-color:rgba(79,70,229,.35);background:rgba(79,70,229,.12);color:var(--series-ink)">Kör research</button>`}
+      </div>
     </div>`;
   };
 
-  /* Kommande toppar, med sista rimliga researchdag för var och en. */
   const rader = [];
   for (let i = 0; i < 16; i++) {
     const m = new Date(idagUtc.getTime() + i * 7 * DAG);
     const v = isoVecka(m);
-    const ar = m.getUTCFullYear();
-    const start = veckansMandag(ar, v);
+    const start = veckansMandag(m.getUTCFullYear(), v);
     const senast = new Date(start.getTime() - LEDTID * 7 * DAG);
     const teman = fonsterFor(v).teman;
-    const klara = teman.filter((t) => gjord(t)).length;
+    const klara = teman.filter((t) => gjord(t, kalMarknad)).length;
     rader.push({ v, start, slut: new Date(start.getTime() + 6 * DAG), senast, teman, klara,
       forsenad: senast < idagUtc && klara < teman.length, arMal: v === malvecka });
   }
 
-  const dagensTeman = fonsterFor(malvecka).teman;
-
   return `<div style="display:grid;gap:16px">
-    ${sec("Kör detta nu", "computed", `Efterfrågetoppen ligger i vecka ${malvecka}. Research ${LEDTID} veckor före ger annonserna tid att testas färdigt.`, `
-      <p class="note" style="margin:0 0 4px">Temana nedan toppar omkring <b>vecka ${malvecka}</b>
-      (från ${kortDatum(veckansMandag(idagUtc.getUTCFullYear(), malvecka))}). Kör dem nu, inte då.</p>
-      ${dagensTeman.map(knapp).join("")}`)}
+    <div class="filters">
+      ${KAL_MARKNADER.map((k) => `<button class="fbtn" data-kalmarknad="${k}" aria-pressed="${kalMarknad === k}">${esc(MARKETS[k].name)}</button>`).join("")}
+      <span class="muted" style="margin-left:auto">Köpstarka marknader först — Sverige sist, som kontroll</span>
+    </div>
 
-    ${sec("Kommande toppar", null, null, `
+    ${sec(`Kör detta nu i ${M.name}`, "computed", `Toppen ligger i vecka ${malvecka}. Research ${LEDTID} veckor före ger annonserna tid att testas färdigt.`, `
+      <p class="note" style="margin:0 0 4px">Temana nedan toppar omkring <b>vecka ${malvecka}</b>
+      (från ${kortDatum(veckansMandag(idagUtc.getUTCFullYear(), malvecka))}) i ${esc(M.name)}. Kör dem nu, inte då.</p>
+      <p class="muted" style="margin:0 0 4px">Belopp räknas i ${M.cur}${M.vat > 0 ? ` med ${pct(M.vat, 0)} moms` : " utan moms i priset — sales tax läggs på i kassan"}.</p>
+      ${fonsterFor(malvecka).teman.map((t) => rad(t, kalMarknad)).join("")}`)}
+
+    ${sec(`Kommande toppar i ${M.name}`, null, null, `
       <p class="muted" style="margin:-8px 0 14px">Sista researchdag är veckans start minus ${LEDTID} veckor.
-      Har den passerat utan att temat körts står det <b>försenad</b> — då hinner annonserna inte testas klart.</p>
+      Har den passerat utan att temat körts står det <b>försenad</b>.${kalMarknad === "AU"
+        ? " Australien har omvänd årstid: jul infaller mitt i sommaren och vintern ligger i juni till augusti."
+        : ""}</p>
       <div class="scroll"><table style="min-width:560px">
         <thead><tr><th>Vecka</th><th>Toppar</th><th>Researcha senast</th><th>Teman</th><th class="r">Klart</th></tr></thead>
         <tbody>${rader.map((r) => `<tr${r.arMal ? ' style="background:rgba(79,70,229,.07)"' : ""}>
@@ -1192,19 +1270,21 @@ function viewKalender() {
       </table></div>`)}
 
     ${sec("Bredd året om", null, null, `
-      <p class="muted" style="margin:-8px 0 4px">Nischer utan säsong, som bär volym hela året. De finns här för att
-      täckningen ska växa i stället för att stå still — kör dem när det inte är bråttom med en säsong.</p>
-      ${BREDD.map(knapp).join("")}`)}
+      <p class="muted" style="margin:-8px 0 4px">Nischer utan säsong, som bär volym hela året. Körs i ${esc(M.name)}
+      när det inte är bråttom med en säsong.</p>
+      ${BREDD.map((t) => rad(t, kalMarknad)).join("")}`)}
 
-    ${sec("Varför kalender och inte trenddata", null, null, `
-      <p class="note" style="margin:0">Det finns ingen gratis daglig visningsdata för svensk e-handel. Google Trends
-      dagliga flöde testades: kategorifiltret ignoreras — tolv kategorier gav identisk lista — och innehållet är
-      nyheter, inte produkter. Den 21 september 2026 bestod listan av kändisar, ett läkemedel och ett spelbolag.</p>
-      <p class="note" style="margin:10px 0 0">Dessutom är dagens trend per definition sen: när en sökning toppar är
-      boomen redan igång. Kalendern siktar i stället ${LEDTID} veckor framåt, vilket är det närmaste man kommer att
-      vara tidig utan att betala för en trendtjänst.</p>
+    ${sec("Var kommer urvalet ifrån", null, null, `
+      <p class="note" style="margin:0"><b>Inte från Facebook-annonser.</b> Metas annonsbibliotek går inte att läsa
+      automatiskt: Graph API:ts <code>ads_archive</code> svarar OAuthException utan en godkänd utvecklarapp, och den
+      publika sidan svarar 403 med en bot-utmaning. Därför finns i stället en <b>Se annonserna</b>-länk vid varje tema
+      som öppnar biblioteket för rätt marknad — du tittar, sidan hittar inte på.</p>
+      <p class="note" style="margin:10px 0 0">Urvalet är en handelskalender per marknad. Den siktar ${LEDTID} veckor
+      framåt, vilket är det närmaste man kommer att vara tidig utan att betala för en trendtjänst. USA, Storbritannien
+      och Australien har sina egna helger och säsonger; EU behandlas som en marknad med EUR och ett snitt på
+      ${pct(MARKETS.EU.vat, 0)} moms, vilket är en förenkling — satserna skiljer sig mellan länderna.</p>
       <p class="muted" style="margin:12px 0 0;border-top:1px solid var(--hair);padding-top:12px">Ingenting här körs
-      automatiskt. Varje knapp är ett anrop som du startar, och som kostar OpenAI-krediter.</p>`)}
+      automatiskt. Varje knapp är ett anrop du startar, och som kostar OpenAI-krediter.</p>`)}
   </div>`;
 }
 
@@ -1331,12 +1411,15 @@ addEventListener("DOMContentLoaded", () => {
     if (df) { dayFilter = df.dataset.day; return render(); }
     const sok = e.target.closest("[data-sok]");
     if (sok) { query = sok.dataset.sok; countryFilter = "ALL"; dayFilter = "ALL"; return; }
+    const km = e.target.closest("[data-kalmarknad]");
+    if (km) { kalMarknad = km.dataset.kalmarknad; return render(); }
     const kor = e.target.closest("[data-kor]");
     if (kor) {
       const tema = kor.dataset.kor;
-      query = tema; researchCountry = HOME; countryFilter = "ALL"; dayFilter = "ALL";
+      const land = MARKETS[kor.dataset.land] ? kor.dataset.land : "US";
+      query = tema; researchCountry = land; countryFilter = "ALL"; dayFilter = "ALL";
       location.hash = "#/research";
-      setTimeout(() => runResearch(tema, HOME), 0);
+      setTimeout(() => runResearch(tema, land), 0);
       return;
     }
     const s = e.target.closest("[data-sort]");

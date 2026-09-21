@@ -16,10 +16,26 @@ Varje morgon 06:00
        └─ Kör research       (POST → plan-vy-research-generate, en gång per nisch)
 ```
 
+## Marknader
+
+Kalendern utgår från köpstarka marknader — USA, Storbritannien, Australien och
+EU som en enhet — inte från Sverige. Sverige finns kvar sist eftersom det är
+där liveprodukterna faktiskt säljs och verklighetskollen fungerar.
+
+Det är inte bara andra ord: USA har ingen moms i det annonserade priset (sales
+tax läggs på i kassan och varierar per delstat), Australien har omvänd årstid
+så julen infaller mitt i sommaren, och EU behandlas som en marknad med EUR och
+21 % som snitt — en förenkling, satserna skiljer sig mellan länderna.
+
+Varje marknad har sin egen handelskalender med sina helger: Thanksgiving och
+back to school i USA, Bonfire Night och Boxing Day i Storbritannien, EOFY-rean
+och jul i sommarvärme i Australien.
+
 ## Varför kalender och inte trenddata
 
-Det finns ingen gratis daglig visningsdata för svensk e-handel. Google Trends
-dagliga RSS-flöde testades och förkastades: kategoriparametern ignoreras — tolv
+Metas annonsbibliotek går inte att läsa automatiskt — se
+`META-ANNONSDATA.md` för de faktiska svarskoderna. Google Trends dagliga
+RSS-flöde testades också och förkastades: kategoriparametern ignoreras — tolv
 olika kategorier gav identisk lista — och listan är nyheter, inte produkter.
 Den 21 september 2026 innehöll den `brigitte bardot`, `presley gerber`,
 `ozempic` och `bet365`. Noll shoppingnischer. USA-flödet ser likadant ut.

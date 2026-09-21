@@ -13,7 +13,7 @@ await p.waitForTimeout(400);
 
 // 1. Landsknappar finns
 const chips = await p.$$eval("[data-country]", (n) => n.map((x) => x.textContent.trim()));
-T("landsknappar renderas", chips.length === 3, JSON.stringify(chips));
+T("landsknappar speglar poolen", chips.length >= 3 && chips[0].startsWith("Alla marknader"), JSON.stringify(chips));
 console.log("   knappar:", JSON.stringify(chips));
 
 // 2. Filtrera på Storbritannien
@@ -156,12 +156,31 @@ await kp.goto(url + "#/kalender");
 await kp.waitForTimeout(500);
 const kt = await kp.textContent("#view");
 T("kalendervyn renderas", kt.includes("Kör detta nu") && kt.includes("Kommande toppar"), kt.slice(0, 160));
+T("kalendern utgår från USA, inte Sverige", kt.includes("Kör detta nu i USA"), kt.slice(0, 120));
+const marknader = await kp.$$eval("[data-kalmarknad]", (n) => n.map((x) => x.textContent.trim()));
+T("alla fem marknader kan väljas", marknader.join(",") === "USA,Storbritannien,Australien,EU,Sverige", JSON.stringify(marknader));
+T("USA visas utan moms i priset", kt.includes("utan moms i priset"), "");
+// Australien har omvänd årstid — den ska synas i tabellen
+await kp.click('[data-kalmarknad="AU"]');
+await kp.waitForTimeout(300);
+const au = await kp.textContent("#view");
+T("Australien nämner omvänd årstid", au.includes("omvänd årstid"), au.slice(0, 160));
+T("Australien siktar på sommar, inte vinter", /sommarförberedelse|strand/.test(au), au.slice(0, 200));
+T("Australien räknar i AUD", au.includes("AUD"), "");
+// Varje tema ska ha en länk till annonsbiblioteket för rätt marknad
+const adlib = await kp.$$eval('a[href*="ads/library"]', (n) => n.map((x) => x.getAttribute("href")));
+T("annonslänkar pekar på vald marknad", adlib.length > 0 && adlib.every((h) => h.includes("country=AU")), adlib[0] || "inga");
+// Täckningen finns i Sverige, där allt faktiskt kördes
+await kp.click('[data-kalmarknad="SE"]');
+await kp.waitForTimeout(300);
 T("navet har en kalenderflik", (await kp.$$eval("#nav a", (a) => a.map((x) => x.textContent.trim()))).includes("Kalender"));
 T("siktar framåt, inte på i dag", /toppar omkring vecka \d+/.test(kt) && /Kör dem nu, inte då/.test(kt), kt.slice(0, 200));
 
+const kt2 = await kp.textContent("#view");
+T("Sverige siktar på däckbyte", kt2.includes("däckbyte"), kt2.slice(0, 200));
 const korKnappar = await kp.$$eval("[data-kor]", (n) => n.map((x) => x.getAttribute("data-kor")));
 const visaLankar = await kp.$$eval("[data-sok]", (n) => n.map((x) => x.getAttribute("data-sok")));
-T("teman som körts visas som klara", visaLankar.length >= 8, visaLankar.length + " klara");
+T("teman som körts visas som klara i Sverige", visaLankar.length >= 8, visaLankar.length + " klara");
 T("teman som inte körts har en knapp", korKnappar.length >= 3, korKnappar.length + " oklara");
 console.log("   researchade:", visaLankar.slice(0, 4).join(" · "));
 console.log("   kvar att köra:", korKnappar.slice(0, 4).join(" · "));
@@ -174,7 +193,9 @@ const ljuger = await kp.evaluate((teman) => teman.filter((t) => !CANDIDATES.some
 T("inget tema påstås klart utan kandidater", ljuger.length === 0, JSON.stringify(ljuger));
 
 // Deadline-kolumnen
-T("tabellen visar sista researchdag", kt.includes("Researcha senast"), "");
+T("tabellen visar sista researchdag", kt2.includes("Researcha senast"), "");
+const korLand = await kp.$$eval("[data-kor]", (n) => n.map((x) => x.getAttribute("data-land")));
+T("kör-knappen bär vald marknad", korLand.length > 0 && korLand.every((l) => l === "SE"), JSON.stringify(korLand.slice(0, 3)));
 const forsenade = await kp.$$eval("td", (t) => t.filter((x) => x.textContent.includes("försenad")).length);
 console.log("   försenade toppar:", forsenade);
 
