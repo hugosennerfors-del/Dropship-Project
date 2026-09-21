@@ -13,6 +13,30 @@ const monthLabel = (m) => {
   const [y, mm] = m.split("-").map(Number);
   return new Intl.DateTimeFormat(L, { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(Date.UTC(y, mm - 1, 1)));
 };
+/* Färskheten räknas vid visning, inte vid bygget, så den åldras av sig själv.
+   Dagen är det sidan grupperar på — en kandidat från i dag har haft noll
+   dagar på sig att bli upptäckt av någon annan. */
+const idag = () => new Date().toISOString().slice(0, 10);
+const dagarSedan = (dag) => {
+  if (!dag) return null;
+  const d = Math.round((Date.parse(idag() + "T00:00:00Z") - Date.parse(dag + "T00:00:00Z")) / 86400000);
+  return Number.isFinite(d) ? d : null;
+};
+const farskhet = (dag) => {
+  const d = dagarSedan(dag);
+  if (d == null) return { text: "Okänd dag", cls: "p-neu", n: 999 };
+  if (d <= 0) return { text: "I dag", cls: "p-pos", n: 0 };
+  if (d === 1) return { text: "I går", cls: "p-pos", n: 1 };
+  if (d <= 7) return { text: d + " dagar", cls: "p-warn", n: d };
+  return { text: d + " dagar", cls: "p-neu", n: d };
+};
+const KALLA = { kalender: "Säsong", bredd: "Bredd", manuell: "Manuell" };
+const KALLA_VARFOR = {
+  kalender: "Vald ur säsongskalendern: nischen researchas ungefär sex veckor före sin efterfrågetopp, så att annonserna hinner testas färdigt innan volymen kommer.",
+  bredd: "Vald ur breddrotationen: nischer som bär volym året om, så att täckningen växer i stället för att stå still.",
+  manuell: "Körd för hand — antingen från sökrutan i Research eller direkt mot n8n.",
+};
+
 const dateLabel = (iso) => (iso ? new Intl.DateTimeFormat(L, { dateStyle: "medium" }).format(new Date(iso)) : "—");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -53,7 +77,8 @@ const adLibraryUrl = (q, country) =>
 
 /* ── Kandidatkalkyl. Samma formel som n8n-backenden. ─────────────────── */
 function calcCandidate(row) {
-  const [id, name, notes, cost, sale, ship, fee, cpa, units, created, country = HOME] = row;
+  const [id, name, notes, cost, sale, ship, fee, cpa, units, created, country = HOME,
+         niche = "", researchDate = "", trendSource = "manuell"] = row;
   const u = units || 1;
   const m = market(country);
   const mex = (v) => v / (1 + m.vat);
@@ -65,6 +90,7 @@ function calcCandidate(row) {
   return {
     id, name, notes, created,
     country: MARKETS[country] ? country : HOME, market: m, cur: m.cur, mex,
+    niche: niche || null, dag: researchDate || String(created).slice(0, 10), kalla: trendSource || "manuell",
     ad: PLANS[id] ?? null,
     inputs: { cost, sale, ship, fee, cpa, units: u },
     contribution, grossMargin, expectedPoas, verdict,
@@ -484,6 +510,15 @@ function viewProduct(sku) {
 let showRejected = false;
 let query = "";
 let countryFilter = "ALL";
+let dayFilter = "ALL";
+
+/* Researchdagarna som faktiskt finns, nyast först. Dagsvyn är poängen med
+   schemat: en kandidat från i dag har ingen annan hunnit se. */
+const dagar = () => {
+  const d = {};
+  CANDIDATES.forEach((c) => { if (c.dag) d[c.dag] = (d[c.dag] || 0) + 1; });
+  return Object.keys(d).sort().reverse().map((k) => ({ dag: k, antal: d[k] }));
+};
 
 /* Länder som faktiskt förekommer i listan, i den ordning MARKETS räknar upp
    dem. Ett land utan kandidater får ingen knapp — annars vore hälften döda. */
@@ -495,7 +530,7 @@ const countries = () => Object.keys(MARKETS).filter((k) => CANDIDATES.some((c) =
 const norm = (s) => String(s ?? "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const haystack = (c) => {
   const a = c.ad ?? {};
-  return norm([c.name, c.notes, c.verdict, c.market.name, c.country,
+  return norm([c.name, c.notes, c.verdict, c.market.name, c.country, c.niche, c.dag,
     a.q, a.angle, a.hook, a.format, a.audience, a.primaryText, a.headline,
     ...(a.script ?? [])].join(" "));
 };
@@ -733,7 +768,10 @@ function researchPanel() {
 }
 
 function viewResearch() {
-  const hits = CANDIDATES.filter((c) => (countryFilter === "ALL" || c.country === countryFilter) && matches(c, query));
+  const hits = CANDIDATES.filter((c) =>
+    (countryFilter === "ALL" || c.country === countryFilter) &&
+    (dayFilter === "ALL" || c.dag === dayFilter) &&
+    matches(c, query));
   const worth = hits.filter((c) => c.verdict !== "UNDVIK");
   const rejected = hits.length - worth.length;
   const shown = showRejected ? hits : worth;
@@ -801,10 +839,12 @@ function viewResearch() {
                 <span class="num muted" style="flex-shrink:0">${i + 1}</span>
                 <a href="#/kandidat?id=${c.id}" style="text-decoration:none">${esc(c.name)}</a>
               </h3>
-              <p class="muted" style="margin:5px 0 0">${esc(c.market.name)} · ${dateLabel(c.created)}</p>
+              <p class="muted" style="margin:5px 0 0">${esc(c.market.name)} · ${dateLabel(c.created)}${c.niche ? " · " + esc(c.niche) : ""}</p>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-              ${pill(...verdictMeta(c.verdict))}<span class="num muted">Chans ${r.score}</span>
+              ${pill(...verdictMeta(c.verdict))}
+              <span style="display:flex;gap:6px;align-items:center">${pill(farskhet(c.dag).text, farskhet(c.dag).cls)}</span>
+              <span class="num muted">Chans ${r.score}</span>
             </div>
           </header>
           <p class="note" style="margin:12px 0 ${c.ad?.hook ? "10px" : "16px"}">${esc(c.notes)}</p>
@@ -827,7 +867,20 @@ function viewResearch() {
   return `${bestBet}
     <div style="margin-top:16px">
     ${sec(`Kandidater (${shown.length})`, "real", "Sparade rader i product_candidates. Kalkylen är beräknad, siffrorna i den är AI-uppskattade.",
-      `${countries().length > 1 ? `<div class="filters" style="margin-bottom:12px">
+      `${(() => {
+        const d = dagar();
+        if (d.length < 2) return "";
+        const visa = d.slice(0, 8);
+        return `<div class="filters" style="margin-bottom:12px">
+          <button class="fbtn" data-day="ALL" aria-pressed="${dayFilter === "ALL"}">Alla dagar <span class="num" style="opacity:.7">(${CANDIDATES.length})</span></button>
+          ${visa.map((x) => {
+            const f = farskhet(x.dag);
+            return `<button class="fbtn" data-day="${x.dag}" aria-pressed="${dayFilter === x.dag}" title="${x.dag}">${f.text} <span class="num" style="opacity:.7">(${x.antal})</span></button>`;
+          }).join("")}
+          <span class="muted" style="margin-left:auto">Nyast först — färskast har minst risk att redan vara upptäckt</span>
+        </div>`;
+      })()}
+      ${countries().length > 1 ? `<div class="filters" style="margin-bottom:12px">
         ${[["ALL", "Alla marknader", CANDIDATES.length], ...countries().map((k) =>
           [k, MARKETS[k].name, CANDIDATES.filter((c) => c.country === k).length])].map(([k, l, cnt]) =>
           `<button class="fbtn" data-country="${k}" aria-pressed="${countryFilter === k}">${l} <span class="num" style="opacity:.7">(${cnt})</span></button>`).join("")}
@@ -872,11 +925,17 @@ function viewCandidate(id) {
   <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-bottom:20px">
     <div style="min-width:0">
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
-        <h2 style="font-size:19px;font-weight:600">${esc(c.name)}</h2>${pill(...verdictMeta(c.verdict))}
+        <h2 style="font-size:19px;font-weight:600">${esc(c.name)}</h2>${pill(...verdictMeta(c.verdict))}${pill(farskhet(c.dag).text, farskhet(c.dag).cls)}
       </div>
-      <p class="muted" style="margin:5px 0 0">${esc(c.market.name)} · ${c.cur} · moms ${pct(c.market.vat, 0)} · sparad ${dateLabel(c.created)}</p>
+      <p class="muted" style="margin:5px 0 0">${esc(c.market.name)} · ${c.cur} · moms ${pct(c.market.vat, 0)} · researchad ${dateLabel(c.created)}${c.niche ? " ur nischen " + esc(c.niche) : ""}</p>
     </div>
     <a class="chip" href="#/research">&larr; All research</a>
+  </div>
+
+  <div style="display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline;border:1px solid rgba(255,255,255,.6);background:rgba(255,255,255,.45);border-radius:14px;padding:12px 16px;margin-bottom:16px">
+    <span class="muted">Researchdag</span><b style="font-size:13px;font-weight:500">${esc(c.dag || "okänd")}</b>
+    <span class="muted">Härkomst</span><b style="font-size:13px;font-weight:500">${esc(KALLA[c.kalla] || "Manuell")}${c.niche ? " · " + esc(c.niche) : ""}</b>
+    <p class="muted" style="flex-basis:100%;margin:2px 0 0">${esc(KALLA_VARFOR[c.kalla] || KALLA_VARFOR.manuell)}</p>
   </div>
 
   <div class="callout c-warn" style="margin-bottom:16px">
@@ -1114,6 +1173,8 @@ addEventListener("DOMContentLoaded", () => {
     if (f) { prodFilter = f.dataset.filter; return render(); }
     const cf = e.target.closest("[data-country]");
     if (cf) { countryFilter = cf.dataset.country; return render(); }
+    const df = e.target.closest("[data-day]");
+    if (df) { dayFilter = df.dataset.day; return render(); }
     const s = e.target.closest("[data-sort]");
     if (s) {
       if (sortKey === s.dataset.sort) sortDir = sortDir === "asc" ? "desc" : "asc";

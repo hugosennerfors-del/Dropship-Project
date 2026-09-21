@@ -106,4 +106,45 @@ for (const id of allIds) {
 T("alla " + allIds.length + " kandidatsidor renderar", broken.length === 0, broken.join(", "));
 
 console.log(errs.length ? "\nFEL I KONSOLEN:\n" + errs.join("\n") : "\nInga konsolfel.");
+
+
+// ── 8. Dagsvyn ──────────────────────────────────────────────────────────
+const dp = await b.newPage({ viewport: { width: 1440, height: 1100 } });
+dp.on("pageerror", (e) => console.log("PAGEERROR:", e.message));
+await dp.goto(url + "#/research");
+await dp.waitForTimeout(500);
+const dagKnappar = await dp.$$eval("[data-day]", (n) => n.map((x) => x.textContent.trim()));
+T("dagsknappar renderas", dagKnappar.length >= 3, JSON.stringify(dagKnappar));
+console.log("   dagar:", JSON.stringify(dagKnappar));
+T("färskaste dagen först efter 'Alla dagar'", /I dag|I går|\d+ dagar/.test(dagKnappar[1] || ""), dagKnappar[1]);
+
+const dagVarden = await dp.$$eval("[data-day]", (n) => n.map((x) => x.getAttribute("data-day")));
+const senaste = dagVarden.find((v) => v !== "ALL");
+await dp.click('[data-day="' + senaste + '"]');
+await dp.waitForTimeout(400);
+const dt = await dp.textContent("#view");
+const antalEfter = await dp.evaluate((d) => CANDIDATES.filter((c) => c.dag === d).length, senaste);
+T("dagsfilter begränsar listan", dt.includes("Kandidater (") && antalEfter > 0 && antalEfter < (await dp.evaluate(() => CANDIDATES.length)), senaste + " -> " + antalEfter);
+T("nischen syns på kortet", dt.includes("mörkerkörning") || dt.includes("däckbyte") || dt.includes("garderob"), dt.slice(0, 200));
+
+// Kandidatsidan ska bära dag, härkomst och varför
+const nyHref = await dp.getAttribute('a[href^="#/kandidat"]', "href");
+await dp.goto(url + nyHref);
+await dp.waitForTimeout(400);
+const nt = await dp.textContent("#view");
+T("kandidatsidan visar researchdag", nt.includes("Researchdag"), nt.slice(0, 160));
+T("kandidatsidan visar härkomst", /Säsong|Bredd|Manuell/.test(nt), "");
+T("kandidatsidan förklarar valet", nt.includes("sex veckor före") || nt.includes("volym året om") || nt.includes("Körd för hand"), "");
+T("färskhetsmärket syns", /I dag|I går|\d+ dagar/.test(nt), "");
+
+// Sökningen ska nå nischen
+await dp.goto(url + "#/research");
+await dp.reload();
+await dp.waitForTimeout(400);
+await dp.fill("#q", "däckbyte");
+await dp.waitForTimeout(400);
+const st2 = await dp.textContent("#view");
+T("sökning når nischen", !st2.includes("Inget matchar"), st2.slice(0, 160));
+await dp.close();
+
 await b.close();
