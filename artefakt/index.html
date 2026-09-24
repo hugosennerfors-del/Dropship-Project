@@ -200,9 +200,13 @@ dl{margin:0}
 </div>
 
 <script>
-/* Hämtat från n8n-workflowet "Plan-vy · Intelligence-API", körningarna 1387 och 1464,
-   2026-09-21 08:09 UTC. Kandidaternas kalkyl räknas i sidan ur
-   indata med samma formel som backenden, så talen inte kan glida isär. */
+/* Hämtat från n8n-workflowet "Plan-vy · Intelligence-API", körningarna 1387 och
+   1464, 2026-09-21 08:09 UTC. Fälten funnel och returns kommer från körning 1494
+   (2026-09-24), som var den första som hade dem; KPI-talen var identiska i båda,
+   så inget kan glida isär. generatedAt står kvar på den äldre körningen med flit —
+   färskhetsvarningen ska hellre varna en dag för tidigt än en dag för sent.
+   Kandidaternas kalkyl räknas fram i sidan ur indata med samma formel som
+   backenden, så talen inte kan glida isär där heller. */
 const META = {
   period: "2026-09",
   generatedAt: "2026-09-21T08:09:44.666Z",
@@ -237,6 +241,8 @@ const PRODUCTS = [
          grossMargin: 0.4, poas: 0.762, roas: 1.905, breakEvenRoas: 2.5, returnRate: 0 },
     demand: { series: [{ month: "2026-09", orders: 40, units: 40, revenueExVat: 8000 }], monthsOfData: 1, momGrowth: null, trend: "unknown" },
     score: 63, scoreLabel: "Lovande", sb: { profitability: 51, margin: 100, demand: 50 },
+    funnel: {"available":false,"spend":4200,"impressions":0,"clicks":0,"cpm":null,"ctr":null,"cpc":null,"cvr":null,"cpa":105,"series":[{"month":"2026-09","spend":4200,"impressions":0,"clicks":0}],"saknas":["impressions","clicks"]},
+    returns: {"available":false,"rows":[]},
     ai: {
       verdict: "Pausa",
       verdictReason: "POAS 0,762 är under break-even 1,00, roas 1,905 är också under breakEvenRoas 2,5, netProfit är -1 000 SEK och CAC 105 SEK äter upp contributionPerOrder på 80 SEK. Med endast 1 månad data och unknown demandTrend finns ingen evidens för att skala.",
@@ -255,6 +261,8 @@ const PRODUCTS = [
          grossMargin: 0.6458, poas: 0.894, roas: 1.385, breakEvenRoas: 1.55, returnRate: 0 },
     demand: { series: [{ month: "2026-09", orders: 30, units: 30, revenueExVat: 7200 }], monthsOfData: 1, momGrowth: null, trend: "unknown" },
     score: 66, scoreLabel: "Lovande", sb: { profitability: 60, margin: 100, demand: 50 },
+    funnel: {"available":false,"spend":5200,"impressions":0,"clicks":0,"cpm":null,"ctr":null,"cpc":null,"cvr":null,"cpa":173.33,"series":[{"month":"2026-09","spend":5200,"impressions":0,"clicks":0}],"saknas":["impressions","clicks"]},
+    returns: {"available":false,"rows":[]},
     ai: {
       verdict: "Åtgärda CAC",
       verdictReason: "POAS 0,894 är under break-even 1,00, roas 1,385 ligger under breakEvenRoas 1,55 och netProfit är -550 SEK. GrossMargin är stark på 64,58%, men CAC 173,33 SEK är för hög relativt AOV 240 SEK.",
@@ -1227,6 +1235,15 @@ function viewOverview() {
   </div>
 
   <div style="margin-top:16px">
+  ${(() => {
+      const k = koncentration();
+      if (!k || k.niva === "lag") return "";
+      return `<div class="callout ${k.niva === "hog" ? "c-neg" : "c-warn"}" style="margin-bottom:16px">
+        <b>${pct(k.andel, 0)} av bidraget hänger på ${esc(k.storst)}.</b>
+        Med ${k.antal} ${k.antal === 1 ? "produkt" : "produkter"} i portföljen försvinner större delen av rörelsen
+        samma dag som en av dem stoppas. <a href="#/risk" style="color:var(--series-ink)">Se Risk</a>.
+      </div>`;
+    })()}
   ${sec("Datakällor", null, null, `
     <ul style="margin:0;padding:0;list-style:none;display:grid;gap:10px">
       ${META.sources.map(([k, label, origin, note]) => `<li style="display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 12px">
@@ -1403,11 +1420,144 @@ function viewProduct(sku) {
     ${sec("Market", "ai-estimated", "Ingen fri söktrend-API — AI-uppskattning.", `<p class="note">${esc(ai.market)}</p>`)}
     ${sec("AI Analysis", "ai-generated", "Språkmodellens sammanfattning av vad som driver scoren.", `<p class="note">${esc(ai.scoreSummary)}</p>`)}
 
+    ${produktTratt(p)}
+    ${produktReturer(p)}
+    ${produktJamforelse(p)}
+    ${produktScenario(p)}
+
     <div class="grid" style="grid-template-columns:1fr 1fr" data-stack>
       ${sec("Opportunities", "ai-generated", "AI-genererade uppslag, inte verifierade.", bullets(ai.opportunities, "Inga möjligheter genererade."))}
       ${sec("Risks", "ai-generated", "AI-genererade risker, inte verifierade.", bullets(ai.risks, "Inga risker genererade."))}
     </div>
   </div>`;
+}
+
+/* ── CPA-trappan ─────────────────────────────────────────────────────────
+   CPA är slutsiffran. Den består av CPM, CTR, CPC och konverteringsgrad, och
+   utan uppdelningen går det inte att se om problemet är kreativen eller
+   landningssidan. Visningar och klick finns som kolumner i databasen men är
+   tomma — då sägs det, i stället för att visa nollor som om de vore mätta. */
+function produktTratt(p) {
+  const f = p.funnel || {};
+  if (f.available) {
+    const steg = [
+      ["Visningar", num(f.impressions), ""],
+      ["CPM", kr(f.cpm), "kostnad per tusen visningar"],
+      ["Klick", num(f.clicks), ""],
+      ["CTR", pct(f.ctr, 2), "andel som klickar"],
+      ["CPC", kr(f.cpc), "kostnad per klick"],
+      ["Konvertering", f.cvr != null ? pct(f.cvr, 2) : "—", "andel klick som blir order"],
+      ["CPA", kr(f.cpa), "kostnad per order"],
+    ];
+    return sec("CPA-trappan", "real", "Uppmätt ur annonsdata.", `
+      <dl class="cards" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
+        ${steg.map(([t, v, d]) => `<div class="flat stat"><dt>${t}</dt><dd class="num">${v}</dd>${d ? `<p class="muted" style="margin:2px 0 0;font-size:11px">${d}</p>` : ""}</div>`).join("")}
+      </dl>`);
+  }
+  /* Ögonblicksbilden kan vara äldre än API:ets trattfält. Då räknas CPA:n
+     ur produktens egna siffror i stället för att visa NaN. */
+  const spend = ok(f.spend) ? f.spend : p.f.adSpend;
+  const cpa = ok(f.cpa) ? f.cpa : p.f.cac;
+  return sec("CPA-trappan", null, null, `
+    <p class="callout c-warn" style="margin:0"><b>Väntar på data.</b> Kolumnerna <code>impressions</code> och
+    <code>clicks</code> finns i <code>ad_spend</code> men är tomma, så CPM, CTR, CPC och konverteringsgrad går
+    inte att räkna. Det enda som går är CPA: ${kr(cpa)} per order, alltså ${kr(spend)} delat på
+    ${num(p.f.orders)} ordrar.</p>
+    <p class="note" style="margin-top:12px">Fyll kolumnerna från Meta så tänds resten av trappan av sig själv.
+    Då går det att se skillnad på tre helt olika problem som alla ser likadana ut i CPA:n: dålig CTR betyder att
+    kreativen inte fångar, dålig konvertering betyder att annonsen lovar något sidan inte håller, och hög CPM
+    betyder att du tävlar om fel målgrupp.</p>`);
+}
+
+function produktReturer(p) {
+  const r = p.returns || {};
+  if (!r.available) {
+    return sec("Returer", null, null, `
+      <p class="callout c-warn" style="margin:0"><b>Inga returer registrerade.</b> Tabellen <code>returns</code>
+      är tom, så systemet räknar på det antagna värdet ${pct(p.f.returnRate, 1)} i stället för uppmätt.</p>
+      <p class="note" style="margin-top:12px">Returgraden är tyst tills man ser vad den består av. Fel storlek är
+      ett annat problem än trasig vid leverans — det första löses i annonsen, det andra hos leverantören.</p>`);
+  }
+  const perOrsak = {};
+  r.rows.forEach((x) => { perOrsak[x.reason] = (perOrsak[x.reason] || 0) + x.antal; });
+  const tot = Object.values(perOrsak).reduce((a, b) => a + b, 0) || 1;
+  return sec("Returer", "real", "Uppmätt ur returtabellen.", `
+    <ul style="margin:0;padding:0;list-style:none;display:grid;gap:10px">
+      ${Object.entries(perOrsak).sort((a, b) => b[1] - a[1]).map(([orsak, antal]) => `<li style="display:flex;align-items:center;gap:12px">
+        <span style="flex:1;font-size:13px">${esc(orsak)}</span>
+        <div style="width:120px;height:10px;background:rgba(255,255,255,.4);border-radius:5px;overflow:hidden">
+          <i style="display:block;height:100%;width:${Math.round((antal / tot) * 100)}%;background:var(--warn)"></i></div>
+        <span class="num muted" style="width:56px;text-align:right">${num(antal)}</span>
+      </li>`).join("")}
+    </ul>`);
+}
+
+function produktJamforelse(p) {
+  const pp = poolPlacering(p.f.cac * (1 + MARKETS[HOME].vat));
+  if (!pp) return "";
+  return sec("Mot kandidaternas antaganden", "computed", "Din uppmätta CAC mot vad researchen gissar.", `
+    <p class="note" style="margin:0 0 14px">Din faktiska CAC är ${kr(p.f.cac)} ex moms, alltså
+    ${kr(p.f.cac * (1 + MARKETS[HOME].vat))} inklusive. Kandidaterna gissar mellan ${kr(pp.lagst)} och
+    ${kr(pp.hogst)}, med ${kr(pp.median)} som median.</p>
+    <div style="display:flex;align-items:flex-end;gap:12px">
+      <span class="num" style="font-size:34px;font-weight:600;line-height:1">${pp.percentil}:e</span>
+      <span class="muted" style="padding-bottom:4px">percentilen av ${pp.antal} antaganden</span>
+    </div>
+    <div class="meter" style="margin-top:12px"><i style="width:${pp.percentil}%;background:${pp.percentil >= 70 ? "var(--neg)" : pp.percentil >= 40 ? "var(--warn)" : "var(--pos)"}"></i></div>
+    <p class="note" style="margin-top:14px">${pp.percentil >= 70
+      ? "Din verkliga CAC är dyrare än de flesta antaganden i poolen. Kandidaternas POAS är därför sannolikt för optimistiska — räkna med sämre utfall än kalkylen visar."
+      : pp.percentil >= 40 ? "Din CAC ligger mitt i spannet. Kandidaternas antaganden är i samma storleksordning som din verklighet."
+      : "Du köper trafik billigare än de flesta kandidater antar. Det betyder att kalkylerna snarast är försiktiga."}</p>`);
+}
+
+/* Scenariot räknar om på plats. Alla tre reglagen är procent mot nuläget. */
+let scen = { pris: 0, cpa: 0, retur: 0 };
+function produktScenario(p) {
+  const f = p.f;
+  const orders = f.orders || 1;
+  const prisF = 1 + scen.pris / 100;
+  const cpaF = 1 + scen.cpa / 100;
+  const returNy = Math.max(0, Math.min(0.9, f.returnRate + scen.retur / 100));
+
+  const intakt = f.revenueExVat * prisF;
+  const rorligt = f.revenueExVat - f.contribution;
+  /* Bidraget skalas med hur mycket mer som kommer tillbaka: både intäkt och
+     rörlig kostnad följer antalet behållna ordrar, så kvoten räcker. */
+  const bidragEnkelt = (intakt - rorligt) * ((1 - returNy) / Math.max(1 - f.returnRate, 0.01));
+  const spend = f.adSpend * cpaF;
+  const poas = spend > 0 ? bidragEnkelt / spend : 0;
+  const netto = bidragEnkelt - spend;
+
+  const reglage = (id, etikett, varde, min, max, suffix) => `
+    <div style="display:grid;gap:4px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span class="muted">${etikett}</span>
+        <span class="num" style="font-weight:600">${varde > 0 ? "+" : ""}${varde}${suffix}</span>
+      </div>
+      <input type="range" data-scen="${id}" min="${min}" max="${max}" step="1" value="${varde}" style="width:100%">
+    </div>`;
+
+  return sec("Vad händer om", "computed", "Räknat på nuvarande period. Reglagen ändrar ingenting i databasen.", `
+    <div class="grid" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)" data-stack>
+      <div style="display:grid;gap:16px">
+        ${reglage("pris", "Utpris", scen.pris, -30, 50, " %")}
+        ${reglage("cpa", "Annonskostnad", scen.cpa, -50, 100, " %")}
+        ${reglage("retur", "Returgrad", scen.retur, 0, 25, " p.e.")}
+        <button id="scenNoll" class="fbtn" style="justify-self:start">Nollställ</button>
+      </div>
+      <div>
+        <dl class="rows">
+          <div><dt>Täckningsbidrag</dt><dd class="num" style="font-weight:600">${kr(bidragEnkelt)}<span class="muted" style="font-weight:400"> mot ${kr(f.contribution)}</span></dd></div>
+          <div><dt>Annonskostnad</dt><dd class="num">${kr(spend)}</dd></div>
+          <div class="sum"><dt style="font-size:13px;color:var(--ink)">POAS</dt><dd class="num" style="font-weight:600;color:${signColor(poas - 1)}">${mult(poas)}</dd></div>
+          <div class="sum"><dt style="font-size:13px;color:var(--ink)">Netto</dt><dd class="num" style="font-weight:600;color:${signColor(netto)}">${kr(netto)}</dd></div>
+        </dl>
+        <p class="note" style="margin-top:14px">${poas >= 1 && f.poas < 1
+          ? "Med den här justeringen bär produkten sig. Det säger vad som krävs — inte att det går att genomföra."
+          : poas < 1 && f.poas >= 1 ? "Den här justeringen tippar produkten till förlust."
+          : "Förhållandet mellan bidrag och annonskostnad är oförändrat i tecken."}</p>
+      </div>
+    </div>`);
 }
 
 let showRejected = false;
@@ -1693,7 +1843,8 @@ function viewResearch() {
           <div>
             <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
               <a href="#/kandidat?id=${c.id}" style="font-size:17px;font-weight:600;line-height:1.35;text-decoration:none">${esc(c.name)}</a>
-              ${pill(...verdictMeta(c.verdict))}
+              <span style="display:flex;gap:6px;flex-shrink:0">${pill(...verdictMeta(c.verdict))}${
+                (policy(c) || {}).niva === "block" ? pill("Inte på Meta", "p-neg") : ""}</span>
             </div>
             <p class="muted" style="margin:5px 0 0">${money(c.inputs.cost, c.cur)} &rarr; ${money(c.inputs.sale, c.cur)} inkl moms · ${esc(c.market.name)}</p>
             <div style="display:flex;align-items:flex-end;gap:12px;margin-top:16px">
@@ -1745,7 +1896,7 @@ function viewResearch() {
               <p class="muted" style="margin:5px 0 0">${esc(c.market.name)} · ${dateLabel(c.created)}${c.niche ? " · " + esc(c.niche) : ""}</p>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
-              ${pill(...verdictMeta(c.verdict))}
+              ${pill(...verdictMeta(c.verdict))}${(policy(c) || {}).niva === "block" ? pill("Inte på Meta", "p-neg") : ""}
               <span style="display:flex;gap:6px;align-items:center">${pill(farskhet(c.dag).text, farskhet(c.dag).cls)}</span>
               <span class="num muted">Chans ${r.score}</span>
             </div>
@@ -1799,6 +1950,7 @@ function viewResearch() {
                    padding:10px 14px 10px 38px;font:inherit;font-size:13.5px;color:var(--ink)">
         </label>
         ${query ? `<button id="clearQ" class="fbtn">Rensa</button>` : ""}
+        <button id="exportCsv" class="fbtn">Exportera CSV</button>
         <span class="muted">${query ? `${hits.length} av ${CANDIDATES.length} matchar`
           : countryFilter === "ALL" ? `${CANDIDATES.length} kandidater`
           : `${hits.length} kandidater i ${MARKETS[countryFilter].name}`}</span>
@@ -1828,7 +1980,8 @@ function viewCandidate(id) {
   <div style="display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;margin-bottom:20px">
     <div style="min-width:0">
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:10px">
-        <h2 style="font-size:19px;font-weight:600">${esc(c.name)}</h2>${pill(...verdictMeta(c.verdict))}${pill(farskhet(c.dag).text, farskhet(c.dag).cls)}
+        <h2 style="font-size:19px;font-weight:600">${esc(c.name)}</h2>${pill(...verdictMeta(c.verdict))}${
+          (policy(c) || {}).niva === "block" ? pill("Inte på Meta", "p-neg") : ""}${pill(farskhet(c.dag).text, farskhet(c.dag).cls)}
       </div>
       <p class="muted" style="margin:5px 0 0">${esc(c.market.name)} · ${c.cur} · moms ${pct(c.market.vat, 0)} · researchad ${dateLabel(c.created)}${c.niche ? " ur nischen " + esc(c.niche) : ""}</p>
     </div>
@@ -1840,6 +1993,16 @@ function viewCandidate(id) {
     <span class="muted">Härkomst</span><b style="font-size:13px;font-weight:500">${esc(KALLA[c.kalla] || "Manuell")}${c.niche ? " · " + esc(c.niche) : ""}</b>
     <p class="muted" style="flex-basis:100%;margin:2px 0 0">${esc(KALLA_VARFOR[c.kalla] || KALLA_VARFOR.manuell)}</p>
   </div>
+
+  ${(() => {
+    const pol = policy(c);
+    if (!pol) return "";
+    const neg = pol.niva === "block";
+    return `<div class="callout ${neg ? "c-neg" : "c-warn"}" style="margin-bottom:16px">
+      <b>${esc(pol.etikett)}.</b> ${esc(pol.varfor)}
+      ${neg ? " Siffrorna nedan stämmer, men de går inte att omsätta på den här kanalen." : ""}
+    </div>`;
+  })()}
 
   <div class="callout c-warn" style="margin-bottom:16px">
     <b>Produkten har aldrig sålts.</b> Varenda siffra nedan är en uppskattning — inköpspris, utpris och framför allt
@@ -1871,8 +2034,30 @@ function viewCandidate(id) {
         <dl style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px;border-top:1px solid var(--hair);padding-top:16px">
           <div class="flat stat"><dt>Bruttomarginal</dt><dd class="num">${pct(c.grossMargin)}</dd></div>
           <div class="flat stat"><dt>Break-even ROAS</dt><dd class="num">${c.breakEvenRoas == null ? "—" : mult(c.breakEvenRoas)}</dd></div>
-        </dl>`)}
+        </dl>
+        ${kandidatAvgift(c)}`)}
     </div>
+
+    ${leverantorsSektion(c)}
+
+    ${(() => {
+      const m = new Date().getUTCMonth() + 1;
+      const q = q4Justerad(c, m);
+      if (q.faktor === 1) return "";
+      const upp = q.faktor > 1;
+      return sec("Säsongen i annonsauktionen", "computed", "Annonspriserna följer efterfrågan, kalkylen gör det inte.", `
+        <p class="note" style="margin:0 0 14px">Kalkylen antar ${money(c.inputs.cpa, c.cur)} i CPA oavsett månad. I
+        ${new Intl.DateTimeFormat(L, { month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(2026, m - 1, 1)))}
+        ligger annonspriserna typiskt ${pct(Math.abs(q.faktor - 1), 0)} ${upp ? "högre" : "lägre"} än årsgenomsnittet.</p>
+        <dl class="cards" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+          <div class="flat stat"><dt>Justerad CPA</dt><dd class="num">${money(q.cpaInkl, c.cur)}</dd></div>
+          <div class="flat stat"><dt>POAS då</dt><dd class="num" style="color:${signColor(q.poas - 1)}">${mult(q.poas)}</dd></div>
+          <div class="flat stat"><dt>Netto per order</dt><dd class="num" style="color:${signColor(q.netto)}">${money(q.netto, c.cur)}</dd></div>
+        </dl>
+        ${q.poas < 1 && c.expectedPoas >= 1 ? `<p class="callout c-neg" style="margin-top:14px">Produkten bär sig i
+          kalkylen men inte i den här månaden. Det är den vanligaste fällan inför Black Friday: kalkylen räknas i
+          september och körs i november.</p>` : ""}`);
+    })()}
 
     ${sec("Tål kalkylen att ha fel?", "computed", "POAS och netto per order vid högre CPA än antaget.", `
       <p class="note" style="margin:0 0 12px">CPA är det enda talet ingen känner till på förhand, och hela utfallet
@@ -2188,6 +2373,787 @@ function viewKalender() {
   </div>`;
 }
 
+/* ═══ Tillägg ══════════════════════════════════════════════════════════════
+   Allt nedan är byggt på en enkel regel: siffror som går att räkna fram ur
+   data räknas fram, siffror som bara du vet frågas efter, och siffror som
+   saknas sägs sakna. Ingenting fylls i med gissningar som ser ut som mätning.
+
+   Det du matar in sparas i sidans egen lagring och finns kvar över
+   omladdning. Den når inte n8n — den är sidans, inte databasens. */
+
+const LAGER = { kassa: null, risk: null, konto: null, beslut: [], konkurrenter: [], kreativa: [],
+  livscykel: {}, avgifter: {}, leverantorer: {} };
+let lagerKlart = false;
+
+async function lagerLas() {
+  try {
+    const db = await cap("db");
+    if (!db) { lagerKlart = true; return; }
+    const [kassa, risk, konto, avg, lev, beslut, konk, krea, livs] = await Promise.all([
+      db.doc("plan/kassa").get(),
+      db.doc("plan/risk").get(),
+      db.doc("plan/konto").get(),
+      db.doc("plan/avgifter").get(),
+      db.collection("leverantorer").limit(500).get(),
+      db.collection("beslut").orderBy("tid", "desc").limit(200).get(),
+      db.collection("konkurrenter").limit(100).get(),
+      db.collection("kreativa").orderBy("tid", "desc").limit(200).get(),
+      db.collection("livscykel").limit(500).get(),
+    ]);
+    LAGER.kassa = kassa.exists ? kassa.data() : null;
+    LAGER.risk = risk.exists ? risk.data() : null;
+    LAGER.konto = konto.exists ? konto.data() : null;
+    LAGER.avgifter = avg.exists ? avg.data() : {};
+    lev.docs.forEach((d) => { LAGER.leverantorer[d.id] = d.data(); });
+    LAGER.beslut = beslut.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+    LAGER.konkurrenter = konk.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+    LAGER.kreativa = krea.docs.map((d) => Object.assign({ id: d.id }, d.data()));
+    livs.docs.forEach((d) => { LAGER.livscykel[d.id] = d.data(); });
+  } catch (e) { /* utan lagring visas tomma formulär, inget kraschar */ }
+  lagerKlart = true;
+  render();
+}
+
+/* Lagret läses asynkront. Innan det kommit tillbaka står formulären på sina
+   utgångsvärden, och en kassa på noll ser ut som en konkurs. Vyerna som drar
+   slutsatser ur inmatade tal håller inne slutsatsen tills lagret är läst. */
+function lagerLaddar() {
+  if (lagerKlart) return "";
+  return `<p class="callout c-warn" style="margin-top:16px">Läser dina sparade inmatningar. Talen nedan är
+    utgångsvärden tills de kommit fram.</p>`;
+}
+
+async function lagerSkriv(vag, data, samling) {
+  try {
+    const db = await cap("db");
+    if (!db) return false;
+    if (samling) await db.collection(samling).doc(vag).set(data);
+    else await db.doc(vag).set(data);
+    return true;
+  } catch (e) { return false; }
+}
+async function lagerTaBort(samling, id) {
+  try { const db = await cap("db"); if (db) await db.collection(samling).doc(id).delete(); } catch (e) {}
+}
+
+const nuISO = () => new Date().toISOString();
+/* Namn klipps på ordgräns med ellips — "app-styrni" ser ut som en bugg. */
+const kortNamn = (t, max) => {
+  const s = String(t || "");
+  if (s.length <= max) return s;
+  const kap = s.slice(0, max);
+  const mellanslag = kap.lastIndexOf(" ");
+  return (mellanslag > max * 0.6 ? kap.slice(0, mellanslag) : kap.trimEnd()) + "\u2026";
+};
+const idNu = () => "x" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+/* ── Färskhet på hela ögonblicksbilden ──────────────────────────────────── */
+function farskhetsbanner() {
+  const d = dagarSedan(String(META.generatedAt || "").slice(0, 10));
+  if (d == null || d < 7) return "";
+  const allvar = d >= 21 ? "c-neg" : "c-warn";
+  return `<div class="callout ${allvar}" style="margin-bottom:16px">
+    <b>Siffrorna är ${d} dagar gamla.</b> Ögonblicksbilden hämtades ${esc(String(META.generatedAt).slice(0, 10))}
+    och uppdateras inte av sig själv. Allt utom det du kört från Research sedan dess kan ha rört sig
+    ${d >= 21 ? "— en hel månadsrapportering kan ha hunnit passera." : "."}
+  </div>`;
+}
+
+/* ── Q4: annonspriserna stiger, kalkylen gör det inte ───────────────────── */
+const Q4 = { 1: 0.85, 2: 0.9, 3: 0.95, 4: 1, 5: 1, 6: 0.95, 7: 0.9, 8: 0.95, 9: 1, 10: 1.15, 11: 1.4, 12: 1.3 };
+const q4Faktor = (m) => Q4[m] || 1;
+function q4Justerad(c, manad) {
+  const f = q4Faktor(manad);
+  const cpaEx = c.mex(c.inputs.cpa * f);
+  return { faktor: f, cpaInkl: c.inputs.cpa * f, poas: cpaEx > 0 ? c.contribution / cpaEx : 0, netto: c.contribution - cpaEx };
+}
+
+/* ── Policykontroll ─────────────────────────────────────────────────────── */
+const POLICY = [
+  { niva: "block", etikett: "Meta tillåter inte annonsen",
+    varfor: "Vuxenprodukter får inte annonseras på Meta, oavsett hur kalkylen ser ut.",
+    re: /vibrator|dildo|g-punkt|parvibrator|sexleksak|analplugg|penisring|onani/i },
+  { niva: "block", etikett: "Meta tillåter inte annonsen",
+    varfor: "Receptbelagda läkemedel och viktminskningspreparat är förbjudna.",
+    re: /ozempic|semaglutid|viktminskningspiller|bantningspiller|receptbelagd/i },
+  { niva: "risk", niva2: "risk", etikett: "Hälsopåstående — fastnar ofta i granskning",
+    varfor: "Meta begränsar annonser som påstår medicinsk effekt. Vinkeln måste hålla sig till bekvämlighet, inte bot.",
+    re: /massage|nacksträckar|hållning|posture|smärt|värk|led\b|rygg|blodcirkulation|terapi|rehab/i },
+  { niva: "risk", etikett: "Kroppsfokus — före/efter är inte tillåtet",
+    varfor: "Före- och efterbilder på kroppen är förbjudna, och personlig karaktäristik får inte utpekas.",
+    re: /bantning|fettförbrän|midjeband|shapewear|hudföryngring|rynk|cellulit/i },
+  { niva: "risk", etikett: "Åldersgräns eller tillstånd kan krävas",
+    varfor: "Alkohol, spel och tobak kräver särskilda tillstånd och åldersinställningar.",
+    re: /vin\b|alkohol|sprit|öl\b|vape|nikotin|spel|casino|lotteri/i },
+];
+function policy(c) {
+  const hoge = (c.name + " " + (c.notes || "") + " " + (c.niche || "")).toLowerCase();
+  const traffar = POLICY.filter((p) => p.re.test(hoge));
+  if (!traffar.length) return null;
+  const block = traffar.find((p) => p.niva === "block");
+  return block || traffar[0];
+}
+
+/* ── Hur din CAC står sig mot poolens antaganden ────────────────────────── */
+function poolPlacering(cacInklMoms) {
+  const alla = CANDIDATES.filter((c) => c.country === HOME && c.inputs.cpa > 0).map((c) => c.inputs.cpa).sort((a, b) => a - b);
+  if (!alla.length || !ok(cacInklMoms)) return null;
+  const under = alla.filter((v) => v < cacInklMoms).length;
+  return { percentil: Math.round((under / alla.length) * 100), antal: alla.length,
+    median: alla[Math.floor(alla.length / 2)], lagst: alla[0], hogst: alla[alla.length - 1] };
+}
+
+/* ── Koncentrationsrisk ─────────────────────────────────────────────────── */
+function koncentration() {
+  const bidrag = PRODUCTS.map((p) => ({ namn: p.name, v: Math.max(0, p.f.contribution) })).sort((a, b) => b.v - a.v);
+  const tot = bidrag.reduce((a, x) => a + x.v, 0);
+  if (!tot) return null;
+  const andel = bidrag[0].v / tot;
+  return { storst: bidrag[0].namn, andel, antal: PRODUCTS.length,
+    niva: PRODUCTS.length <= 2 || andel >= 0.7 ? "hog" : andel >= 0.5 ? "medel" : "lag" };
+}
+
+/* ── CSV ────────────────────────────────────────────────────────────────── */
+function csvRad(v) {
+  const s = String(v == null ? "" : v);
+  return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function kandidatCsv() {
+  const h = ["namn", "land", "valuta", "nisch", "researchdag", "omdome", "inkop", "utpris", "frakt", "avgift", "cpa",
+    "enheter", "bidrag", "marginal", "poas", "netto", "chans", "policy", "annonssokning"];
+  const rader = rankCandidates(CANDIDATES).map(({ c, r }) => {
+    const p = policy(c);
+    return [c.name, c.country, c.cur, c.niche || "", c.dag || "", c.verdict, c.inputs.cost, c.inputs.sale,
+      c.inputs.ship, c.inputs.fee, c.inputs.cpa, c.inputs.units,
+      c.contribution.toFixed(2), (c.grossMargin * 100).toFixed(1), c.expectedPoas.toFixed(3),
+      c.netPerOrder.toFixed(2), r.score, p ? p.niva : "ok", (c.ad && c.ad.q) || ""].map(csvRad).join(";");
+  });
+  return "﻿" + h.join(";") + "\n" + rader.join("\n");
+}
+/* Knappen får själv bära beskedet. En alert() blockeras tyst i en sandlåda
+   utan allow-modals, och då hade felet sett ut som att ingenting hände. */
+async function laddaNer(filnamn, text, knapp) {
+  const svar = (t) => {
+    if (!knapp) return;
+    const original = knapp.dataset.text || knapp.textContent;
+    knapp.dataset.text = original;
+    knapp.textContent = t;
+    setTimeout(() => { knapp.textContent = knapp.dataset.text; }, 2600);
+  };
+  const d = await cap("downloads");
+  if (!d) { svar("Nedladdning ej tillgänglig"); return; }
+  try { await d.save({ filename: filnamn, data: text }); svar("Sparad"); }
+  catch (e) { svar("Viewern nekade"); }
+}
+
+/* ═══ Kassa ════════════════════════════════════════════════════════════════
+   Täckningsbidrag är inte pengar på kontot. Du betalar leverantören direkt,
+   Meta drar dagligen, men betalleverantören håller pengarna i några dagar och
+   returer kommer ännu senare. Ett lönsamt bolag kan gå omkull på timing. */
+const KASSA_STD = { kassa: 0, utbetalningsdagar: 7, leverantorsdagar: 0, returdagar: 30,
+  dagligAnnons: 0, fastaKostnader: 0 };
+const kassaData = () => Object.assign({}, KASSA_STD, LAGER.kassa || {});
+
+function kassaProjektion(inst, dagar) {
+  const K = OVERVIEW.kpis;
+  const dagarIManad = 30;
+  const intaktPerDag = K.revenueExVat / dagarIManad;
+  const rorligPerDag = (K.revenueExVat - K.contribution) / dagarIManad;
+  const annonsPerDag = inst.dagligAnnons > 0 ? inst.dagligAnnons : K.adSpend / dagarIManad;
+  const fastPerDag = inst.fastaKostnader / dagarIManad;
+  /* Returer betalas tillbaka långt efter att ordern räknats som intäkt. De
+     läggs på som ett utflöde först när returfönstret passerats. */
+  const returSats = PRODUCTS.length
+    ? PRODUCTS.reduce((a, p) => a + p.f.returnRate * p.f.revenueExVat, 0) / Math.max(K.revenueExVat, 1)
+    : 0;
+  const returPerDag = intaktPerDag * returSats;
+  const rader = [];
+  let saldo = inst.kassa;
+  for (let d = 1; d <= dagar; d++) {
+    const in_ = d > inst.utbetalningsdagar ? intaktPerDag : 0;
+    const retur = d > inst.returdagar ? returPerDag : 0;
+    const ut = annonsPerDag + fastPerDag + retur + (d > inst.leverantorsdagar ? rorligPerDag : 0);
+    saldo += in_ - ut;
+    rader.push({ dag: d, in: in_, ut, saldo });
+  }
+  const botten = rader.reduce((a, r) => (r.saldo < a.saldo ? r : a), rader[0]);
+  const slut = rader.find((r) => r.saldo < 0);
+  return { rader, botten, slut, annonsPerDag, intaktPerDag, rorligPerDag, fastPerDag,
+    returPerDag, returSats, glapp: inst.returdagar - inst.utbetalningsdagar };
+}
+
+function falt(id, etikett, varde, suffix, hjalp) {
+  return `<label style="display:grid;gap:4px">
+    <span class="muted">${esc(etikett)}</span>
+    <span style="display:flex;align-items:center;gap:6px">
+      <input type="number" data-kassa="${id}" value="${esc(String(varde))}" step="any"
+        style="width:110px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;color:var(--ink)">
+      <span class="muted">${esc(suffix)}</span>
+    </span>
+    ${hjalp ? `<span class="muted" style="font-size:11.5px">${esc(hjalp)}</span>` : ""}
+  </label>`;
+}
+
+function viewKassa() {
+  const inst = kassaData();
+  const p = kassaProjektion(inst, 60);
+  const bredd = (v, max) => Math.max(1, Math.min(100, (Math.abs(v) / (max || 1)) * 100));
+  const maxSaldo = Math.max(...p.rader.map((r) => Math.abs(r.saldo)), 1);
+  const steg = p.rader.filter((_, i) => i % 5 === 4);
+
+  return `<div style="display:grid;gap:16px">
+    ${farskhetsbanner()}
+    ${sec("Så ligger pengarna", null, null, `
+      <p class="note" style="margin:0 0 14px">Täckningsbidraget säger att affären bär sig. Kassan säger om du
+      överlever tiden fram tills den gör det. Fyll i talen nedan — de sparas i sidan.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:18px">
+        ${falt("kassa", "Kassa i dag", inst.kassa, META.currency, "Vad som faktiskt finns på kontot")}
+        ${falt("utbetalningsdagar", "Utbetalning dröjer", inst.utbetalningsdagar, "dagar", "Stripe och Klarna håller pengarna")}
+        ${falt("leverantorsdagar", "Kredit hos leverantör", inst.leverantorsdagar, "dagar", "0 om du betalar direkt")}
+        ${falt("returdagar", "Returfönster", inst.returdagar, "dagar", "Så länge kunden får ångra sig")}
+        ${falt("dagligAnnons", "Annonsbudget per dag", inst.dagligAnnons, META.currency, "0 = räkna på nuvarande takt")}
+        ${falt("fastaKostnader", "Fasta kostnader per månad", inst.fastaKostnader, META.currency, "Verktyg, domän, abonnemang")}
+      </div>
+      ${p.glapp > 0 ? `<p class="callout c-warn" style="margin-top:16px"><b>Returfönstret är ${p.glapp} dagar
+        längre än utbetalningsfönstret.</b> Under de dagarna står pengarna på ditt konto utan att vara dina.
+        Kassan ser därför strukturellt bättre ut än den är, och ju snabbare du växer desto större blir glappet
+        — det är precis vid uppskalning som det brukar smälla.</p>`
+        : `<p class="muted" style="margin-top:16px">Utbetalningen dröjer minst lika länge som returfönstret,
+        så pengarna på kontot är dina när de kommer. Det är ovanligt bra villkor.</p>`}`)}
+
+    ${sec("Kassalinje 60 dagar", "computed", "Räknat på nuvarande intäktstakt och dina inmatade villkor.", `
+      <dl class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+        <div class="flat stat"><dt>In per dag</dt><dd class="num">${kr(p.intaktPerDag)}</dd></div>
+        <div class="flat stat"><dt>Ut per dag</dt><dd class="num">${kr(p.annonsPerDag + p.rorligPerDag + p.fastPerDag)}</dd></div>
+        <div class="flat stat"><dt>Lägsta punkt</dt><dd class="num" style="color:${signColor(p.botten.saldo)}">${kr(p.botten.saldo)}</dd></div>
+        <div class="flat stat"><dt>Når botten</dt><dd class="num">dag ${p.botten.dag}</dd></div>
+      </dl>
+      ${!lagerKlart ? lagerLaddar() : p.slut
+        ? `<p class="callout c-neg" style="margin-top:16px"><b>Kassan tar slut dag ${p.slut.dag}.</b>
+           I nuvarande takt går saldot under noll ${p.slut.dag < 30 ? "innan månaden är ute" : "inom två månader"}.
+           Det är inte samma sak som att affären är olönsam — det är att pengarna kommer för sent.</p>`
+        : `<p class="callout c-pos" style="margin-top:16px">Kassan håller hela perioden. Lägsta punkt ${kr(p.botten.saldo)} dag ${p.botten.dag}.</p>`}
+      <div style="margin-top:18px;display:grid;gap:6px">
+        ${steg.map((r) => `<div style="display:flex;align-items:center;gap:10px">
+          <span class="muted num" style="width:46px">dag ${r.dag}</span>
+          <div style="flex:1;height:14px;background:rgba(255,255,255,.4);border-radius:7px;overflow:hidden">
+            <i style="display:block;height:100%;width:${bredd(r.saldo, maxSaldo)}%;background:${r.saldo >= 0 ? "var(--pos)" : "var(--neg)"}"></i>
+          </div>
+          <span class="num" style="width:90px;text-align:right;color:${signColor(r.saldo)}">${kr(r.saldo)}</span>
+        </div>`).join("")}
+      </div>
+      <p class="muted" style="margin-top:14px">Modellen är avsiktligt enkel: jämn intäktstakt, jämn kostnadstakt.
+      Den fångar timingen, inte enskilda dagar. ${p.returSats > 0
+        ? `Returerna räknas på ${pct(p.returSats, 1)} av intäkten och dras först efter returfönstret — men den
+           satsen är ett antagande, inte uppmätt: returtabellen är tom.`
+        : `Returer rör inte linjen alls, eftersom den antagna returgraden i inställningarna står på noll och
+           returtabellen är tom. Det är nästan säkert för optimistiskt — varje procent verklig returgrad drar
+           linjen nedåt med ungefär ${kr(p.intaktPerDag * 0.01 * 30)} i månaden.`}</p>`)}
+
+    ${avgiftsSektion()}
+  </div>`;
+}
+
+/* ═══ Test ═════════════════════════════════════════════════════════════════
+   Kandidaterna står på "idé" och rör sig aldrig. Utan en plats att skriva vad
+   som faktiskt hände blir systemet aldrig klokare — bara större. */
+const STEG = { ide: "Idé", testas: "Testas", vinnare: "Vinnare", forlorare: "Förlorare", arkiv: "Arkiverad" };
+const stegAv = (id) => (LAGER.livscykel[id] || {}).steg || "ide";
+
+function viewTest() {
+  const iSteg = {};
+  Object.keys(STEG).forEach((k) => { iSteg[k] = []; });
+  CANDIDATES.forEach((c) => { (iSteg[stegAv(c.id)] || iSteg.ide).push(c); });
+
+  const aktiva = iSteg.testas.concat(iSteg.vinnare, iSteg.forlorare);
+  const tratt = aktiva.map((c) => {
+    const l = LAGER.livscykel[c.id] || {};
+    const verklig = Number(l.verkligCpa) || 0;
+    const fel = verklig > 0 && c.inputs.cpa > 0 ? verklig / c.inputs.cpa - 1 : null;
+    return { c, l, fel };
+  });
+  const medFel = tratt.filter((t) => t.fel != null);
+  const snittFel = medFel.length ? medFel.reduce((a, t) => a + t.fel, 0) / medFel.length : null;
+
+  const rad = (c) => {
+    const l = LAGER.livscykel[c.id] || {};
+    const steg = stegAv(c.id);
+    return `<tr>
+      <td><a href="#/kandidat?id=${esc(c.id)}" style="text-decoration:none">${esc(kortNamn(c.name, 42))}</a>
+        <span class="muted" style="display:block">${esc(c.market.name)} · ${esc(c.dag || "")}</span></td>
+      <td><select data-steg="${esc(c.id)}" style="border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:8px;padding:4px 8px;font:inherit;font-size:12px">
+        ${Object.keys(STEG).map((k) => `<option value="${k}"${steg === k ? " selected" : ""}>${STEG[k]}</option>`).join("")}
+      </select></td>
+      <td class="num muted">${mult(c.expectedPoas)}</td>
+      <td><input type="number" step="any" data-verklig="${esc(c.id)}" value="${esc(String(l.verkligCpa ?? ""))}" placeholder="—"
+        style="width:78px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:8px;padding:4px 8px;font:inherit;font-size:12px;text-align:right"></td>
+      <td><input type="number" step="1" data-ordrar="${esc(c.id)}" value="${esc(String(l.ordrar ?? ""))}" placeholder="—"
+        style="width:64px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:8px;padding:4px 8px;font:inherit;font-size:12px;text-align:right"></td>
+      <td class="r num">${(() => {
+        const v = Number(l.verkligCpa) || 0;
+        if (!v || !c.inputs.cpa) return "—";
+        const f = v / c.inputs.cpa - 1;
+        return `<span style="color:${f > 0.15 ? "var(--neg-ink)" : f < -0.15 ? "var(--pos-ink)" : "var(--ink2)"}">${f > 0 ? "+" : ""}${pct(f, 0)}</span>`;
+      })()}</td>
+    </tr>`;
+  };
+
+  const kanTestas = CANDIDATES.filter((c) => stegAv(c.id) === "ide" && c.verdict !== "UNDVIK");
+  const blockeradeHar = kanTestas.filter((c) => (policy(c) || {}).niva === "block").length;
+  const valbara = rankCandidates(kanTestas.filter((c) => (policy(c) || {}).niva !== "block")).slice(0, 12);
+
+  return `<div style="display:grid;gap:16px">
+    ${lagerKlart ? "" : `<div>${lagerLaddar()}</div>`}
+    ${sec("Träffsäkerhet", "computed", "Hur fel kalkylen var, mätt mot det du skrivit in.", `
+      ${snittFel == null
+        ? `<p class="note" style="margin:0">Ingen kandidat har ett verkligt utfall inskrivet än. Så fort du fyllt i
+           verklig CPA på ett par tester räknas snittfelet här — och då vet du om systemet systematiskt gissar
+           för lågt, vilket är den vanligaste sjukan.</p>`
+        : `<div style="display:flex;align-items:flex-end;gap:12px">
+             <span class="num" style="font-size:38px;font-weight:600;line-height:1;color:${signColor(-snittFel)}">${snittFel > 0 ? "+" : ""}${pct(snittFel, 0)}</span>
+             <span class="muted" style="padding-bottom:5px">snittfel på CPA över ${medFel.length} test</span>
+           </div>
+           <p class="note" style="margin-top:12px">${snittFel > 0.15
+             ? "Kalkylen gissar systematiskt för lågt. Räkna upp CPA-antagandena med ungefär den här siffran innan du litar på en POAS."
+             : snittFel < -0.15 ? "Kalkylen gissar för högt — du köper billigare trafik än modellen antar."
+             : "Gissningarna ligger nära utfallet. Modellen är användbar som den är."}</p>`}`)}
+
+    ${sec(`Under test (${aktiva.length})`, null, null, aktiva.length === 0
+      ? emptyBox("Inget test pågår.", "Flytta en kandidat till Testas nedan, så dyker den upp här.")
+      : `<div class="scroll"><table style="min-width:640px">
+          <thead><tr><th>Kandidat</th><th>Steg</th><th>Gissad POAS</th><th>Verklig CPA</th><th>Ordrar</th><th class="r">Fel</th></tr></thead>
+          <tbody>${aktiva.map(rad).join("")}</tbody></table></div>
+        <p class="muted" style="margin-top:12px">Verklig CPA anges inklusive moms, samma sätt som gissningen, annars
+        jämförs äpplen med päron.</p>`)}
+
+    ${sec("Starta ett test", null, null, `
+      <p class="muted" style="margin:-8px 0 12px">De bäst rankade kandidaterna som ännu inte testats.${blockeradeHar
+        ? ` ${blockeradeHar} kandidater är utelämnade eftersom Meta inte släpper igenom dem — de står kvar med sina siffror under <a href="#/risk" style="color:var(--series-ink)">Risk</a>.`
+        : ""}</p>
+      <div class="scroll"><table style="min-width:560px">
+        <thead><tr><th>Kandidat</th><th>Marknad</th><th class="r">Bidrag</th><th class="r">POAS</th><th class="r">Chans</th><th></th></tr></thead>
+        <tbody>${valbara.map(({ c, r }) => `<tr>
+          <td><a href="#/kandidat?id=${esc(c.id)}" style="text-decoration:none">${esc(kortNamn(c.name, 44))}</a></td>
+          <td class="muted">${esc(c.market.name)}</td>
+          <td class="r num">${money(c.contribution, c.cur)}</td>
+          <td class="r num">${mult(c.expectedPoas)}</td>
+          <td class="r num" style="font-weight:600">${r.score}</td>
+          <td class="r"><button class="fbtn" data-starta="${esc(c.id)}">Testa</button></td>
+        </tr>`).join("")}</tbody></table></div>`)}
+
+    ${sec("Beslutslogg", null, null, `
+      <p class="muted" style="margin:-8px 0 12px">Varför dödade vi produkten? Om sex veckor minns ingen, och risken
+      är att ni testar samma sak igen.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <input id="beslutText" type="text" placeholder="Vad beslutades, och varför?" maxlength="300"
+          style="flex:1;min-width:240px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;color:var(--ink)">
+        <button id="beslutSpara" class="fbtn" style="font-weight:600">Spara</button>
+      </div>
+      ${LAGER.beslut.length === 0 ? emptyBox("Inga beslut loggade.") : `<ul style="margin:0;padding:0;list-style:none;display:grid;gap:8px">
+        ${LAGER.beslut.slice(0, 40).map((b) => `<li style="display:flex;gap:12px;align-items:baseline;border-top:1px solid var(--hair);padding-top:8px">
+          <span class="muted num" style="flex-shrink:0">${esc(String(b.tid || "").slice(0, 10))}</span>
+          <span class="note" style="flex:1">${esc(b.text || "")}</span>
+          <button class="fbtn" data-ta-bort-beslut="${esc(b.id)}" style="padding:2px 8px;font-size:11px">Ta bort</button>
+        </li>`).join("")}</ul>`}`)}
+
+    ${sec("Konkurrenter att hålla koll på", null, null, `
+      <p class="muted" style="margin:-8px 0 12px">Stigande antal aktiva annonser betyder att de skalar, vilket betyder
+      att produkten fungerar. Det är den närmaste riktiga trendsignal du kommer utan att betala för en tjänst.
+      Räkna annonserna i biblioteket och skriv in siffran — den som rör sig uppåt över veckorna är intressant.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <input id="konkNamn" type="text" placeholder="Varumärke eller sökord" maxlength="80"
+          style="flex:1;min-width:180px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;color:var(--ink)">
+        <select id="konkLand" style="border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px">
+          ${KAL_MARKNADER.map((k) => `<option value="${k}">${esc(MARKETS[k].name)}</option>`).join("")}
+        </select>
+        <input id="konkAntal" type="number" placeholder="antal" style="width:82px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px">
+        <button id="konkSpara" class="fbtn" style="font-weight:600">Spara</button>
+      </div>
+      ${LAGER.konkurrenter.length === 0 ? emptyBox("Ingen konkurrent bevakas än.") : `<div class="scroll"><table style="min-width:520px">
+        <thead><tr><th>Sökord</th><th>Marknad</th><th class="r">Senast</th><th>Historik</th><th></th></tr></thead>
+        <tbody>${LAGER.konkurrenter.map((k) => {
+          const h = Array.isArray(k.matningar) ? k.matningar : [];
+          const sista = h[h.length - 1];
+          const forsta = h[0];
+          const riktning = h.length > 1 && sista && forsta ? sista.antal - forsta.antal : null;
+          return `<tr>
+            <td><a href="${esc(adLibraryUrl(k.namn || "", k.land || "US"))}" target="_blank" rel="noopener noreferrer" style="text-decoration:none">${esc(k.namn || "")} &nearr;</a></td>
+            <td class="muted">${esc((MARKETS[k.land] || {}).name || k.land || "")}</td>
+            <td class="r num">${sista ? sista.antal : "—"}${riktning != null ? ` <span style="color:${riktning > 0 ? "var(--pos-ink)" : riktning < 0 ? "var(--neg-ink)" : "var(--ink3)"}">${riktning > 0 ? "▲" : riktning < 0 ? "▼" : "–"}${Math.abs(riktning)}</span>` : ""}</td>
+            <td class="muted" style="font-size:11.5px">${h.slice(-6).map((m) => String(m.dag).slice(5) + ": " + m.antal).join(" · ") || "—"}</td>
+            <td class="r"><button class="fbtn" data-ta-bort-konk="${esc(k.id)}" style="padding:2px 8px;font-size:11px">Ta bort</button></td>
+          </tr>`;
+        }).join("")}</tbody></table></div>`}`)}
+
+    ${sec("Kreativ-liggare", null, null, `
+      <p class="muted" style="margin:-8px 0 12px">Efter tjugo tester vet du vilken <b>hooktyp</b> som fungerar för dig,
+      inte bara vilken produkt. Meta-siffrorna finns inte i databasen, så de skrivs in för hand.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <input id="kreaHook" type="text" placeholder="Hook eller vinkel" maxlength="120"
+          style="flex:1;min-width:200px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;color:var(--ink)">
+        <select id="kreaTyp" style="border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px">
+          ${Object.keys(HOOKTYPER).map((k) => `<option value="${k}">${esc(HOOKTYPER[k])}</option>`).join("")}
+        </select>
+        <input id="kreaCtr" type="number" step="any" placeholder="CTR %" style="width:86px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px">
+        <input id="kreaCpa" type="number" step="any" placeholder="CPA" style="width:80px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px">
+        <input id="kreaFrek" type="number" step="any" placeholder="Frekvens" style="width:92px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:8px 10px;font:inherit;font-size:13px">
+        <button id="kreaSpara" class="fbtn" style="font-weight:600">Spara</button>
+      </div>
+      ${LAGER.kreativa.length === 0 ? emptyBox("Ingen kreativ loggad än.") : `<div class="scroll"><table style="min-width:640px">
+        <thead><tr><th>Hook</th><th>Typ</th><th class="r">CTR</th><th class="r">CPA</th><th class="r">Frekvens</th><th>Datum</th><th></th></tr></thead>
+        <tbody>${LAGER.kreativa.slice(0, 40).map((k) => {
+          const frek = k.frekvens == null ? null : Number(k.frekvens);
+          const trott = frek != null && frek >= 2.5;
+          return `<tr>
+          <td>${esc(k.hook || "")}${trott ? ` <span class="pill p-neg" style="margin-left:6px">Byt film</span>` : ""}</td>
+          <td class="muted">${esc(HOOKTYPER[k.typ] || HOOKTYPER.ovrigt)}</td>
+          <td class="r num">${k.ctr != null ? Number(k.ctr).toFixed(2) + " %" : "—"}</td>
+          <td class="r num">${k.cpa != null ? Number(k.cpa).toFixed(0) : "—"}</td>
+          <td class="r num" style="${trott ? "color:var(--neg-ink);font-weight:600" : ""}">${frek == null ? "—" : frek.toFixed(1)}</td>
+          <td class="muted num">${esc(String(k.tid || "").slice(0, 10))}</td>
+          <td class="r"><button class="fbtn" data-ta-bort-krea="${esc(k.id)}" style="padding:2px 8px;font-size:11px">Ta bort</button></td>
+        </tr>`; }).join("")}</tbody></table></div>
+        ${(() => {
+          const trotta = LAGER.kreativa.filter((k) => k.frekvens != null && Number(k.frekvens) >= 2.5);
+          if (!trotta.length) return `<p class="muted" style="margin-top:12px">Frekvensen säger hur många gånger
+            samma person sett filmen. Över 2,5 tillsammans med fallande CTR betyder att den är utsliten, inte att
+            produkten är fel.</p>`;
+          return `<p class="callout c-warn" style="margin-top:14px"><b>${trotta.length}
+            ${trotta.length === 1 ? "kreativ är" : "kreativa är"} utslitna.</b> Frekvens över 2,5 betyder att samma
+            person sett filmen två och en halv gång. Då stiger CPA:n av trötthet, inte för att produkten slutat
+            fungera — byt film innan du sänker budgeten.</p>`;
+        })()}`}`)}
+
+    ${vinkelbibliotek()}
+  </div>`;
+}
+
+/* ═══ Risk ═════════════════════════════════════════════════════════════════ */
+const TROSKLAR = [
+  { kod: "GB", namn: "Storbritannien", belopp: 85000, valuta: "GBP", vad: "VAT-registrering", not: "Gäller omsättning i Storbritannien under rullande 12 månader." },
+  { kod: "EU", namn: "EU (OSS)", belopp: 10000, valuta: "EUR", vad: "OSS-registrering", not: "Gäller total distansförsäljning till alla EU-länder tillsammans. Tröskeln är låg och passeras lätt." },
+  { kod: "US", namn: "USA", belopp: 100000, valuta: "USD", vad: "Economic nexus", not: "Gäller PER DELSTAT och varierar. 100 000 dollar eller 200 transaktioner är det vanligaste, men inte universellt." },
+  { kod: "AU", namn: "Australien", belopp: 75000, valuta: "AUD", vad: "GST-registrering", not: "Gäller omsättning i Australien under 12 månader." },
+];
+const RISK_STD = { manadsbudget: 0, killPoas: 1, killOrdrar: 30 };
+const riskData = () => Object.assign({}, RISK_STD, LAGER.risk || {});
+
+function omsattningPerMarknad() {
+  const per = {};
+  PRODUCTS.forEach((p) => { per[HOME] = (per[HOME] || 0) + p.f.revenueExVat; });
+  return per;
+}
+
+function viewRisk() {
+  const inst = riskData();
+  const konc = koncentration();
+  const oms = omsattningPerMarknad();
+  const K = OVERVIEW.kpis;
+
+  const flaggade = CANDIDATES.map((c) => ({ c, p: policy(c) })).filter((x) => x.p);
+  const blockerade = flaggade.filter((x) => x.p.niva === "block");
+  const riskabla = flaggade.filter((x) => x.p.niva === "risk");
+  const utanLeverantor = CANDIDATES.length;
+  const utanLev = CANDIDATES.filter((c) => !(levFor(c.id).url || "").trim()).length;
+
+  /* Heter nu, inte idag: idag() är en global hjälpare och ett skuggat namn
+     här hade gjort varje framtida anrop till den i den här vyn till ett fel. */
+  const nu = new Date();
+  const dagarIManaden = new Date(Date.UTC(nu.getUTCFullYear(), nu.getUTCMonth() + 1, 0)).getUTCDate();
+  const dagNu = nu.getUTCDate();
+  const takt = K.adSpend / Math.max(1, dagNu);
+  const prognos = takt * dagarIManaden;
+  const slutDag = inst.manadsbudget > 0 ? Math.floor(inst.manadsbudget / Math.max(takt, 0.01)) : null;
+
+  return `<div style="display:grid;gap:16px">
+    ${farskhetsbanner()}
+    ${lagerKlart ? "" : `<div>${lagerLaddar()}</div>`}
+
+    ${sec("Koncentration", "computed", "Hur mycket av bidraget som hänger på en enda produkt.", konc
+      ? `<div style="display:flex;align-items:flex-end;gap:12px">
+          <span class="num" style="font-size:38px;font-weight:600;line-height:1">${pct(konc.andel, 0)}</span>
+          <span class="muted" style="padding-bottom:5px">av täckningsbidraget kommer från ${esc(konc.storst)}</span>
+        </div>
+        <div class="meter" style="margin-top:12px"><i style="width:${Math.round(konc.andel * 100)}%;background:${konc.niva === "hog" ? "var(--neg)" : konc.niva === "medel" ? "var(--warn)" : "var(--pos)"}"></i></div>
+        <p class="note" style="margin-top:14px">${konc.niva === "hog"
+          ? `Du har ${konc.antal} ${konc.antal === 1 ? "produkt" : "produkter"}. Åker en på en policyvarning eller en leverantörsstopp försvinner större delen av rörelsen samma dag. Det är den vanligaste dödsorsaken för små butiker som faktiskt hade en fungerande produkt.`
+          : "Spridningen är rimlig. Ingen enskild produkt bär hela rörelsen."}</p>`
+      : emptyBox("Inget bidrag att fördela än."))}
+
+    ${sec("Annonsbudget", null, null, `
+      <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end">
+        ${falt("manadsbudget", "Månadsbudget", inst.manadsbudget, META.currency, "0 = ingen gräns satt")}
+        <div class="flat stat" style="min-width:120px"><dt>Förbrukat</dt><dd class="num">${kr(K.adSpend)}</dd></div>
+        <div class="flat stat" style="min-width:120px"><dt>Takt per dag</dt><dd class="num">${kr(takt)}</dd></div>
+        <div class="flat stat" style="min-width:120px"><dt>Prognos månad</dt><dd class="num">${kr(prognos)}</dd></div>
+      </div>
+      ${inst.manadsbudget > 0
+        ? (slutDag && slutDag <= dagarIManaden
+          ? `<p class="callout c-warn" style="margin-top:16px">I den här takten är budgeten slut <b>dag ${slutDag}</b> av ${dagarIManaden}.</p>`
+          : `<p class="callout c-pos" style="margin-top:16px">Takten håller sig inom budgeten månaden ut.</p>`)
+        : `<p class="muted" style="margin-top:14px">Sätt en månadsbudget så räknas dagen då den tar slut.</p>`}`)}
+
+    ${sec("Dödsregeln", null, null, `
+      <p class="note" style="margin:0 0 14px">Bestäm gränsen innan pengarna sitter i det. En regel skriven i förväg är
+      det enda som håller när man redan lagt 4 000 kronor på en produkt man tror på.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end">
+        ${falt("killPoas", "Stäng av under POAS", inst.killPoas, "", "1,00 är break-even")}
+        ${falt("killOrdrar", "efter minst", inst.killOrdrar, "ordrar", "Innan dess är utfallet brus")}
+      </div>
+      <div class="scroll" style="margin-top:16px"><table style="min-width:520px">
+        <thead><tr><th>Produkt</th><th class="r">POAS</th><th class="r">Ordrar</th><th>Läge</th></tr></thead>
+        <tbody>${PRODUCTS.map((p) => {
+          const nogOrdrar = p.f.orders >= inst.killOrdrar;
+          const under = p.f.poas < inst.killPoas;
+          const lage = !nogOrdrar ? ["För tidigt att döma", "p-neu"] : under ? ["Regeln säger stäng av", "p-neg"] : ["Över gränsen", "p-pos"];
+          return `<tr><td>${esc(p.name)}</td><td class="r num">${mult(p.f.poas)}</td>
+            <td class="r num">${num(p.f.orders)}</td><td>${pill(lage[0], lage[1])}</td></tr>`;
+        }).join("")}</tbody></table></div>`)}
+
+    ${sec("Registreringströsklar", null, null, `
+      <p class="note" style="margin:0 0 14px">Den här är billig att missa och dyr att upptäcka i efterhand. Passerar du
+      en tröskel utan att registrera dig blir momsen din kostnad retroaktivt, inte kundens.</p>
+      <p class="muted" style="margin:-6px 0 14px">Omsättningskolumnen läses ur ordertabellen per marknad. All
+      försäljning hittills är svensk och räknas inte mot någon av raderna nedan, så de står på noll tills den
+      första utlandsordern kommer. Tabellen är alltså en förvarning, inte en mätning.</p>
+      <div class="scroll"><table style="min-width:560px">
+        <thead><tr><th>Marknad</th><th>Gäller</th><th class="r">Tröskel</th><th class="r">Din omsättning</th><th>Läge</th></tr></thead>
+        <tbody>${TROSKLAR.map((t) => {
+          const o = oms[t.kod] || 0;
+          const andel = t.belopp > 0 ? o / t.belopp : 0;
+          const lage = o === 0 ? ["Ingen försäljning", "p-neu"] : andel >= 0.8 ? ["Nära tröskeln", "p-neg"] : andel >= 0.5 ? ["Halvvägs", "p-warn"] : ["God marginal", "p-pos"];
+          return `<tr><td><b style="font-weight:500">${esc(t.namn)}</b><span class="muted" style="display:block;font-size:11.5px">${esc(t.not)}</span></td>
+            <td class="muted">${esc(t.vad)}</td>
+            <td class="r num">${nf({ maximumFractionDigits: 0 }).format(t.belopp)} ${esc(t.valuta)}</td>
+            <td class="r num">${o > 0 ? nf({ maximumFractionDigits: 0 }).format(o) : "—"}</td>
+            <td>${pill(lage[0], lage[1])}</td></tr>`;
+        }).join("")}</tbody></table></div>
+      <p class="muted" style="margin-top:14px">Beloppen är de vanligaste gränserna och ändras. Kontrollera mot
+      skattemyndigheten i landet innan du förlitar dig på dem — särskilt USA, där varje delstat har sin egen regel.</p>`)}
+
+    ${sec("Annonspolicy", "computed", "Regelbaserad kontroll mot Metas förbjudna och begränsade kategorier.", `
+      <dl class="cards" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+        <div class="flat stat"><dt>Blockerade</dt><dd class="num" style="color:var(--neg-ink)">${blockerade.length}</dd></div>
+        <div class="flat stat"><dt>Kräver försiktighet</dt><dd class="num" style="color:var(--warn-ink,var(--ink))">${riskabla.length}</dd></div>
+        <div class="flat stat"><dt>Utan anmärkning</dt><dd class="num">${CANDIDATES.length - flaggade.length}</dd></div>
+      </dl>
+      ${blockerade.length ? `<div style="margin-top:16px">
+        <h3 class="lab" style="font-size:12px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--ink3)">Går inte att annonsera</h3>
+        <ul style="margin:10px 0 0;padding:0;list-style:none;display:grid;gap:8px">
+          ${blockerade.slice(0, 12).map(({ c, p }) => `<li style="display:flex;flex-wrap:wrap;gap:6px 12px;align-items:baseline;border-top:1px solid var(--hair);padding-top:8px">
+            <a href="#/kandidat?id=${esc(c.id)}" style="font-size:13px;text-decoration:none">${esc(kortNamn(c.name, 48))}</a>
+            <span class="num muted">${money(c.contribution, c.cur)} i bidrag</span>
+            <span class="muted" style="flex-basis:100%">${esc(p.varfor)}</span>
+          </li>`).join("")}
+        </ul>
+        <p class="note" style="margin-top:12px">De här ligger kvar i listan med sina siffror, men de går inte att
+        annonsera på Meta. Räkna inte med dem när du planerar.</p>
+      </div>` : ""}
+      ${riskabla.length ? `<div style="margin-top:18px;border-top:1px solid var(--hair);padding-top:14px">
+        <h3 class="lab" style="font-size:12px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--ink3)">Kräver försiktig vinkel</h3>
+        <p class="muted" style="margin:8px 0 0">${riskabla.length} kandidater rör hälsa, kropp eller åldersgränsade
+        kategorier. De går att annonsera, men vinkeln måste hålla sig till bekvämlighet och funktion — aldrig bot,
+        aldrig före och efter på kroppen.</p>
+      </div>` : ""}`)}
+
+    ${kontoSektion()}
+
+    ${sec("Det vi inte vet", null, null, `
+      <ul style="margin:0;padding:0;list-style:none;display:grid;gap:10px">
+        ${[["Leverantör och ledtid", utanLev >= utanLeverantor
+             ? `<code>supplier_url</code> är tom på alla ${utanLeverantor} kandidater, och ingen har fått en länk i sidans egen lagring heller. Fyll i länk och ledtid på kandidatsidan — en produkt som tar 25 dagar till USA har ett returproblem inbyggt, oavsett hur fin kalkylen ser ut.`
+             : `${utanLeverantor - utanLev} av ${utanLeverantor} kandidater har fått leverantör och ledtid ifyllda här i sidan; ${utanLev} saknar det fortfarande. Databasens <code>supplier_url</code> är tom på allihop — det är sidans lagring som håller det du skrivit in.`],
+           ["Återköpsfrekvens", "Går inte att räkna: ordertabellen saknar kundidentitet. Om 15 % köper igen stiger din tillåtna CAC lika mycket, och gränsfall blir plötsligt lönsamma. Det kräver en kolumn i databasen, inte en inmatning här."],
+           ["Valutaexponering", "Du säljer snart i USD, GBP och AUD, köper i USD och rapporterar i SEK. Ingen kurskälla är inkopplad, så kursrörelse och drift går inte att skilja åt. Avgiftstabellen i Kassa täcker betalavgiften, inte kursen."],
+           ["Annonstratten", "Visningar och klick finns som kolumner i databasen men är tomma. Utan dem går det inte att se om en dålig CPA beror på kreativen eller på landningssidan."],
+           ["Returgrad över tid", "Returtabellen är tom, så kassalinjen räknar på det antagna värdet. Driftar den verkliga returgraden uppåt äts bidraget tyst, och ingenting i sidan skulle märka det."]]
+          .map(([t, d]) => `<li style="border-top:1px solid var(--hair);padding-top:10px">
+            <b style="font-size:13px;font-weight:500">${t}</b>
+            <span class="muted" style="display:block;margin-top:3px">${d}</span></li>`).join("")}
+      </ul>`)}
+  </div>`;
+}
+
+/* ═══ Avgifter per marknad ═════════════════════════════════════════════════
+   Du räknar med ungefär tre procent överallt. Klarna och Stripe tar olika
+   mycket i olika länder, och på en tunn marginal är skillnaden mellan 2,4 %
+   och 3,9 % hela vinsten på en gränsfallsprodukt.
+
+   Talen nedan är utgångsvärden, inte mätningar. Ingen kurs- eller priskälla
+   är inkopplad, så de är till för att ersättas med det som står i ditt eget
+   avtal — därför är de redigerbara och sparas. */
+const AVGIFT_STD = {
+  US: { pct: 2.9, fast: 0.3 }, GB: { pct: 1.5, fast: 0.2 }, AU: { pct: 1.75, fast: 0.3 },
+  EU: { pct: 1.5, fast: 0.25 }, SE: { pct: 1.5, fast: 1.8 },
+};
+const avgiftFor = (kod) => Object.assign({}, AVGIFT_STD[kod] || AVGIFT_STD.SE, (LAGER.avgifter || {})[kod] || {});
+const avgiftAv = (kod, ordervarde) => {
+  const a = avgiftFor(kod);
+  return (ordervarde * a.pct) / 100 + a.fast;
+};
+
+function avgiftsSektion() {
+  return sec("Avgifter per marknad", null, null, `
+    <p class="note" style="margin:0 0 14px">Utgångsvärdena är vanliga listpriser, inte hämtade från ditt konto.
+    Skriv in det som faktiskt står i ditt avtal — på en gränsfallsprodukt är skillnaden mellan 2,4 % och 3,9 %
+    hela vinsten.</p>
+    <div class="scroll"><table style="min-width:520px">
+      <thead><tr><th>Marknad</th><th class="r">Procent</th><th class="r">Fast per order</th><th class="r">På en order à 500</th></tr></thead>
+      <tbody>${KAL_MARKNADER.map((k) => {
+        const a = avgiftFor(k);
+        return `<tr>
+          <td>${esc(MARKETS[k].name)}</td>
+          <td class="r"><input type="number" step="any" data-avgift="${k}|pct" value="${a.pct}"
+            style="width:72px;text-align:right;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:8px;padding:4px 8px;font:inherit;font-size:12px"> %</td>
+          <td class="r"><input type="number" step="any" data-avgift="${k}|fast" value="${a.fast}"
+            style="width:72px;text-align:right;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:8px;padding:4px 8px;font:inherit;font-size:12px"> ${esc(MARKETS[k].cur)}</td>
+          <td class="r num">${money(avgiftAv(k, 500), MARKETS[k].cur)}</td>
+        </tr>`;
+      }).join("")}</tbody></table></div>`);
+}
+
+/* Kandidatens antagna avgift mot vad tabellen säger för just det ordervärdet. */
+function kandidatAvgift(c) {
+  const ordervarde = c.inputs.sale * c.inputs.units;
+  const enligtTabell = avgiftAv(c.country, ordervarde);
+  const antagen = c.inputs.fee;
+  const diff = antagen - enligtTabell;
+  if (Math.abs(diff) < Math.max(0.5, enligtTabell * 0.08)) return "";
+  const forLagt = diff < 0;
+  const paverkan = c.mex(Math.abs(diff));
+  return `<p class="callout ${forLagt ? "c-warn" : "c-pos"}" style="margin-top:14px">
+    <b>Betalavgiften ${forLagt ? "ser låg ut" : "ser generös ut"}.</b> Kalkylen räknar
+    ${money(antagen, c.cur)} per order; ${esc(MARKETS[c.country].name)}-raden i Kassa ger
+    ${money(enligtTabell, c.cur)} på ett ordervärde om ${money(ordervarde, c.cur)}.
+    ${forLagt
+      ? `Stämmer tabellen försvinner ${money(paverkan, c.cur)} till av bidraget per order, och POAS faller till
+         ${mult((c.contribution - paverkan) / c.cpaEx)}.`
+      : `Bidraget är i så fall ${money(paverkan, c.cur)} bättre per order än kalkylen visar.`}
+  </p>`;
+}
+
+/* ═══ Leverantör och kalkylens ålder ═══════════════════════════════════════
+   supplier_url är null på varenda kandidat. En produkt som tar 25 dagar till
+   USA har ett returproblem inbyggt, oavsett hur fin kalkylen ser ut. */
+const LEV_STD = { url: "", ledtid: "", moq: "" };
+const levFor = (id) => Object.assign({}, LEV_STD, (LAGER.leverantorer || {})[id] || {});
+
+function leverantorsSektion(c) {
+  const l = levFor(c.id);
+  const ledtid = Number(l.ledtid) || 0;
+  const alder = dagarSedan(String(c.created || "").slice(0, 10));
+  const gammal = alder != null && alder >= 45;
+
+  return sec("Leverantör och kalkylens ålder", null, null, `
+    <p class="note" style="margin:0 0 14px">Två saker fattas i databasen och ingen research kan gissa dem åt dig:
+    var produkten faktiskt köps och hur lång tid den tar fram.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
+      <label style="display:grid;gap:4px;flex:1;min-width:220px">
+        <span class="muted">Leverantörslänk</span>
+        <input type="url" data-lev="${esc(c.id)}|url" value="${esc(l.url)}" placeholder="https://…"
+          style="border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;color:var(--ink)">
+      </label>
+      <label style="display:grid;gap:4px">
+        <span class="muted">Ledtid till kund</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <input type="number" data-lev="${esc(c.id)}|ledtid" value="${esc(String(l.ledtid))}" placeholder="—"
+            style="width:74px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;color:var(--ink)">
+          <span class="muted">dagar</span></span>
+      </label>
+      <label style="display:grid;gap:4px">
+        <span class="muted">Minsta order</span>
+        <span style="display:flex;align-items:center;gap:6px">
+          <input type="number" data-lev="${esc(c.id)}|moq" value="${esc(String(l.moq))}" placeholder="—"
+            style="width:74px;border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:7px 10px;font:inherit;font-size:13px;color:var(--ink)">
+          <span class="muted">st</span></span>
+      </label>
+    </div>
+    ${ledtid >= 20 ? `<p class="callout c-warn" style="margin-top:14px"><b>${ledtid} dagars ledtid bygger in ett
+      returproblem.</b> Över tre veckors väntan är den vanligaste orsaken till återbetalningskrav och tvister,
+      och den kostnaden syns inte i kalkylen ovan.</p>`
+      : ledtid > 0 ? `<p class="callout c-pos" style="margin-top:14px">${ledtid} dagars ledtid är hanterbart.
+        Skriv ut leveranstiden i annonsen ändå — förväntan är halva returorsaken.</p>` : ""}
+    ${alder == null ? "" : `<p class="${gammal ? "callout c-warn" : "muted"}" style="margin-top:14px">
+      ${gammal ? "<b>Kalkylen är " + alder + " dagar gammal.</b> Leverantörspriser rör sig, särskilt inför Q4. "
+        + "Kontrollera inköpspriset mot leverantören innan du räknar hem den här."
+        : "Kalkylen räknades för " + alder + " " + (alder === 1 ? "dag" : "dagar") + " sedan. Inköpspriset är färskt nog."}</p>`}`);
+}
+
+/* ═══ Annonskontots hälsa ══════════════════════════════════════════════════
+   Ett konto som fastnar är dyrare än vilken dålig produkt som helst. Meta
+   lämnar inte ut siffran, så den skrivs in. */
+const KONTO_STD = { inskickade: 0, avslagna: 0, not: "" };
+const kontoData = () => Object.assign({}, KONTO_STD, LAGER.konto || {});
+
+function kontoSektion() {
+  const k = kontoData();
+  const andel = k.inskickade > 0 ? k.avslagna / k.inskickade : null;
+  const niva = andel == null ? null : andel >= 0.2 ? "hog" : andel >= 0.1 ? "medel" : "lag";
+  return sec("Annonskontots hälsa", null, null, `
+    <p class="note" style="margin:0 0 14px">Avslagen syns bara i Metas gränssnitt. Räkna dem en gång i veckan och
+    skriv in summan — det är avslagsandelen över tid som säger om kontot är på väg att begränsas, inte det enskilda
+    avslaget.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end">
+      ${falt("kontoInskickade", "Inskickade annonser", k.inskickade, "st", "Totalt sedan du började räkna")}
+      ${falt("kontoAvslagna", "Avslagna", k.avslagna, "st", "Inklusive de som gick igenom efter överklagan")}
+      <div class="flat stat" style="min-width:130px"><dt>Avslagsandel</dt>
+        <dd class="num" style="color:${niva === "hog" ? "var(--neg-ink)" : niva === "medel" ? "var(--warn-ink,var(--ink))" : "var(--ink)"}">
+          ${andel == null ? "—" : pct(andel, 0)}</dd></div>
+    </div>
+    <label style="display:grid;gap:4px;margin-top:16px">
+      <span class="muted">Begränsningar eller varningar på kontot</span>
+      <input type="text" data-konto-not value="${esc(k.not)}" maxlength="200" placeholder="Tomt är goda nyheter"
+        style="border:1px solid rgba(255,255,255,.7);background:rgba(255,255,255,.6);border-radius:10px;padding:8px 12px;font:inherit;font-size:13px;color:var(--ink)">
+    </label>
+    ${niva === "hog" ? `<p class="callout c-neg" style="margin-top:14px"><b>Var femte annons avslås.</b> På den nivån
+      är risken reell att kontot begränsas. Gå igenom vilka kategorier avslagen gäller innan du skickar in fler —
+      Annonspolicy-rutan ovan visar vilka av dina kandidater som rör förbjudna områden.</p>`
+      : niva === "medel" ? `<p class="callout c-warn" style="margin-top:14px">Avslagsandelen börjar bli hög. Det är
+        oftast en handfull produkter som står för dem.</p>`
+      : k.inskickade > 0 ? `<p class="callout c-pos" style="margin-top:14px">Kontot ser friskt ut.</p>` : ""}
+    ${k.not ? `<p class="callout c-warn" style="margin-top:14px"><b>Noterat:</b> ${esc(k.not)}</p>` : ""}`);
+}
+
+/* ═══ Vinkelbibliotek ══════════════════════════════════════════════════════
+   Efter tjugo tester vet du vilken hooktyp som fungerar för dig, inte bara
+   vilken produkt. Typen sätts för hand — ingen modell ska gissa den åt dig. */
+const HOOKTYPER = {
+  problem: "Problemet först", foreefter: "Före och efter", pris: "Priset först",
+  demo: "Ren demo", rost: "Kundröst", humor: "Humor", ovrigt: "Övrigt",
+};
+
+function vinkelbibliotek() {
+  const per = {};
+  LAGER.kreativa.forEach((k) => {
+    const t = k.typ && HOOKTYPER[k.typ] ? k.typ : "ovrigt";
+    (per[t] = per[t] || []).push(k);
+  });
+  const rader = Object.entries(per).map(([typ, rows]) => {
+    const medCtr = rows.filter((r) => r.ctr != null);
+    const medCpa = rows.filter((r) => r.cpa != null);
+    return {
+      typ, antal: rows.length,
+      ctr: medCtr.length ? medCtr.reduce((a, r) => a + Number(r.ctr), 0) / medCtr.length : null,
+      cpa: medCpa.length ? medCpa.reduce((a, r) => a + Number(r.cpa), 0) / medCpa.length : null,
+    };
+  }).sort((a, b) => (b.ctr ?? -1) - (a.ctr ?? -1));
+
+  const nog = LAGER.kreativa.length >= 6;
+  return sec("Vinkelbibliotek", "computed", "Snitt per hooktyp ur kreativ-liggaren.", rader.length === 0
+    ? emptyBox("Ingen kreativ loggad än.", "Sätt en hooktyp när du loggar, så byggs biblioteket av sig självt.")
+    : `<div class="scroll"><table style="min-width:480px">
+        <thead><tr><th>Hooktyp</th><th class="r">Antal</th><th class="r">Snitt-CTR</th><th class="r">Snitt-CPA</th></tr></thead>
+        <tbody>${rader.map((r) => `<tr>
+          <td>${esc(HOOKTYPER[r.typ])}</td>
+          <td class="r num">${r.antal}</td>
+          <td class="r num">${r.ctr == null ? "—" : r.ctr.toFixed(2) + " %"}</td>
+          <td class="r num">${r.cpa == null ? "—" : Math.round(r.cpa)}</td>
+        </tr>`).join("")}</tbody></table></div>
+      <p class="${nog ? "note" : "callout c-warn"}" style="margin-top:14px">${nog
+        ? "Den hooktyp som står överst är den som fungerat bäst för dig, inte den som fungerar bäst i allmänhet. Det är den skillnaden som gör biblioteket värt något."
+        : `<b>För få kreativa för att dra en slutsats.</b> ${LAGER.kreativa.length} av ungefär sex behövs innan snittet säger något annat än brus.`}</p>`);
+}
+
 function viewAlerts() {
   const crit = ALERTS.filter((a) => a[0] === "critical"), warn = ALERTS.filter((a) => a[0] === "warning");
   if (!ALERTS.length) return sec("Larm", "computed", "Beräknade tröskelvärden i backenden.", emptyBox("Inga larm den här perioden."));
@@ -2231,10 +3197,13 @@ const NAV = [
   ["/products", "Products", '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5z"/><path d="M3 7.5 12 12l9-4.5M12 12v9"/>'],
   ["/research", "Research", '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/>'],
   ["/kalender", "Kalender", '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h2M14 14h2M8 18h2"/>'],
+  ["/kassa", "Kassa", '<path d="M3 7h18v12H3z"/><path d="M3 11h18"/><circle cx="8" cy="15" r="1.4"/>'],
+  ["/test", "Test", '<path d="M9 3h6M10 3v6.5L5.5 18a2 2 0 0 0 1.8 3h9.4a2 2 0 0 0 1.8-3L14 9.5V3"/><path d="M8 15h8"/>'],
+  ["/risk", "Risk", '<path d="M12 3 2.5 20h19z"/><path d="M12 10v4M12 17.2v.1"/>'],
   ["/alerts", "Alerts", '<path d="M12 3a6 6 0 0 0-6 6c0 4-1.5 5.5-2 6h16c-.5-.5-2-2-2-6a6 6 0 0 0-6-6z"/><path d="M10 20a2 2 0 0 0 4 0"/>'],
   ["/insights", "AI Insights", '<path d="M12 3v1M4.9 6.3l.7.7M3 13.5h1M20 13.5h1M18.4 7l.7-.7"/><path d="M9 17.5a5 5 0 1 1 6 0c-.6.5-.9 1-1 1.8h-4c-.1-.8-.4-1.3-1-1.8z"/><path d="M10 21h4"/>'],
 ];
-const TITLES = { "/": "Overview", "/products": "Products", "/research": "Research", "/kalender": "Kalender", "/alerts": "Alerts", "/insights": "AI Insights", "/produkt": "Produkt", "/kandidat": "Kandidat" };
+const TITLES = { "/": "Overview", "/products": "Products", "/research": "Research", "/kalender": "Kalender", "/kassa": "Kassa", "/test": "Test", "/risk": "Risk", "/alerts": "Alerts", "/insights": "AI Insights", "/produkt": "Produkt", "/kandidat": "Kandidat" };
 
 function parseHash() {
   const raw = (location.hash || "#/").slice(1);
@@ -2271,11 +3240,16 @@ function render() {
     case "/research": html = viewResearch(); break;
     case "/kandidat": html = viewCandidate(params.get("id") ?? ""); break;
     case "/kalender": html = viewKalender(); break;
+    case "/kassa": html = viewKassa(); break;
+    case "/test": html = viewTest(); break;
+    case "/risk": html = viewRisk(); break;
     case "/alerts": html = viewAlerts(); break;
     case "/insights": html = viewInsights(); break;
     default: html = viewOverview();
   }
-  document.getElementById("view").innerHTML = html;
+  const sub2 = path === "/produkt" || path === "/kandidat";
+  const banner = sub2 || path === "/kassa" || path === "/risk" ? "" : farskhetsbanner();
+  document.getElementById("view").innerHTML = banner + html;
   closeDrawer();
   window.scrollTo(0, 0);
 }
@@ -2335,6 +3309,64 @@ addEventListener("DOMContentLoaded", () => {
       return;
     }
     if (e.target.id === "clearQ") { query = ""; return render(); }
+    if (e.target.id === "exportCsv") { laddaNer("kandidater.csv", kandidatCsv(), e.target); return; }
+    if (e.target.id === "scenNoll") { scen = { pris: 0, cpa: 0, retur: 0 }; return render(); }
+
+    const starta = e.target.closest("[data-starta]");
+    if (starta) {
+      const id = starta.dataset.starta;
+      const d = { steg: "testas", tid: nuISO() };
+      LAGER.livscykel[id] = d; lagerSkriv(id, d, "livscykel").then(render);
+      return render();
+    }
+    if (e.target.id === "beslutSpara") {
+      const el = document.getElementById("beslutText");
+      const text = (el && el.value || "").trim();
+      if (!text) return;
+      const id = idNu(); const d = { text, tid: nuISO() };
+      LAGER.beslut.unshift(Object.assign({ id }, d));
+      lagerSkriv(id, d, "beslut"); el.value = "";
+      return render();
+    }
+    if (e.target.id === "konkSpara") {
+      const namn = (document.getElementById("konkNamn").value || "").trim();
+      const land = document.getElementById("konkLand").value;
+      const antal = Number(document.getElementById("konkAntal").value);
+      if (!namn || !Number.isFinite(antal)) return;
+      const dag = idag();
+      const fanns = LAGER.konkurrenter.find((k) => k.namn === namn && k.land === land);
+      if (fanns) {
+        fanns.matningar = (fanns.matningar || []).filter((m) => m.dag !== dag).concat([{ dag, antal }]);
+        lagerSkriv(fanns.id, { namn, land, matningar: fanns.matningar }, "konkurrenter");
+      } else {
+        const id = idNu(); const d = { namn, land, matningar: [{ dag, antal }] };
+        LAGER.konkurrenter.push(Object.assign({ id }, d));
+        lagerSkriv(id, d, "konkurrenter");
+      }
+      document.getElementById("konkNamn").value = ""; document.getElementById("konkAntal").value = "";
+      return render();
+    }
+    if (e.target.id === "kreaSpara") {
+      const hook = (document.getElementById("kreaHook").value || "").trim();
+      if (!hook) return;
+      const ctrEl = document.getElementById("kreaCtr"), cpaEl = document.getElementById("kreaCpa");
+      const frekEl = document.getElementById("kreaFrek");
+      const id = idNu();
+      const d = { hook, typ: document.getElementById("kreaTyp").value,
+        ctr: ctrEl.value === "" ? null : Number(ctrEl.value),
+        cpa: cpaEl.value === "" ? null : Number(cpaEl.value),
+        frekvens: frekEl.value === "" ? null : Number(frekEl.value), tid: nuISO() };
+      LAGER.kreativa.unshift(Object.assign({ id }, d));
+      lagerSkriv(id, d, "kreativa");
+      document.getElementById("kreaHook").value = ""; ctrEl.value = ""; cpaEl.value = ""; frekEl.value = "";
+      return render();
+    }
+    const tbB = e.target.closest("[data-ta-bort-beslut]");
+    if (tbB) { const id = tbB.dataset.taBortBeslut; LAGER.beslut = LAGER.beslut.filter((x) => x.id !== id); lagerTaBort("beslut", id); return render(); }
+    const tbK = e.target.closest("[data-ta-bort-konk]");
+    if (tbK) { const id = tbK.dataset.taBortKonk; LAGER.konkurrenter = LAGER.konkurrenter.filter((x) => x.id !== id); lagerTaBort("konkurrenter", id); return render(); }
+    const tbC = e.target.closest("[data-ta-bort-krea]");
+    if (tbC) { const id = tbC.dataset.taBortKrea; LAGER.kreativa = LAGER.kreativa.filter((x) => x.id !== id); lagerTaBort("kreativa", id); return render(); }
   });
 
   /* Sökfältet ritas om vid varje tangenttryck, så fokus och markörläge måste
@@ -2349,6 +3381,67 @@ addEventListener("DOMContentLoaded", () => {
   /* Sparad research från tidigare körningar. Lagringen svarar först efter
      första målningen, så listan byggs om när den kommer. */
   loadSaved();
+  lagerLas();
+
+  /* Inmatningar som sparas i sidans lagring. */
+  document.getElementById("view").addEventListener("change", async (e) => {
+    const t = e.target;
+    if (t.dataset && t.dataset.kassa) {
+      const vilken = t.dataset.kassa;
+      const iRisk = ["manadsbudget", "killPoas", "killOrdrar"].includes(vilken);
+      const iKonto = vilken === "kontoInskickade" || vilken === "kontoAvslagna";
+      if (iKonto) {
+        const bas = kontoData();
+        bas[vilken === "kontoInskickade" ? "inskickade" : "avslagna"] = Math.max(0, Number(t.value) || 0);
+        LAGER.konto = bas; await lagerSkriv("plan/konto", bas);
+        return render();
+      }
+      const bas = iRisk ? riskData() : kassaData();
+      bas[vilken] = Number(t.value) || 0;
+      if (iRisk) { LAGER.risk = bas; await lagerSkriv("plan/risk", bas); }
+      else { LAGER.kassa = bas; await lagerSkriv("plan/kassa", bas); }
+      return render();
+    }
+    if (t.dataset && t.dataset.avgift) {
+      const [kod, del] = t.dataset.avgift.split("|");
+      const bas = Object.assign({}, LAGER.avgifter);
+      bas[kod] = Object.assign({}, avgiftFor(kod), { [del]: Math.max(0, Number(t.value) || 0) });
+      LAGER.avgifter = bas; await lagerSkriv("plan/avgifter", bas);
+      return render();
+    }
+    if (t.dataset && t.dataset.lev) {
+      const [id, del] = t.dataset.lev.split("|");
+      const d = Object.assign({}, levFor(id), { [del]: del === "url" ? t.value.trim() : t.value });
+      LAGER.leverantorer[id] = d; await lagerSkriv(id, d, "leverantorer");
+      return render();
+    }
+    if (t.hasAttribute && t.hasAttribute("data-konto-not")) {
+      const bas = Object.assign(kontoData(), { not: t.value.trim() });
+      LAGER.konto = bas; await lagerSkriv("plan/konto", bas);
+      return render();
+    }
+    if (t.dataset && t.dataset.steg) {
+      const id = t.dataset.steg;
+      const d = Object.assign({}, LAGER.livscykel[id] || {}, { steg: t.value, tid: nuISO() });
+      LAGER.livscykel[id] = d; await lagerSkriv(id, d, "livscykel");
+      return render();
+    }
+    if (t.dataset && (t.dataset.verklig || t.dataset.ordrar)) {
+      const id = t.dataset.verklig || t.dataset.ordrar;
+      const falt2 = t.dataset.verklig ? "verkligCpa" : "ordrar";
+      const d = Object.assign({}, LAGER.livscykel[id] || {}, { tid: nuISO() });
+      d[falt2] = t.value === "" ? null : Number(t.value);
+      LAGER.livscykel[id] = d; await lagerSkriv(id, d, "livscykel");
+      return render();
+    }
+  });
+
+  document.getElementById("view").addEventListener("input", (e) => {
+    const t = e.target;
+    if (!t.dataset || !t.dataset.scen) return;
+    scen[t.dataset.scen] = Number(t.value) || 0;
+    render();
+  });
 
   let qTimer;
   document.getElementById("view").addEventListener("input", (e) => {

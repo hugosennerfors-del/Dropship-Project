@@ -13,8 +13,10 @@ hämtad från n8n-workflowet **Plan-vy · Intelligence-API** (körning 1387).
 | `data.js` | Ögonblicksbilden från API:t — META, OVERVIEW, PRODUCTS, ALERTS, RAW_CANDIDATES, AD_PLANS, AI |
 | `app.js` | Vyer, kalkyl, chansscore, router |
 | `build.mjs` | Slår ihop ovanstående till `index.html` |
-| `verify.mjs` | Playwright-kontroller: vyer, marknader, mobil |
-| `verify-research.mjs` | Playwright-kontroller: research-körningen, med mockad koppling |
+| `gen-data.mjs` | Gör om ett API-svar till `data.js` |
+| `verify.mjs` | Playwright-kontroller: vyer, marknader, mobil (48 st) |
+| `verify-research.mjs` | Playwright-kontroller: research-körningen, med mockad koppling (26 st) |
+| `verify-tillagg.mjs` | Playwright-kontroller: Kassa, Test, Risk, policy, CSV (127 st) |
 | `index.html` | Det som publiceras — genererad, redigera den inte för hand |
 
 ## Bygga och kontrollera
@@ -23,7 +25,14 @@ hämtad från n8n-workflowet **Plan-vy · Intelligence-API** (körning 1387).
 node build.mjs
 node verify.mjs
 node verify-research.mjs
+node verify-tillagg.mjs
 ```
+
+`verify-tillagg.mjs` startar en egen http-server på `127.0.0.1` i stället för
+att öppna `file://`. En `file://`-sida får en ogenomskinlig origin i Chromium
+och då beter sig `sessionStorage` inte som i en publicerad artefakt — testerna
+för att inmatningar överlever en omladdning blev flaxiga av miljön, inte av
+koden.
 
 ## Köra ny research från sidan
 
@@ -35,6 +44,7 @@ capability `mcp`:
 capabilities: {
   mcp: { servers: [{ server: "n8n", tools: ["execute_workflow", "get_workflow_execution"] }] },
   db: {},
+  downloads: true,
 }
 ```
 
@@ -69,3 +79,27 @@ inom en marknad, inte mellan två.
 Verklighetskollen mot dina egna siffror är avstängd utanför Sverige: alla
 liveprodukter säljs i SEK, och en CAC i en valuta säger ingenting om en CPA
 i en annan.
+
+## Vad sidan räknar och vad den frågar efter
+
+Regeln genom hela sidan: **siffror som går att räkna fram ur data räknas fram,
+siffror som bara användaren vet frågas efter, och siffror som saknas sägs
+sakna.** Ingenting fylls i med gissningar som ser ut som mätningar.
+
+Räknas fram ur `data.js`: koncentrationsrisk, poolplacering av CAC,
+Q4-påslaget på CPA, policykontrollen, dödsregeln, scenarioreglagen och
+budgettakten.
+
+Frågas efter (sparas i sidans `db`, når aldrig n8n): kassa och betalvillkor,
+returfönster, månadsbudget, verklig CPA per test, beslutslogg,
+konkurrentmätningar, kreativa med frekvens och hooktyp, avgiftssatser per
+marknad, leverantörslänk och ledtid, samt avslagsräkningen för annonskontot.
+
+Sägs sakna, med orsak, under **Risk → Det vi inte vet**: återköpsfrekvens
+(ordertabellen har ingen kundidentitet), valutaexponering (ingen kurskälla),
+annonstratten (`impressions` och `clicks` finns som kolumner men är tomma)
+och returgrad över tid (`returns` är tom).
+
+`lagerKlart` gör att Kassa och Risk håller inne sina slutsatser tills lagret
+lästs. Utan det skulle en tom kassa på noll se ut som en konkurs under de
+första hundra millisekunderna.

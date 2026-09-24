@@ -1,6 +1,10 @@
-/* Hämtat från n8n-workflowet "Plan-vy · Intelligence-API", körningarna 1387 och 1464,
-   2026-09-21 08:09 UTC. Kandidaternas kalkyl räknas i sidan ur
-   indata med samma formel som backenden, så talen inte kan glida isär. */
+/* Hämtat från n8n-workflowet "Plan-vy · Intelligence-API", körningarna 1387 och
+   1464, 2026-09-21 08:09 UTC. Fälten funnel och returns kommer från körning 1494
+   (2026-09-24), som var den första som hade dem; KPI-talen var identiska i båda,
+   så inget kan glida isär. generatedAt står kvar på den äldre körningen med flit —
+   färskhetsvarningen ska hellre varna en dag för tidigt än en dag för sent.
+   Kandidaternas kalkyl räknas fram i sidan ur indata med samma formel som
+   backenden, så talen inte kan glida isär där heller. */
 const META = {
   period: "2026-09",
   generatedAt: "2026-09-21T08:09:44.666Z",
@@ -35,6 +39,8 @@ const PRODUCTS = [
          grossMargin: 0.4, poas: 0.762, roas: 1.905, breakEvenRoas: 2.5, returnRate: 0 },
     demand: { series: [{ month: "2026-09", orders: 40, units: 40, revenueExVat: 8000 }], monthsOfData: 1, momGrowth: null, trend: "unknown" },
     score: 63, scoreLabel: "Lovande", sb: { profitability: 51, margin: 100, demand: 50 },
+    funnel: {"available":false,"spend":4200,"impressions":0,"clicks":0,"cpm":null,"ctr":null,"cpc":null,"cvr":null,"cpa":105,"series":[{"month":"2026-09","spend":4200,"impressions":0,"clicks":0}],"saknas":["impressions","clicks"]},
+    returns: {"available":false,"rows":[]},
     ai: {
       verdict: "Pausa",
       verdictReason: "POAS 0,762 är under break-even 1,00, roas 1,905 är också under breakEvenRoas 2,5, netProfit är -1 000 SEK och CAC 105 SEK äter upp contributionPerOrder på 80 SEK. Med endast 1 månad data och unknown demandTrend finns ingen evidens för att skala.",
@@ -53,6 +59,8 @@ const PRODUCTS = [
          grossMargin: 0.6458, poas: 0.894, roas: 1.385, breakEvenRoas: 1.55, returnRate: 0 },
     demand: { series: [{ month: "2026-09", orders: 30, units: 30, revenueExVat: 7200 }], monthsOfData: 1, momGrowth: null, trend: "unknown" },
     score: 66, scoreLabel: "Lovande", sb: { profitability: 60, margin: 100, demand: 50 },
+    funnel: {"available":false,"spend":5200,"impressions":0,"clicks":0,"cpm":null,"ctr":null,"cpc":null,"cvr":null,"cpa":173.33,"series":[{"month":"2026-09","spend":5200,"impressions":0,"clicks":0}],"saknas":["impressions","clicks"]},
+    returns: {"available":false,"rows":[]},
     ai: {
       verdict: "Åtgärda CAC",
       verdictReason: "POAS 0,894 är under break-even 1,00, roas 1,385 ligger under breakEvenRoas 1,55 och netProfit är -550 SEK. GrossMargin är stark på 64,58%, men CAC 173,33 SEK är för hög relativt AOV 240 SEK.",

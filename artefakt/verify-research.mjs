@@ -1,5 +1,10 @@
 import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
-const url = "file:///tmp/claude-0/-home-user-Dropship-Project/d8fc5821-8dc5-5fdf-ab43-bfc4a2d57554/scratchpad/art/index.html";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+/* Katalogen tas ur skriptets egen plats, så sviten går att köra från en
+   checkout och inte bara från katalogen den skrevs i. */
+const DIR = path.dirname(fileURLToPath(import.meta.url));
+const url = "file://" + DIR + "/index.html";
 const b = await chromium.launch();
 const T = (l, c, x = "") => console.log((c ? "PASS " : "FEL  ") + l + (c ? "" : "  " + x));
 
