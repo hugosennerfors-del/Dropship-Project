@@ -164,12 +164,124 @@ dl{margin:0}
 .rows dt{font-size:12.5px;color:var(--ink2)}
 .rows dd{margin:0;font-size:13px}
 .sum{border-top:1px solid var(--hair)!important;font-weight:600}
+/* ── Effekter ─────────────────────────────────────────────────────────────
+   Allt nedan är ljus som går genom glas: kort som stiger in, ett prismasvep
+   över varje kort, en regnbågskant som roterar på hover och ett sken bakom
+   glaset som följer muspekaren. Allt ligger bakom två spärrar: systemets
+   "minska rörelse" och knappen Effekter i toppraden (klassen fx-off). */
+@property --ang{syntax:"<angle>";inherits:false;initial-value:0deg}
+.glass{position:relative;isolation:isolate}
+.fxbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.75);background:rgba(255,255,255,.5);
+  border-radius:99px;padding:5px 11px;font-size:12px;font-weight:500;color:var(--ink2);white-space:nowrap}
+.fxbtn:hover{background:rgba(255,255,255,.85)}
+.fxbtn[aria-pressed="true"]{color:var(--series-ink);border-color:rgba(79,70,229,.3)}
+.fxbtn[aria-pressed="true"] svg{color:#a21caf}
+.fxbar{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;height:3px;z-index:60;pointer-events:none;
+  background:linear-gradient(90deg,#38bdf8,#818cf8,#e879f9,#38bdf8);background-size:200% 100%;
+  transform-origin:0 50%;transform:scaleX(0);opacity:0}
+.fxcanvas{position:fixed;inset:0;width:100%;height:100%;z-index:80;pointer-events:none}
+.glow{position:absolute;left:0;top:0;width:36vw;height:36vw;min-width:280px;min-height:280px;border-radius:9999px;
+  background:radial-gradient(circle,#a5b4fc 0%,#f0abfc 45%,rgba(240,171,252,0) 70%);filter:blur(60px);opacity:0;
+  transition:opacity .8s;will-change:transform}
+.fx-spark,.fx-ring{position:fixed;left:0;top:0;pointer-events:none;z-index:70}
+.fx-spark{width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:99px;animation:fxSpark .65s cubic-bezier(.2,.8,.3,1) forwards}
+.fx-ring{width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:99px;border:2px solid #818cf8;animation:fxRing .6s ease-out forwards}
+@keyframes fxSpark{from{transform:translate(var(--x0),var(--y0)) scale(1);opacity:1}to{transform:translate(var(--x1),var(--y1)) scale(.15);opacity:0}}
+@keyframes fxRing{from{transform:translate(var(--x0),var(--y0)) scale(.4);opacity:.9}to{transform:translate(var(--x0),var(--y0)) scale(4.2);opacity:0}}
+@keyframes fxRise{from{opacity:.2;transform:translateY(26px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes fxShine{from{background-position:130% 0}to{background-position:-70% 0}}
+@keyframes fxFill{from{transform:scaleX(0)}}
+@keyframes fxFocus{from{letter-spacing:.35em;opacity:.25;filter:blur(8px)}to{letter-spacing:-.011em;opacity:1;filter:blur(0)}}
+@keyframes fxSlide{to{background-position:200% 0}}
+@keyframes fxSlideY{to{background-position:0 200%}}
+@keyframes fxSpin{to{--ang:360deg}}
+@keyframes fxBar{0%{transform:scaleX(0);opacity:1}55%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
+@keyframes fxHue{from{filter:hue-rotate(-35deg)}to{filter:hue-rotate(55deg)}}
+@keyframes fxPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}50%{box-shadow:0 0 0 4px rgba(220,38,38,.12),0 0 16px rgba(220,38,38,.28)}}
+@keyframes fxCrit{0%,100%{box-shadow:var(--shadow)}50%{box-shadow:0 0 0 1px rgba(220,38,38,.18),0 10px 34px rgba(220,38,38,.2)}}
+@keyframes fxGlint{0%,55%{background-position:140% 0}100%{background-position:-40% 0}}
+@keyframes fxWiggle{30%{transform:rotate(-14deg) scale(1.18)}60%{transform:rotate(9deg) scale(1.1)}}
+@keyframes fxTwinkle{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.2) rotate(18deg)}}
+
+@media (prefers-reduced-motion:no-preference){
+  :root:not(.fx-off) .field{animation:fxHue 18s ease-in-out infinite alternate}
+  :root:not(.fx-off) .blob{opacity:.42}
+  :root:not(.fx-off) .glow.on{opacity:.55}
+  :root:not(.fx-off) .fxbar.go{animation:fxBar .95s cubic-bezier(.22,1,.36,1)}
+  :root:not(.fx-off) .fxbtn[aria-pressed="true"] svg{animation:fxTwinkle 2.6s ease-in-out infinite}
+
+  /* Sidbyte: korten stiger in i tur och ordning och ett ljussvep går över dem. */
+  :root:not(.fx-off) #view.enter .glass,
+  :root:not(.fx-off) #view.enter .callout,
+  :root:not(.fx-off) #view.enter .alert{animation:fxRise .75s cubic-bezier(.2,.9,.25,1.12) both;
+    animation-delay:calc(var(--i,0) * 55ms - var(--fx-el,0ms))}
+  :root:not(.fx-off) #view.enter .glass::after{opacity:1;background:linear-gradient(112deg,rgba(255,255,255,0) 32%,rgba(255,255,255,.8) 48%,rgba(255,255,255,0) 62%) no-repeat;
+    background-size:260% 100%;animation:fxShine 1.15s ease-out both;animation-delay:calc(var(--i,0) * 55ms + 200ms - var(--fx-el,0ms))}
+  :root:not(.fx-off) #view.enter .meter>i,
+  :root:not(.fx-off) #view.enter .bar>i,
+  :root:not(.fx-off) #view.enter .poas>i,
+  :root:not(.fx-off) #view.enter i[style*="height:100%"]{transform-origin:0 50%;animation:fxFill 1.15s cubic-bezier(.22,1,.36,1) both;
+    animation-delay:calc(220ms + var(--j,0) * 40ms - var(--fx-el,0ms))}
+  :root:not(.fx-off) #pageHead.enter h1{animation:fxFocus .8s cubic-bezier(.2,.9,.2,1) both,fxSlide 7s linear infinite}
+
+  /* Rubriken går i prismats färger, mörkare än bakgrundens så den går att läsa. */
+  :root:not(.fx-off) .page-h h1{background:linear-gradient(90deg,#0369a1,#4f46e5,#a21caf,#0369a1);background-size:200% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;animation:fxSlide 7s linear infinite}
+
+  /* Kortens kant och spotlight. */
+  :root:not(.fx-off) .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;z-index:-1;pointer-events:none;
+    background:conic-gradient(from var(--ang),#38bdf8,#818cf8,#e879f9,#fbbf24,#38bdf8);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
+    opacity:0;transition:opacity .35s}
+  :root:not(.fx-off) .glass:hover::before{opacity:1;animation:fxSpin 3.2s linear infinite}
+  :root:not(.fx-off) .glass:has(> .rule)::before{opacity:1;animation:fxSpin 6s linear infinite}
+  :root:not(.fx-off) .glass::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:-1;pointer-events:none;
+    background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.7),rgba(255,255,255,0) 45%);
+    opacity:0;transition:opacity .3s}
+  :root:not(.fx-off) .glass:hover::after{opacity:1}
+  :root:not(.fx-off) .glass{transition:box-shadow .3s,translate .3s,rotate .3s}
+  :root:not(.fx-off) .glass:hover{box-shadow:0 14px 44px rgba(79,70,229,.14)}
+  :root:not(.fx-off) #view .grid:has(> .kpi),:root:not(.fx-off) #view .cards{perspective:1100px}
+  :root:not(.fx-off) .fx-tilt{transition:box-shadow .3s,translate .12s,rotate .12s}
+
+  /* Tillstånd som kräver uppmärksamhet pulserar; SATSA och andra gröna glimmar. */
+  :root:not(.fx-off) .pill.p-neg{animation:fxPulse 2.4s ease-in-out infinite}
+  :root:not(.fx-off) .pill.p-pos{background-image:linear-gradient(110deg,rgba(255,255,255,0) 35%,rgba(255,255,255,.85) 50%,rgba(255,255,255,0) 65%);
+    background-size:250% 100%;background-repeat:no-repeat;animation:fxGlint 3.4s ease-in-out infinite}
+  :root:not(.fx-off) .alert.a-crit{animation:fxCrit 2.6s ease-in-out infinite}
+
+  /* Menyn. */
+  :root:not(.fx-off) .nav a{transition:background .15s,transform .2s}
+  :root:not(.fx-off) .nav a:hover{transform:translateX(3px)}
+  :root:not(.fx-off) .nav a:hover svg{animation:fxWiggle .5s ease}
+  :root:not(.fx-off) .nav a[aria-current]{box-shadow:0 6px 22px rgba(129,140,248,.2)}
+  :root:not(.fx-off) .nav a[aria-current]::before,:root:not(.fx-off) .brand i{
+    background:linear-gradient(180deg,#38bdf8,#818cf8,#e879f9,#38bdf8);background-size:100% 200%;animation:fxSlideY 2.4s linear infinite}
+
+  /* Knappar lyfter och får ett ljussvep. */
+  :root:not(.fx-off) .fbtn,:root:not(.fx-off) .chip{position:relative;overflow:hidden;transition:transform .15s,box-shadow .2s,background .15s}
+  :root:not(.fx-off) .fbtn:hover:not(:disabled),:root:not(.fx-off) .chip:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(79,70,229,.16)}
+  :root:not(.fx-off) .fbtn:active:not(:disabled),:root:not(.fx-off) .chip:active{transform:scale(.96)}
+  :root:not(.fx-off) .fbtn::after,:root:not(.fx-off) .chip::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(110deg,rgba(255,255,255,0) 30%,rgba(255,255,255,.75) 50%,rgba(255,255,255,0) 70%);transform:translateX(-120%)}
+  :root:not(.fx-off) .fbtn:hover:not(:disabled)::after,:root:not(.fx-off) .chip:hover::after{transform:translateX(120%);transition:transform .65s ease}
+  :root:not(.fx-off) #runResearch:not(:disabled){background:linear-gradient(110deg,rgba(56,189,248,.22),rgba(129,140,248,.26),rgba(232,121,249,.22),rgba(56,189,248,.22))!important;
+    background-size:200% 100%!important;animation:fxSlide 3s linear infinite}
+  :root:not(.fx-off) #rStatus:not(:empty){position:relative;padding-bottom:12px}
+  :root:not(.fx-off) #rStatus:not(:empty)::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;border-radius:99px;
+    background:linear-gradient(90deg,#38bdf8,#818cf8,#e879f9,#38bdf8);background-size:200% 100%;animation:fxSlide 1.1s linear infinite}
+}
+@media (max-width:767px){.fxbtn span{display:none}}
+@media (prefers-reduced-motion:reduce){.fxbtn{display:none}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}.blob{animation:none}}
 </style>
 
 <div class="field" aria-hidden="true">
   <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+  <div id="fxGlow" class="glow"></div>
 </div>
+<div id="fxBar" class="fxbar" aria-hidden="true"></div>
+<canvas id="fxCanvas" class="fxcanvas" width="0" height="0" aria-hidden="true"></canvas>
 
 <button id="scrim" class="scrim" aria-label="Stäng menyn"></button>
 
@@ -185,6 +297,10 @@ dl{margin:0}
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
       </button>
       <nav id="crumbs" class="crumbs" aria-label="Brödsmulor"></nav>
+      <button id="fxToggle" class="fxbtn" type="button" aria-pressed="true" title="Slå av eller på animationerna">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>
+        <span>Effekter</span>
+      </button>
       <span class="muted" style="white-space:nowrap">september 2026</span>
     </header>
 
@@ -1776,6 +1892,7 @@ async function runResearch(niche, country) {
     showRejected = false;
     rState = { status: "done", niche, country, msg: "", added: added.length, total: rows.length, fix: "" };
     render();
+    if (added.length) fxFest(undefined, undefined, 160);
   } catch (e) {
     fail(e);
   }
@@ -2542,7 +2659,7 @@ async function laddaNer(filnamn, text, knapp) {
   };
   const d = await cap("downloads");
   if (!d) { svar("Nedladdning ej tillgänglig"); return; }
-  try { await d.save({ filename: filnamn, data: text }); svar("Sparad"); }
+  try { await d.save({ filename: filnamn, data: text }); svar("Sparad"); fxFestVid(knapp, 50); }
   catch (e) { svar("Viewern nekade"); }
 }
 
@@ -3205,6 +3322,224 @@ const NAV = [
 ];
 const TITLES = { "/": "Overview", "/products": "Products", "/research": "Research", "/kalender": "Kalender", "/kassa": "Kassa", "/test": "Test", "/risk": "Risk", "/alerts": "Alerts", "/insights": "AI Insights", "/produkt": "Produkt", "/kandidat": "Kandidat" };
 
+/* ═══ Effekter ═════════════════════════════════════════════════════════════
+   Sidbyten, uppräknade siffror, lutande kort, gnistor vid klick och konfetti
+   när något går bra. Allt stängs av både av systemets "minska rörelse" och
+   av knappen Effekter, och inget av det rör själva datan: en siffra som
+   räknas upp slutar alltid på exakt samma text som vyn skrev. */
+const FX = { t0: 0, path: null, timer: 0, tilt: null, bitar: [], loop: 0 };
+const FX_ENTRE = 1500;
+const FX_FARG = ["#38bdf8", "#818cf8", "#e879f9", "#fbbf24", "#34d399"];
+const fxLugn = window.matchMedia("(prefers-reduced-motion: reduce)");
+const fxOn = () => !fxLugn.matches && !document.documentElement.classList.contains("fx-off");
+
+function fxEfterRender(path) {
+  const view = document.getElementById("view");
+  const head = document.getElementById("pageHead");
+  const nu = performance.now();
+  if (path !== FX.path) {
+    FX.path = path; FX.t0 = nu;
+    const bar = document.getElementById("fxBar");
+    bar.classList.remove("go"); void bar.offsetWidth; bar.classList.add("go");
+  }
+  const gatt = nu - FX.t0;
+  const slut = () => { view.classList.remove("enter"); head.classList.remove("enter"); };
+  if (!fxOn() || gatt > FX_ENTRE) return slut();
+
+  /* Ritas vyn om mitt i inflygningen fortsätter animationerna där de var,
+     i stället för att börja om: fördröjningen dras av med tiden som gått. */
+  view.style.setProperty("--fx-el", gatt + "ms");
+  head.style.setProperty("--fx-el", gatt + "ms");
+  let i = 0, j = 0;
+  view.querySelectorAll(".glass, .callout, .alert").forEach((n) => n.style.setProperty("--i", Math.min(i++, 12)));
+  view.querySelectorAll('.meter>i, .bar>i, .poas>i, i[style*="height:100%"]').forEach((n) => n.style.setProperty("--j", Math.min(j++, 24)));
+  view.classList.add("enter"); head.classList.add("enter");
+  clearTimeout(FX.timer);
+  FX.timer = setTimeout(slut, FX_ENTRE - gatt + 60);
+  fxRakna(view);
+}
+
+/* ── Uppräkning ─────────────────────────────────────────────────────────── */
+const FX_TAL = /[−-]?(?:\d{1,3}(?:[  ]\d{3})+|\d+)(?:[,.]\d+)?/g;
+function fxTolka(m) {
+  const tecken = /^[−-]/.test(m) ? m[0] : "";
+  const kropp = tecken ? m.slice(1) : m;
+  const dec = kropp.match(/[,.](\d+)$/);
+  return {
+    tecken, dec: dec ? dec[1].length : 0,
+    decTecken: dec ? kropp[kropp.length - dec[1].length - 1] : "",
+    grupp: (kropp.match(/[  ]/) || [""])[0],
+    v: Number(kropp.replace(/[  ]/g, "").replace(",", ".")),
+  };
+}
+function fxSkriv(d, andel) {
+  let [hel, bra] = (d.v * andel).toFixed(d.dec).split(".");
+  if (d.grupp) hel = hel.replace(/\B(?=(\d{3})+(?!\d))/g, d.grupp);
+  return d.tecken + hel + (d.dec ? d.decTecken + bra : "");
+}
+function fxRakna(view) {
+  const jobb = [];
+  view.querySelectorAll('.kpi .val, .stat dd, .num[style*="font-size:3"], .num[style*="font-size:4"]').forEach((el) => {
+    if (el.children.length || el.dataset.fxRaknad) return;
+    const text = el.textContent;
+    if (!/\d/.test(text) || /\d{4}-\d{2}/.test(text)) return;
+    const delar = [];
+    let sist = 0;
+    text.replace(FX_TAL, (m, pos) => { delar.push(text.slice(sist, pos), fxTolka(m)); sist = pos + m.length; return m; });
+    delar.push(text.slice(sist));
+    el.dataset.fxRaknad = "1";
+    jobb.push({ el, text, delar });
+  });
+  if (!jobb.length || document.visibilityState !== "visible") return;
+  const t0 = FX.t0, LANGD = 1100;
+  const steg = (nu) => {
+    const p = Math.min(1, (nu - t0) / LANGD);
+    const andel = 1 - Math.pow(2, -10 * p);
+    for (const j of jobb) {
+      if (!j.el.isConnected) continue;
+      j.el.textContent = p >= 1 ? j.text : j.delar.map((d) => (typeof d === "string" ? d : fxSkriv(d, andel))).join("");
+    }
+    if (p < 1) requestAnimationFrame(steg);
+  };
+  requestAnimationFrame(steg);
+}
+
+/* ── Lutning, spotlight och skenet bakom glaset ─────────────────────────── */
+function fxRor(e) {
+  if (e.pointerType !== "mouse" || !fxOn()) return;
+  const g = e.target.closest && e.target.closest(".glass");
+  if (g) {
+    const r = g.getBoundingClientRect();
+    g.style.setProperty("--mx", e.clientX - r.left + "px");
+    g.style.setProperty("--my", e.clientY - r.top + "px");
+  }
+  const k = e.target.closest && e.target.closest("#view .kpi, #view .cards > article.glass");
+  if (FX.tilt && FX.tilt !== k) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt.classList.remove("fx-tilt"); }
+  FX.tilt = k || null;
+  if (k) {
+    const r = k.getBoundingClientRect();
+    const dx = (e.clientX - r.left) / r.width - 0.5, dy = (e.clientY - r.top) / r.height - 0.5;
+    const styrka = Math.hypot(dx, dy);
+    k.classList.add("fx-tilt");
+    k.style.rotate = styrka < 0.01 ? "" : `${-dy} ${dx} 0 ${(styrka * 16).toFixed(2)}deg`;
+    k.style.translate = "0 -4px";
+  }
+  FX.mal = [e.clientX, e.clientY];
+  const glow = document.getElementById("fxGlow");
+  glow.classList.add("on");
+  if (!FX.glowLoop) FX.glowLoop = requestAnimationFrame(fxGlowSteg);
+}
+function fxGlowSteg() {
+  const glow = document.getElementById("fxGlow");
+  FX.pos = FX.pos || FX.mal.slice();
+  FX.pos[0] += (FX.mal[0] - FX.pos[0]) * 0.1;
+  FX.pos[1] += (FX.mal[1] - FX.pos[1]) * 0.1;
+  glow.style.transform = `translate3d(${FX.pos[0]}px,${FX.pos[1]}px,0) translate(-50%,-50%)`;
+  FX.glowLoop = Math.hypot(FX.mal[0] - FX.pos[0], FX.mal[1] - FX.pos[1]) > 0.5 ? requestAnimationFrame(fxGlowSteg) : 0;
+}
+
+/* ── Gnistor vid klick ──────────────────────────────────────────────────── */
+function fxGnista(x, y, antal = 10) {
+  if (!fxOn()) return;
+  const bitar = [];
+  const ring = document.createElement("span");
+  ring.className = "fx-ring";
+  ring.style.setProperty("--x0", x + "px"); ring.style.setProperty("--y0", y + "px");
+  bitar.push(ring);
+  for (let i = 0; i < antal; i++) {
+    const a = (i / antal) * Math.PI * 2 + Math.random() * 0.5;
+    const d = 26 + Math.random() * 28;
+    const s = document.createElement("span");
+    s.className = "fx-spark";
+    s.style.background = FX_FARG[i % FX_FARG.length];
+    s.style.setProperty("--x0", x + "px"); s.style.setProperty("--y0", y + "px");
+    s.style.setProperty("--x1", x + Math.cos(a) * d + "px"); s.style.setProperty("--y1", y + Math.sin(a) * d + "px");
+    bitar.push(s);
+  }
+  bitar.forEach((b) => { b.addEventListener("animationend", () => b.remove()); setTimeout(() => b.remove(), 1200); });
+  document.body.append(...bitar);
+}
+
+/* ── Konfetti ───────────────────────────────────────────────────────────── */
+function fxFest(x, y, antal = 110) {
+  if (!fxOn()) return;
+  const ox = x ?? innerWidth / 2, oy = y ?? innerHeight * 0.32;
+  for (let i = 0; i < antal; i++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.15;
+    const v = 5 + Math.random() * 9;
+    FX.bitar.push({ x: ox, y: oy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6.3,
+      vr: (Math.random() - 0.5) * 0.35, w: 5 + Math.random() * 6, h: 3 + Math.random() * 5,
+      f: FX_FARG[i % FX_FARG.length], liv: 0, max: 1900 + Math.random() * 900 });
+  }
+  if (FX.loop) return;
+  const c = document.getElementById("fxCanvas");
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = innerWidth * dpr; c.height = innerHeight * dpr;
+  const ctx = c.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  /* Fysiken räknas i tid, inte i bildrutor: på en 120 Hz-skärm hade konfettin
+     annars fallit dubbelt så fort, och på en seg telefon aldrig tagit slut. */
+  let forra = performance.now();
+  const steg = (nu) => {
+    const dt = Math.max(0, nu - forra);
+    const k = Math.min(3, dt / 16.7);
+    forra = nu;
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    FX.bitar = FX.bitar.filter((b) => (b.liv += dt) < b.max && b.y < innerHeight + 40);
+    for (const b of FX.bitar) {
+      b.vy += 0.24 * k; b.vx *= Math.pow(0.985, k); b.vy *= Math.pow(0.985, k);
+      b.x += b.vx * k; b.y += b.vy * k; b.r += b.vr * k;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (b.max - b.liv) / 500);
+      ctx.translate(b.x, b.y); ctx.rotate(b.r);
+      ctx.fillStyle = b.f;
+      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h * Math.abs(Math.cos(b.r * 1.7)) + 1);
+      ctx.restore();
+    }
+    if (FX.bitar.length) FX.loop = requestAnimationFrame(steg);
+    else { FX.loop = 0; c.width = 0; c.height = 0; }
+  };
+  FX.loop = requestAnimationFrame(steg);
+}
+function fxFestVid(el, antal) {
+  if (!el || !el.getBoundingClientRect) return fxFest(undefined, undefined, antal);
+  const r = el.getBoundingClientRect();
+  fxFest(r.left + r.width / 2, r.top + r.height / 2, antal);
+}
+
+/* ── Av/på ──────────────────────────────────────────────────────────────── */
+function fxSatt(pa) {
+  document.documentElement.classList.toggle("fx-off", !pa);
+  const knapp = document.getElementById("fxToggle");
+  if (knapp) knapp.setAttribute("aria-pressed", pa ? "true" : "false");
+  if (!pa) {
+    document.getElementById("fxGlow").classList.remove("on");
+    FX.bitar = [];
+    if (FX.tilt) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt = null; }
+  }
+  try { localStorage.setItem("planvy-fx", pa ? "pa" : "av"); } catch (e) { /* lagringen är en bekvämlighet */ }
+}
+
+function fxInit() {
+  let sparat = "pa";
+  try { sparat = localStorage.getItem("planvy-fx") || "pa"; } catch (e) { /* utan lagring: på */ }
+  fxSatt(sparat !== "av");
+  document.getElementById("fxToggle").addEventListener("click", (e) => {
+    const pa = document.documentElement.classList.contains("fx-off");
+    fxSatt(pa);
+    if (pa) { FX.path = null; render(); fxFestVid(e.currentTarget, 70); }
+  });
+  addEventListener("pointermove", fxRor, { passive: true });
+  document.documentElement.addEventListener("mouseleave", () => {
+    document.getElementById("fxGlow").classList.remove("on");
+    if (FX.tilt) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt.classList.remove("fx-tilt"); FX.tilt = null; }
+  });
+  addEventListener("pointerdown", (e) => {
+    if (e.target.closest && e.target.closest("button, a, select, .chip, input[type=range]")) fxGnista(e.clientX, e.clientY);
+  }, { passive: true });
+  addEventListener("resize", () => { const c = document.getElementById("fxCanvas"); if (!FX.loop) { c.width = 0; c.height = 0; } });
+}
+
 function parseHash() {
   const raw = (location.hash || "#/").slice(1);
   const [path, qs] = raw.split("?");
@@ -3252,6 +3587,7 @@ function render() {
   document.getElementById("view").innerHTML = banner + html;
   closeDrawer();
   window.scrollTo(0, 0);
+  fxEfterRender(path);
 }
 
 /* Lådan skjuts ut med transform och ligger kvar i DOM:en, så den får inert
@@ -3269,6 +3605,7 @@ function closeDrawer() { side().classList.remove("open"); document.getElementByI
 
 addEventListener("hashchange", render);
 addEventListener("DOMContentLoaded", () => {
+  fxInit();
   render();
   syncInert();
   mq.addEventListener("change", syncInert);
@@ -3316,6 +3653,7 @@ addEventListener("DOMContentLoaded", () => {
     if (starta) {
       const id = starta.dataset.starta;
       const d = { steg: "testas", tid: nuISO() };
+      fxFestVid(starta, 60);
       LAGER.livscykel[id] = d; lagerSkriv(id, d, "livscykel").then(render);
       return render();
     }
@@ -3326,6 +3664,7 @@ addEventListener("DOMContentLoaded", () => {
       const id = idNu(); const d = { text, tid: nuISO() };
       LAGER.beslut.unshift(Object.assign({ id }, d));
       lagerSkriv(id, d, "beslut"); el.value = "";
+      fxFestVid(e.target, 45);
       return render();
     }
     if (e.target.id === "konkSpara") {
@@ -3344,6 +3683,7 @@ addEventListener("DOMContentLoaded", () => {
         lagerSkriv(id, d, "konkurrenter");
       }
       document.getElementById("konkNamn").value = ""; document.getElementById("konkAntal").value = "";
+      fxFestVid(e.target, 45);
       return render();
     }
     if (e.target.id === "kreaSpara") {
@@ -3359,6 +3699,7 @@ addEventListener("DOMContentLoaded", () => {
       LAGER.kreativa.unshift(Object.assign({ id }, d));
       lagerSkriv(id, d, "kreativa");
       document.getElementById("kreaHook").value = ""; ctrEl.value = ""; cpaEl.value = ""; frekEl.value = "";
+      fxFestVid(e.target, 45);
       return render();
     }
     const tbB = e.target.closest("[data-ta-bort-beslut]");
@@ -3423,6 +3764,7 @@ addEventListener("DOMContentLoaded", () => {
     if (t.dataset && t.dataset.steg) {
       const id = t.dataset.steg;
       const d = Object.assign({}, LAGER.livscykel[id] || {}, { steg: t.value, tid: nuISO() });
+      if (t.value === "vinnare") fxFest(undefined, undefined, 180);
       LAGER.livscykel[id] = d; await lagerSkriv(id, d, "livscykel");
       return render();
     }

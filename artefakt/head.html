@@ -164,5 +164,114 @@ dl{margin:0}
 .rows dt{font-size:12.5px;color:var(--ink2)}
 .rows dd{margin:0;font-size:13px}
 .sum{border-top:1px solid var(--hair)!important;font-weight:600}
+/* ── Effekter ─────────────────────────────────────────────────────────────
+   Allt nedan är ljus som går genom glas: kort som stiger in, ett prismasvep
+   över varje kort, en regnbågskant som roterar på hover och ett sken bakom
+   glaset som följer muspekaren. Allt ligger bakom två spärrar: systemets
+   "minska rörelse" och knappen Effekter i toppraden (klassen fx-off). */
+@property --ang{syntax:"<angle>";inherits:false;initial-value:0deg}
+.glass{position:relative;isolation:isolate}
+.fxbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(255,255,255,.75);background:rgba(255,255,255,.5);
+  border-radius:99px;padding:5px 11px;font-size:12px;font-weight:500;color:var(--ink2);white-space:nowrap}
+.fxbtn:hover{background:rgba(255,255,255,.85)}
+.fxbtn[aria-pressed="true"]{color:var(--series-ink);border-color:rgba(79,70,229,.3)}
+.fxbtn[aria-pressed="true"] svg{color:#a21caf}
+.fxbar{position:fixed;top:env(safe-area-inset-top,0px);left:0;right:0;height:3px;z-index:60;pointer-events:none;
+  background:linear-gradient(90deg,#38bdf8,#818cf8,#e879f9,#38bdf8);background-size:200% 100%;
+  transform-origin:0 50%;transform:scaleX(0);opacity:0}
+.fxcanvas{position:fixed;inset:0;width:100%;height:100%;z-index:80;pointer-events:none}
+.glow{position:absolute;left:0;top:0;width:36vw;height:36vw;min-width:280px;min-height:280px;border-radius:9999px;
+  background:radial-gradient(circle,#a5b4fc 0%,#f0abfc 45%,rgba(240,171,252,0) 70%);filter:blur(60px);opacity:0;
+  transition:opacity .8s;will-change:transform}
+.fx-spark,.fx-ring{position:fixed;left:0;top:0;pointer-events:none;z-index:70}
+.fx-spark{width:7px;height:7px;margin:-3.5px 0 0 -3.5px;border-radius:99px;animation:fxSpark .65s cubic-bezier(.2,.8,.3,1) forwards}
+.fx-ring{width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:99px;border:2px solid #818cf8;animation:fxRing .6s ease-out forwards}
+@keyframes fxSpark{from{transform:translate(var(--x0),var(--y0)) scale(1);opacity:1}to{transform:translate(var(--x1),var(--y1)) scale(.15);opacity:0}}
+@keyframes fxRing{from{transform:translate(var(--x0),var(--y0)) scale(.4);opacity:.9}to{transform:translate(var(--x0),var(--y0)) scale(4.2);opacity:0}}
+@keyframes fxRise{from{opacity:.2;transform:translateY(26px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes fxShine{from{background-position:130% 0}to{background-position:-70% 0}}
+@keyframes fxFill{from{transform:scaleX(0)}}
+@keyframes fxFocus{from{letter-spacing:.35em;opacity:.25;filter:blur(8px)}to{letter-spacing:-.011em;opacity:1;filter:blur(0)}}
+@keyframes fxSlide{to{background-position:200% 0}}
+@keyframes fxSlideY{to{background-position:0 200%}}
+@keyframes fxSpin{to{--ang:360deg}}
+@keyframes fxBar{0%{transform:scaleX(0);opacity:1}55%{transform:scaleX(1);opacity:1}100%{transform:scaleX(1);opacity:0}}
+@keyframes fxHue{from{filter:hue-rotate(-35deg)}to{filter:hue-rotate(55deg)}}
+@keyframes fxPulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}50%{box-shadow:0 0 0 4px rgba(220,38,38,.12),0 0 16px rgba(220,38,38,.28)}}
+@keyframes fxCrit{0%,100%{box-shadow:var(--shadow)}50%{box-shadow:0 0 0 1px rgba(220,38,38,.18),0 10px 34px rgba(220,38,38,.2)}}
+@keyframes fxGlint{0%,55%{background-position:140% 0}100%{background-position:-40% 0}}
+@keyframes fxWiggle{30%{transform:rotate(-14deg) scale(1.18)}60%{transform:rotate(9deg) scale(1.1)}}
+@keyframes fxTwinkle{0%,100%{transform:scale(1) rotate(0)}50%{transform:scale(1.2) rotate(18deg)}}
+
+@media (prefers-reduced-motion:no-preference){
+  :root:not(.fx-off) .field{animation:fxHue 18s ease-in-out infinite alternate}
+  :root:not(.fx-off) .blob{opacity:.42}
+  :root:not(.fx-off) .glow.on{opacity:.55}
+  :root:not(.fx-off) .fxbar.go{animation:fxBar .95s cubic-bezier(.22,1,.36,1)}
+  :root:not(.fx-off) .fxbtn[aria-pressed="true"] svg{animation:fxTwinkle 2.6s ease-in-out infinite}
+
+  /* Sidbyte: korten stiger in i tur och ordning och ett ljussvep går över dem. */
+  :root:not(.fx-off) #view.enter .glass,
+  :root:not(.fx-off) #view.enter .callout,
+  :root:not(.fx-off) #view.enter .alert{animation:fxRise .75s cubic-bezier(.2,.9,.25,1.12) both;
+    animation-delay:calc(var(--i,0) * 55ms - var(--fx-el,0ms))}
+  :root:not(.fx-off) #view.enter .glass::after{opacity:1;background:linear-gradient(112deg,rgba(255,255,255,0) 32%,rgba(255,255,255,.8) 48%,rgba(255,255,255,0) 62%) no-repeat;
+    background-size:260% 100%;animation:fxShine 1.15s ease-out both;animation-delay:calc(var(--i,0) * 55ms + 200ms - var(--fx-el,0ms))}
+  :root:not(.fx-off) #view.enter .meter>i,
+  :root:not(.fx-off) #view.enter .bar>i,
+  :root:not(.fx-off) #view.enter .poas>i,
+  :root:not(.fx-off) #view.enter i[style*="height:100%"]{transform-origin:0 50%;animation:fxFill 1.15s cubic-bezier(.22,1,.36,1) both;
+    animation-delay:calc(220ms + var(--j,0) * 40ms - var(--fx-el,0ms))}
+  :root:not(.fx-off) #pageHead.enter h1{animation:fxFocus .8s cubic-bezier(.2,.9,.2,1) both,fxSlide 7s linear infinite}
+
+  /* Rubriken går i prismats färger, mörkare än bakgrundens så den går att läsa. */
+  :root:not(.fx-off) .page-h h1{background:linear-gradient(90deg,#0369a1,#4f46e5,#a21caf,#0369a1);background-size:200% 100%;
+    -webkit-background-clip:text;background-clip:text;color:transparent;animation:fxSlide 7s linear infinite}
+
+  /* Kortens kant och spotlight. */
+  :root:not(.fx-off) .glass::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1.5px;z-index:-1;pointer-events:none;
+    background:conic-gradient(from var(--ang),#38bdf8,#818cf8,#e879f9,#fbbf24,#38bdf8);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;
+    opacity:0;transition:opacity .35s}
+  :root:not(.fx-off) .glass:hover::before{opacity:1;animation:fxSpin 3.2s linear infinite}
+  :root:not(.fx-off) .glass:has(> .rule)::before{opacity:1;animation:fxSpin 6s linear infinite}
+  :root:not(.fx-off) .glass::after{content:"";position:absolute;inset:0;border-radius:inherit;z-index:-1;pointer-events:none;
+    background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.7),rgba(255,255,255,0) 45%);
+    opacity:0;transition:opacity .3s}
+  :root:not(.fx-off) .glass:hover::after{opacity:1}
+  :root:not(.fx-off) .glass{transition:box-shadow .3s,translate .3s,rotate .3s}
+  :root:not(.fx-off) .glass:hover{box-shadow:0 14px 44px rgba(79,70,229,.14)}
+  :root:not(.fx-off) #view .grid:has(> .kpi),:root:not(.fx-off) #view .cards{perspective:1100px}
+  :root:not(.fx-off) .fx-tilt{transition:box-shadow .3s,translate .12s,rotate .12s}
+
+  /* Tillstånd som kräver uppmärksamhet pulserar; SATSA och andra gröna glimmar. */
+  :root:not(.fx-off) .pill.p-neg{animation:fxPulse 2.4s ease-in-out infinite}
+  :root:not(.fx-off) .pill.p-pos{background-image:linear-gradient(110deg,rgba(255,255,255,0) 35%,rgba(255,255,255,.85) 50%,rgba(255,255,255,0) 65%);
+    background-size:250% 100%;background-repeat:no-repeat;animation:fxGlint 3.4s ease-in-out infinite}
+  :root:not(.fx-off) .alert.a-crit{animation:fxCrit 2.6s ease-in-out infinite}
+
+  /* Menyn. */
+  :root:not(.fx-off) .nav a{transition:background .15s,transform .2s}
+  :root:not(.fx-off) .nav a:hover{transform:translateX(3px)}
+  :root:not(.fx-off) .nav a:hover svg{animation:fxWiggle .5s ease}
+  :root:not(.fx-off) .nav a[aria-current]{box-shadow:0 6px 22px rgba(129,140,248,.2)}
+  :root:not(.fx-off) .nav a[aria-current]::before,:root:not(.fx-off) .brand i{
+    background:linear-gradient(180deg,#38bdf8,#818cf8,#e879f9,#38bdf8);background-size:100% 200%;animation:fxSlideY 2.4s linear infinite}
+
+  /* Knappar lyfter och får ett ljussvep. */
+  :root:not(.fx-off) .fbtn,:root:not(.fx-off) .chip{position:relative;overflow:hidden;transition:transform .15s,box-shadow .2s,background .15s}
+  :root:not(.fx-off) .fbtn:hover:not(:disabled),:root:not(.fx-off) .chip:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(79,70,229,.16)}
+  :root:not(.fx-off) .fbtn:active:not(:disabled),:root:not(.fx-off) .chip:active{transform:scale(.96)}
+  :root:not(.fx-off) .fbtn::after,:root:not(.fx-off) .chip::after{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(110deg,rgba(255,255,255,0) 30%,rgba(255,255,255,.75) 50%,rgba(255,255,255,0) 70%);transform:translateX(-120%)}
+  :root:not(.fx-off) .fbtn:hover:not(:disabled)::after,:root:not(.fx-off) .chip:hover::after{transform:translateX(120%);transition:transform .65s ease}
+  :root:not(.fx-off) #runResearch:not(:disabled){background:linear-gradient(110deg,rgba(56,189,248,.22),rgba(129,140,248,.26),rgba(232,121,249,.22),rgba(56,189,248,.22))!important;
+    background-size:200% 100%!important;animation:fxSlide 3s linear infinite}
+  :root:not(.fx-off) #rStatus:not(:empty){position:relative;padding-bottom:12px}
+  :root:not(.fx-off) #rStatus:not(:empty)::after{content:"";position:absolute;left:0;right:0;bottom:0;height:4px;border-radius:99px;
+    background:linear-gradient(90deg,#38bdf8,#818cf8,#e879f9,#38bdf8);background-size:200% 100%;animation:fxSlide 1.1s linear infinite}
+}
+@media (max-width:767px){.fxbtn span{display:none}}
+@media (prefers-reduced-motion:reduce){.fxbtn{display:none}}
 @media (prefers-reduced-motion:reduce){*{animation-duration:.001ms!important;transition-duration:.001ms!important}.blob{animation:none}}
 </style>

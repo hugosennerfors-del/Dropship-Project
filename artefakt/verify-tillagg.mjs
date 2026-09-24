@@ -6,6 +6,9 @@ import path from "node:path";
 /* Katalogen tas ur skriptets egen plats, så sviten går att köra från en
    checkout och inte bara från katalogen den skrevs i. */
 const DIR = path.dirname(fileURLToPath(import.meta.url));
+/* Sviten kör med "minska rörelse" på: den prövar vad sidan visar och gör, och
+   uppräknade siffror mitt i en animation hade gjort varje textkontroll till ett
+   lotteri. Effekterna har en egen svit, verify-fx.mjs. */
 
 /* Sidan serveras över http i stället för file://. En file://-sida får en
    ogenomskinlig origin i Chromium, och då beter sig sessionStorage inte
@@ -55,7 +58,7 @@ const mock = `(() => {
 })()`;
 
 async function sida(hash) {
-  const p = await b.newPage({ viewport: { width: 1440, height: 1200 } });
+  const p = await b.newPage({ reducedMotion: "reduce", viewport: { width: 1440, height: 1200 } });
   p.on("pageerror", (e) => { fel++; console.log("PAGEERROR:", e.message); });
   await p.addInitScript(mock);
   await p.goto(url + hash);
@@ -400,7 +403,7 @@ T("BOM så Excel läser åäö", csv.charCodeAt(0) === 0xfeff);
 T("knappen bekräftar", (await p.textContent("#exportCsv")) === "Sparad");
 
 /* ── 8. Utan lagring alls: inget får krascha ────────────────────────────── */
-const p2 = await b.newPage({ viewport: { width: 390, height: 900 } });
+const p2 = await b.newPage({ reducedMotion: "reduce", viewport: { width: 390, height: 900 } });
 const fel2 = [];
 p2.on("pageerror", (e) => fel2.push(e.message));
 for (const h of ["#/", "#/kassa", "#/test", "#/risk", "#/produkt?sku=SPC-001", "#/kandidat?id=9df592e2"]) {
@@ -412,7 +415,7 @@ for (const h of ["#/", "#/kassa", "#/test", "#/risk", "#/produkt?sku=SPC-001", "
 T("nya vyerna når navet", (await p2.$$('a[href="#/kassa"], a[href="#/test"], a[href="#/risk"]')).length >= 3);
 
 /* ── 9. Innan lagret hunnit fram dras inga slutsatser ───────────────────── */
-const p3 = await b.newPage({ viewport: { width: 1440, height: 1000 } });
+const p3 = await b.newPage({ reducedMotion: "reduce", viewport: { width: 1440, height: 1000 } });
 p3.on("pageerror", (e) => { fel++; console.log("PAGEERROR:", e.message); });
 await p3.addInitScript(`(() => {
   const langsam = new Promise((r) => setTimeout(() => r(null), 3000));

@@ -4,9 +4,12 @@ import path from "node:path";
 /* Katalogen tas ur skriptets egen plats, så sviten går att köra från en
    checkout och inte bara från katalogen den skrevs i. */
 const DIR = path.dirname(fileURLToPath(import.meta.url));
+/* Sviten kör med "minska rörelse" på: den prövar vad sidan visar och gör, och
+   uppräknade siffror mitt i en animation hade gjort varje textkontroll till ett
+   lotteri. Effekterna har en egen svit, verify-fx.mjs. */
 const url = "file://" + DIR + "/index.html";
 const b = await chromium.launch();
-const p = await b.newPage({ viewport: { width: 1440, height: 1000 } });
+const p = await b.newPage({ reducedMotion: "reduce", viewport: { width: 1440, height: 1000 } });
 const errs = [];
 p.on("pageerror", (e) => errs.push("PAGEERROR: " + e.message));
 p.on("console", (m) => m.type() === "error" && errs.push("CONSOLE: " + m.text()));
@@ -74,7 +77,7 @@ const q3 = await p.textContent("#view");
 T("sökning når annonsmanus", q3.includes("Pan Stirrer"), q3.slice(0, 160));
 
 // 6. Mobilvy
-const mp = await b.newPage({ viewport: { width: 390, height: 844 } });
+const mp = await b.newPage({ reducedMotion: "reduce", viewport: { width: 390, height: 844 } });
 await mp.goto(url + "#/research");
 await mp.waitForTimeout(400);
 const sw = await mp.evaluate(() => document.documentElement.scrollWidth);
@@ -113,7 +116,7 @@ console.log(errs.length ? "\nFEL I KONSOLEN:\n" + errs.join("\n") : "\nInga kons
 
 
 // ── 8. Dagsvyn ──────────────────────────────────────────────────────────
-const dp = await b.newPage({ viewport: { width: 1440, height: 1100 } });
+const dp = await b.newPage({ reducedMotion: "reduce", viewport: { width: 1440, height: 1100 } });
 dp.on("pageerror", (e) => console.log("PAGEERROR:", e.message));
 await dp.goto(url + "#/research");
 await dp.waitForTimeout(500);
@@ -154,7 +157,7 @@ await dp.close();
 
 
 // ── 9. Kalendervyn ──────────────────────────────────────────────────────
-const kp = await b.newPage({ viewport: { width: 1440, height: 1200 } });
+const kp = await b.newPage({ reducedMotion: "reduce", viewport: { width: 1440, height: 1200 } });
 kp.on("pageerror", (e) => console.log("PAGEERROR:", e.message));
 await kp.goto(url + "#/kalender");
 await kp.waitForTimeout(500);

@@ -868,6 +868,7 @@ async function runResearch(niche, country) {
     showRejected = false;
     rState = { status: "done", niche, country, msg: "", added: added.length, total: rows.length, fix: "" };
     render();
+    if (added.length) fxFest(undefined, undefined, 160);
   } catch (e) {
     fail(e);
   }
@@ -1634,7 +1635,7 @@ async function laddaNer(filnamn, text, knapp) {
   };
   const d = await cap("downloads");
   if (!d) { svar("Nedladdning ej tillgänglig"); return; }
-  try { await d.save({ filename: filnamn, data: text }); svar("Sparad"); }
+  try { await d.save({ filename: filnamn, data: text }); svar("Sparad"); fxFestVid(knapp, 50); }
   catch (e) { svar("Viewern nekade"); }
 }
 
@@ -2297,6 +2298,224 @@ const NAV = [
 ];
 const TITLES = { "/": "Overview", "/products": "Products", "/research": "Research", "/kalender": "Kalender", "/kassa": "Kassa", "/test": "Test", "/risk": "Risk", "/alerts": "Alerts", "/insights": "AI Insights", "/produkt": "Produkt", "/kandidat": "Kandidat" };
 
+/* ═══ Effekter ═════════════════════════════════════════════════════════════
+   Sidbyten, uppräknade siffror, lutande kort, gnistor vid klick och konfetti
+   när något går bra. Allt stängs av både av systemets "minska rörelse" och
+   av knappen Effekter, och inget av det rör själva datan: en siffra som
+   räknas upp slutar alltid på exakt samma text som vyn skrev. */
+const FX = { t0: 0, path: null, timer: 0, tilt: null, bitar: [], loop: 0 };
+const FX_ENTRE = 1500;
+const FX_FARG = ["#38bdf8", "#818cf8", "#e879f9", "#fbbf24", "#34d399"];
+const fxLugn = window.matchMedia("(prefers-reduced-motion: reduce)");
+const fxOn = () => !fxLugn.matches && !document.documentElement.classList.contains("fx-off");
+
+function fxEfterRender(path) {
+  const view = document.getElementById("view");
+  const head = document.getElementById("pageHead");
+  const nu = performance.now();
+  if (path !== FX.path) {
+    FX.path = path; FX.t0 = nu;
+    const bar = document.getElementById("fxBar");
+    bar.classList.remove("go"); void bar.offsetWidth; bar.classList.add("go");
+  }
+  const gatt = nu - FX.t0;
+  const slut = () => { view.classList.remove("enter"); head.classList.remove("enter"); };
+  if (!fxOn() || gatt > FX_ENTRE) return slut();
+
+  /* Ritas vyn om mitt i inflygningen fortsätter animationerna där de var,
+     i stället för att börja om: fördröjningen dras av med tiden som gått. */
+  view.style.setProperty("--fx-el", gatt + "ms");
+  head.style.setProperty("--fx-el", gatt + "ms");
+  let i = 0, j = 0;
+  view.querySelectorAll(".glass, .callout, .alert").forEach((n) => n.style.setProperty("--i", Math.min(i++, 12)));
+  view.querySelectorAll('.meter>i, .bar>i, .poas>i, i[style*="height:100%"]').forEach((n) => n.style.setProperty("--j", Math.min(j++, 24)));
+  view.classList.add("enter"); head.classList.add("enter");
+  clearTimeout(FX.timer);
+  FX.timer = setTimeout(slut, FX_ENTRE - gatt + 60);
+  fxRakna(view);
+}
+
+/* ── Uppräkning ─────────────────────────────────────────────────────────── */
+const FX_TAL = /[−-]?(?:\d{1,3}(?:[  ]\d{3})+|\d+)(?:[,.]\d+)?/g;
+function fxTolka(m) {
+  const tecken = /^[−-]/.test(m) ? m[0] : "";
+  const kropp = tecken ? m.slice(1) : m;
+  const dec = kropp.match(/[,.](\d+)$/);
+  return {
+    tecken, dec: dec ? dec[1].length : 0,
+    decTecken: dec ? kropp[kropp.length - dec[1].length - 1] : "",
+    grupp: (kropp.match(/[  ]/) || [""])[0],
+    v: Number(kropp.replace(/[  ]/g, "").replace(",", ".")),
+  };
+}
+function fxSkriv(d, andel) {
+  let [hel, bra] = (d.v * andel).toFixed(d.dec).split(".");
+  if (d.grupp) hel = hel.replace(/\B(?=(\d{3})+(?!\d))/g, d.grupp);
+  return d.tecken + hel + (d.dec ? d.decTecken + bra : "");
+}
+function fxRakna(view) {
+  const jobb = [];
+  view.querySelectorAll('.kpi .val, .stat dd, .num[style*="font-size:3"], .num[style*="font-size:4"]').forEach((el) => {
+    if (el.children.length || el.dataset.fxRaknad) return;
+    const text = el.textContent;
+    if (!/\d/.test(text) || /\d{4}-\d{2}/.test(text)) return;
+    const delar = [];
+    let sist = 0;
+    text.replace(FX_TAL, (m, pos) => { delar.push(text.slice(sist, pos), fxTolka(m)); sist = pos + m.length; return m; });
+    delar.push(text.slice(sist));
+    el.dataset.fxRaknad = "1";
+    jobb.push({ el, text, delar });
+  });
+  if (!jobb.length || document.visibilityState !== "visible") return;
+  const t0 = FX.t0, LANGD = 1100;
+  const steg = (nu) => {
+    const p = Math.min(1, (nu - t0) / LANGD);
+    const andel = 1 - Math.pow(2, -10 * p);
+    for (const j of jobb) {
+      if (!j.el.isConnected) continue;
+      j.el.textContent = p >= 1 ? j.text : j.delar.map((d) => (typeof d === "string" ? d : fxSkriv(d, andel))).join("");
+    }
+    if (p < 1) requestAnimationFrame(steg);
+  };
+  requestAnimationFrame(steg);
+}
+
+/* ── Lutning, spotlight och skenet bakom glaset ─────────────────────────── */
+function fxRor(e) {
+  if (e.pointerType !== "mouse" || !fxOn()) return;
+  const g = e.target.closest && e.target.closest(".glass");
+  if (g) {
+    const r = g.getBoundingClientRect();
+    g.style.setProperty("--mx", e.clientX - r.left + "px");
+    g.style.setProperty("--my", e.clientY - r.top + "px");
+  }
+  const k = e.target.closest && e.target.closest("#view .kpi, #view .cards > article.glass");
+  if (FX.tilt && FX.tilt !== k) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt.classList.remove("fx-tilt"); }
+  FX.tilt = k || null;
+  if (k) {
+    const r = k.getBoundingClientRect();
+    const dx = (e.clientX - r.left) / r.width - 0.5, dy = (e.clientY - r.top) / r.height - 0.5;
+    const styrka = Math.hypot(dx, dy);
+    k.classList.add("fx-tilt");
+    k.style.rotate = styrka < 0.01 ? "" : `${-dy} ${dx} 0 ${(styrka * 16).toFixed(2)}deg`;
+    k.style.translate = "0 -4px";
+  }
+  FX.mal = [e.clientX, e.clientY];
+  const glow = document.getElementById("fxGlow");
+  glow.classList.add("on");
+  if (!FX.glowLoop) FX.glowLoop = requestAnimationFrame(fxGlowSteg);
+}
+function fxGlowSteg() {
+  const glow = document.getElementById("fxGlow");
+  FX.pos = FX.pos || FX.mal.slice();
+  FX.pos[0] += (FX.mal[0] - FX.pos[0]) * 0.1;
+  FX.pos[1] += (FX.mal[1] - FX.pos[1]) * 0.1;
+  glow.style.transform = `translate3d(${FX.pos[0]}px,${FX.pos[1]}px,0) translate(-50%,-50%)`;
+  FX.glowLoop = Math.hypot(FX.mal[0] - FX.pos[0], FX.mal[1] - FX.pos[1]) > 0.5 ? requestAnimationFrame(fxGlowSteg) : 0;
+}
+
+/* ── Gnistor vid klick ──────────────────────────────────────────────────── */
+function fxGnista(x, y, antal = 10) {
+  if (!fxOn()) return;
+  const bitar = [];
+  const ring = document.createElement("span");
+  ring.className = "fx-ring";
+  ring.style.setProperty("--x0", x + "px"); ring.style.setProperty("--y0", y + "px");
+  bitar.push(ring);
+  for (let i = 0; i < antal; i++) {
+    const a = (i / antal) * Math.PI * 2 + Math.random() * 0.5;
+    const d = 26 + Math.random() * 28;
+    const s = document.createElement("span");
+    s.className = "fx-spark";
+    s.style.background = FX_FARG[i % FX_FARG.length];
+    s.style.setProperty("--x0", x + "px"); s.style.setProperty("--y0", y + "px");
+    s.style.setProperty("--x1", x + Math.cos(a) * d + "px"); s.style.setProperty("--y1", y + Math.sin(a) * d + "px");
+    bitar.push(s);
+  }
+  bitar.forEach((b) => { b.addEventListener("animationend", () => b.remove()); setTimeout(() => b.remove(), 1200); });
+  document.body.append(...bitar);
+}
+
+/* ── Konfetti ───────────────────────────────────────────────────────────── */
+function fxFest(x, y, antal = 110) {
+  if (!fxOn()) return;
+  const ox = x ?? innerWidth / 2, oy = y ?? innerHeight * 0.32;
+  for (let i = 0; i < antal; i++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.15;
+    const v = 5 + Math.random() * 9;
+    FX.bitar.push({ x: ox, y: oy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: Math.random() * 6.3,
+      vr: (Math.random() - 0.5) * 0.35, w: 5 + Math.random() * 6, h: 3 + Math.random() * 5,
+      f: FX_FARG[i % FX_FARG.length], liv: 0, max: 1900 + Math.random() * 900 });
+  }
+  if (FX.loop) return;
+  const c = document.getElementById("fxCanvas");
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  c.width = innerWidth * dpr; c.height = innerHeight * dpr;
+  const ctx = c.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  /* Fysiken räknas i tid, inte i bildrutor: på en 120 Hz-skärm hade konfettin
+     annars fallit dubbelt så fort, och på en seg telefon aldrig tagit slut. */
+  let forra = performance.now();
+  const steg = (nu) => {
+    const dt = Math.max(0, nu - forra);
+    const k = Math.min(3, dt / 16.7);
+    forra = nu;
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    FX.bitar = FX.bitar.filter((b) => (b.liv += dt) < b.max && b.y < innerHeight + 40);
+    for (const b of FX.bitar) {
+      b.vy += 0.24 * k; b.vx *= Math.pow(0.985, k); b.vy *= Math.pow(0.985, k);
+      b.x += b.vx * k; b.y += b.vy * k; b.r += b.vr * k;
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, (b.max - b.liv) / 500);
+      ctx.translate(b.x, b.y); ctx.rotate(b.r);
+      ctx.fillStyle = b.f;
+      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h * Math.abs(Math.cos(b.r * 1.7)) + 1);
+      ctx.restore();
+    }
+    if (FX.bitar.length) FX.loop = requestAnimationFrame(steg);
+    else { FX.loop = 0; c.width = 0; c.height = 0; }
+  };
+  FX.loop = requestAnimationFrame(steg);
+}
+function fxFestVid(el, antal) {
+  if (!el || !el.getBoundingClientRect) return fxFest(undefined, undefined, antal);
+  const r = el.getBoundingClientRect();
+  fxFest(r.left + r.width / 2, r.top + r.height / 2, antal);
+}
+
+/* ── Av/på ──────────────────────────────────────────────────────────────── */
+function fxSatt(pa) {
+  document.documentElement.classList.toggle("fx-off", !pa);
+  const knapp = document.getElementById("fxToggle");
+  if (knapp) knapp.setAttribute("aria-pressed", pa ? "true" : "false");
+  if (!pa) {
+    document.getElementById("fxGlow").classList.remove("on");
+    FX.bitar = [];
+    if (FX.tilt) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt = null; }
+  }
+  try { localStorage.setItem("planvy-fx", pa ? "pa" : "av"); } catch (e) { /* lagringen är en bekvämlighet */ }
+}
+
+function fxInit() {
+  let sparat = "pa";
+  try { sparat = localStorage.getItem("planvy-fx") || "pa"; } catch (e) { /* utan lagring: på */ }
+  fxSatt(sparat !== "av");
+  document.getElementById("fxToggle").addEventListener("click", (e) => {
+    const pa = document.documentElement.classList.contains("fx-off");
+    fxSatt(pa);
+    if (pa) { FX.path = null; render(); fxFestVid(e.currentTarget, 70); }
+  });
+  addEventListener("pointermove", fxRor, { passive: true });
+  document.documentElement.addEventListener("mouseleave", () => {
+    document.getElementById("fxGlow").classList.remove("on");
+    if (FX.tilt) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt.classList.remove("fx-tilt"); FX.tilt = null; }
+  });
+  addEventListener("pointerdown", (e) => {
+    if (e.target.closest && e.target.closest("button, a, select, .chip, input[type=range]")) fxGnista(e.clientX, e.clientY);
+  }, { passive: true });
+  addEventListener("resize", () => { const c = document.getElementById("fxCanvas"); if (!FX.loop) { c.width = 0; c.height = 0; } });
+}
+
 function parseHash() {
   const raw = (location.hash || "#/").slice(1);
   const [path, qs] = raw.split("?");
@@ -2344,6 +2563,7 @@ function render() {
   document.getElementById("view").innerHTML = banner + html;
   closeDrawer();
   window.scrollTo(0, 0);
+  fxEfterRender(path);
 }
 
 /* Lådan skjuts ut med transform och ligger kvar i DOM:en, så den får inert
@@ -2361,6 +2581,7 @@ function closeDrawer() { side().classList.remove("open"); document.getElementByI
 
 addEventListener("hashchange", render);
 addEventListener("DOMContentLoaded", () => {
+  fxInit();
   render();
   syncInert();
   mq.addEventListener("change", syncInert);
@@ -2408,6 +2629,7 @@ addEventListener("DOMContentLoaded", () => {
     if (starta) {
       const id = starta.dataset.starta;
       const d = { steg: "testas", tid: nuISO() };
+      fxFestVid(starta, 60);
       LAGER.livscykel[id] = d; lagerSkriv(id, d, "livscykel").then(render);
       return render();
     }
@@ -2418,6 +2640,7 @@ addEventListener("DOMContentLoaded", () => {
       const id = idNu(); const d = { text, tid: nuISO() };
       LAGER.beslut.unshift(Object.assign({ id }, d));
       lagerSkriv(id, d, "beslut"); el.value = "";
+      fxFestVid(e.target, 45);
       return render();
     }
     if (e.target.id === "konkSpara") {
@@ -2436,6 +2659,7 @@ addEventListener("DOMContentLoaded", () => {
         lagerSkriv(id, d, "konkurrenter");
       }
       document.getElementById("konkNamn").value = ""; document.getElementById("konkAntal").value = "";
+      fxFestVid(e.target, 45);
       return render();
     }
     if (e.target.id === "kreaSpara") {
@@ -2451,6 +2675,7 @@ addEventListener("DOMContentLoaded", () => {
       LAGER.kreativa.unshift(Object.assign({ id }, d));
       lagerSkriv(id, d, "kreativa");
       document.getElementById("kreaHook").value = ""; ctrEl.value = ""; cpaEl.value = ""; frekEl.value = "";
+      fxFestVid(e.target, 45);
       return render();
     }
     const tbB = e.target.closest("[data-ta-bort-beslut]");
@@ -2515,6 +2740,7 @@ addEventListener("DOMContentLoaded", () => {
     if (t.dataset && t.dataset.steg) {
       const id = t.dataset.steg;
       const d = Object.assign({}, LAGER.livscykel[id] || {}, { steg: t.value, tid: nuISO() });
+      if (t.value === "vinnare") fxFest(undefined, undefined, 180);
       LAGER.livscykel[id] = d; await lagerSkriv(id, d, "livscykel");
       return render();
     }

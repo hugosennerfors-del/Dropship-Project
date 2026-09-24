@@ -4,6 +4,9 @@ import path from "node:path";
 /* Katalogen tas ur skriptets egen plats, så sviten går att köra från en
    checkout och inte bara från katalogen den skrevs i. */
 const DIR = path.dirname(fileURLToPath(import.meta.url));
+/* Sviten kör med "minska rörelse" på: den prövar vad sidan visar och gör, och
+   uppräknade siffror mitt i en animation hade gjort varje textkontroll till ett
+   lotteri. Effekterna har en egen svit, verify-fx.mjs. */
 const url = "file://" + DIR + "/index.html";
 const b = await chromium.launch();
 const T = (l, c, x = "") => console.log((c ? "PASS " : "FEL  ") + l + (c ? "" : "  " + x));
@@ -44,7 +47,7 @@ const mock = (mode) => `(() => {
 })()`;
 
 async function page(mode) {
-  const p = await b.newPage({ viewport: { width: 1440, height: 1100 } });
+  const p = await b.newPage({ reducedMotion: "reduce", viewport: { width: 1440, height: 1100 } });
   p.on("pageerror", (e) => console.log("PAGEERROR:", e.message));
   if (mode) await p.addInitScript(mock(mode));
   await p.goto(url + "#/research");

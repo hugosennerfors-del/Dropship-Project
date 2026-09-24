@@ -17,6 +17,7 @@ hämtad från n8n-workflowet **Plan-vy · Intelligence-API** (körning 1387).
 | `verify.mjs` | Playwright-kontroller: vyer, marknader, mobil (48 st) |
 | `verify-research.mjs` | Playwright-kontroller: research-körningen, med mockad koppling (26 st) |
 | `verify-tillagg.mjs` | Playwright-kontroller: Kassa, Test, Risk, policy, CSV (127 st) |
+| `verify-fx.mjs` | Playwright-kontroller: effekterna, med rörelse på (20 st) |
 | `index.html` | Det som publiceras — genererad, redigera den inte för hand |
 
 ## Bygga och kontrollera
@@ -26,6 +27,7 @@ node build.mjs
 node verify.mjs
 node verify-research.mjs
 node verify-tillagg.mjs
+node verify-fx.mjs
 ```
 
 `verify-tillagg.mjs` startar en egen http-server på `127.0.0.1` i stället för
@@ -103,3 +105,29 @@ och returgrad över tid (`returns` är tom).
 `lagerKlart` gör att Kassa och Risk håller inne sina slutsatser tills lagret
 lästs. Utan det skulle en tom kassa på noll se ut som en konkurs under de
 första hundra millisekunderna.
+
+## Effekter
+
+Sidbyten får korten att stiga in i tur och ordning med ett ljussvep över
+varje kort, siffror räknas upp, staplar fylls, rubriken går i prismats färger
+och ett sken bakom glaset följer muspekaren. På hover får korten en roterande
+regnbågskant och KPI-korten lutar mot pekaren. Klick ger gnistor, och sparade
+beslut, startade tester, en kandidat som blir vinnare, en lyckad
+research-körning och en CSV-export ger konfetti. Röda lägen pulserar.
+
+Två spärrar stänger av allt: systemets "minska rörelse" och knappen
+**Effekter** i toppraden, som minns sitt läge i webbläsaren.
+
+Tre regler håller effekterna ärliga:
+
+- En uppräknad siffra slutar alltid på exakt den text vyn skrev. Ritas vyn om
+  mitt i inflygningen fortsätter animationerna där de var, i stället för att
+  börja om från noll.
+- Inflygningen körs bara vid sidbyte. Att skriva i ett fält eller dra i ett
+  reglage ritar om vyn men flyger inte in den igen.
+- Konfettins fysik räknas i tid och inte i bildrutor, så den tar lika lång tid
+  på en 120 Hz-skärm som på en seg telefon, och duken frigörs när den är klar.
+
+De tre funktionssviterna kör med "minska rörelse" på, eftersom uppräknade
+siffror mitt i en animation annars hade gjort varje textkontroll till ett
+lotteri. `verify-fx.mjs` prövar effekterna med rörelse på.
