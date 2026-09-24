@@ -2383,27 +2383,46 @@ function fxRakna(view) {
 /* ── Lutning, spotlight och skenet bakom glaset ─────────────────────────── */
 function fxRor(e) {
   if (e.pointerType !== "mouse" || !fxOn()) return;
+  fxLuta(e);
   const g = e.target.closest && e.target.closest(".glass");
   if (g) {
-    const r = g.getBoundingClientRect();
+    const r = FX.tilt && FX.tilt.el === g ? FX.tilt.rect : g.getBoundingClientRect();
     g.style.setProperty("--mx", e.clientX - r.left + "px");
     g.style.setProperty("--my", e.clientY - r.top + "px");
-  }
-  const k = e.target.closest && e.target.closest("#view .kpi, #view .cards > article.glass");
-  if (FX.tilt && FX.tilt !== k) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt.classList.remove("fx-tilt"); }
-  FX.tilt = k || null;
-  if (k) {
-    const r = k.getBoundingClientRect();
-    const dx = (e.clientX - r.left) / r.width - 0.5, dy = (e.clientY - r.top) / r.height - 0.5;
-    const styrka = Math.hypot(dx, dy);
-    k.classList.add("fx-tilt");
-    k.style.rotate = styrka < 0.01 ? "" : `${-dy} ${dx} 0 ${(styrka * 16).toFixed(2)}deg`;
-    k.style.translate = "0 -4px";
   }
   FX.mal = [e.clientX, e.clientY];
   const glow = document.getElementById("fxGlow");
   glow.classList.add("on");
   if (!FX.glowLoop) FX.glowLoop = requestAnimationFrame(fxGlowSteg);
+}
+/* Bara KPI-rutorna lutar. De har inga länkar eller knappar, så inget
+   klickmål kan flytta sig undan pekaren — det var precis vad som hände när
+   research-korten lutade. Lutningen räknas mot rutans oroterade läge, som
+   sparas när pekaren kommer in; räknad mot det lutade läget matar lutningen
+   sig själv och rutan fladdrar i kanterna. */
+function fxLuta(e) {
+  const t = FX.tilt;
+  if (t && t.el.isConnected) {
+    const r = t.rect;
+    if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return fxVinkla(t, e);
+  }
+  fxRata();
+  const k = e.target.closest && e.target.closest("#view .kpi");
+  if (!k) return;
+  FX.tilt = { el: k, rect: k.getBoundingClientRect() };
+  fxVinkla(FX.tilt, e);
+}
+function fxVinkla(t, e) {
+  const r = t.rect;
+  const dx = (e.clientX - r.left) / r.width - 0.5, dy = (e.clientY - r.top) / r.height - 0.5;
+  t.el.classList.add("fx-tilt");
+  t.el.style.transform = `perspective(700px) rotateX(${(-dy * 12).toFixed(2)}deg) rotateY(${(dx * 12).toFixed(2)}deg) translateY(-4px)`;
+}
+function fxRata() {
+  if (!FX.tilt) return;
+  FX.tilt.el.style.transform = "";
+  FX.tilt.el.classList.remove("fx-tilt");
+  FX.tilt = null;
 }
 function fxGlowSteg() {
   const glow = document.getElementById("fxGlow");
@@ -2491,7 +2510,7 @@ function fxSatt(pa) {
   if (!pa) {
     document.getElementById("fxGlow").classList.remove("on");
     FX.bitar = [];
-    if (FX.tilt) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt = null; }
+    fxRata();
   }
   try { localStorage.setItem("planvy-fx", pa ? "pa" : "av"); } catch (e) { /* lagringen är en bekvämlighet */ }
 }
@@ -2508,12 +2527,14 @@ function fxInit() {
   addEventListener("pointermove", fxRor, { passive: true });
   document.documentElement.addEventListener("mouseleave", () => {
     document.getElementById("fxGlow").classList.remove("on");
-    if (FX.tilt) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt.classList.remove("fx-tilt"); FX.tilt = null; }
+    fxRata();
   });
+  /* Den sparade rutan gäller bara så länge sidan står still. */
+  addEventListener("scroll", fxRata, { passive: true });
   addEventListener("pointerdown", (e) => {
     if (e.target.closest && e.target.closest("button, a, select, .chip, input[type=range]")) fxGnista(e.clientX, e.clientY);
   }, { passive: true });
-  addEventListener("resize", () => { const c = document.getElementById("fxCanvas"); if (!FX.loop) { c.width = 0; c.height = 0; } });
+  addEventListener("resize", () => { fxRata(); const c = document.getElementById("fxCanvas"); if (!FX.loop) { c.width = 0; c.height = 0; } });
 }
 
 function parseHash() {

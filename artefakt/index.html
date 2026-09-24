@@ -239,10 +239,13 @@ dl{margin:0}
     background:radial-gradient(420px circle at var(--mx,50%) var(--my,50%),rgba(255,255,255,.7),rgba(255,255,255,0) 45%);
     opacity:0;transition:opacity .3s}
   :root:not(.fx-off) .glass:hover::after{opacity:1}
-  :root:not(.fx-off) .glass{transition:box-shadow .3s,translate .3s,rotate .3s}
+  :root:not(.fx-off) .glass{transition:box-shadow .3s}
   :root:not(.fx-off) .glass:hover{box-shadow:0 14px 44px rgba(79,70,229,.14)}
-  :root:not(.fx-off) #view .grid:has(> .kpi),:root:not(.fx-off) #view .cards{perspective:1100px}
-  :root:not(.fx-off) .fx-tilt{transition:box-shadow .3s,translate .12s,rotate .12s}
+  /* Bara KPI-rutorna lutar, och de har sitt perspektiv i sin egen transform:
+     då ligger försvinnandepunkten i rutans mitt och inte någonstans i en lång
+     lista. Inget som går att klicka på lutar. */
+  :root:not(.fx-off) .kpi{transition:box-shadow .3s,transform .35s cubic-bezier(.2,.8,.2,1)}
+  :root:not(.fx-off) .kpi.fx-tilt{transition:box-shadow .3s,transform .1s}
 
   /* Tillstånd som kräver uppmärksamhet pulserar; SATSA och andra gröna glimmar. */
   :root:not(.fx-off) .pill.p-neg{animation:fxPulse 2.4s ease-in-out infinite}
@@ -251,17 +254,15 @@ dl{margin:0}
   :root:not(.fx-off) .alert.a-crit{animation:fxCrit 2.6s ease-in-out infinite}
 
   /* Menyn. */
-  :root:not(.fx-off) .nav a{transition:background .15s,transform .2s}
-  :root:not(.fx-off) .nav a:hover{transform:translateX(3px)}
   :root:not(.fx-off) .nav a:hover svg{animation:fxWiggle .5s ease}
   :root:not(.fx-off) .nav a[aria-current]{box-shadow:0 6px 22px rgba(129,140,248,.2)}
   :root:not(.fx-off) .nav a[aria-current]::before,:root:not(.fx-off) .brand i{
     background:linear-gradient(180deg,#38bdf8,#818cf8,#e879f9,#38bdf8);background-size:100% 200%;animation:fxSlideY 2.4s linear infinite}
 
   /* Knappar lyfter och får ett ljussvep. */
-  :root:not(.fx-off) .fbtn,:root:not(.fx-off) .chip{position:relative;overflow:hidden;transition:transform .15s,box-shadow .2s,background .15s}
-  :root:not(.fx-off) .fbtn:hover:not(:disabled),:root:not(.fx-off) .chip:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(79,70,229,.16)}
-  :root:not(.fx-off) .fbtn:active:not(:disabled),:root:not(.fx-off) .chip:active{transform:scale(.96)}
+  :root:not(.fx-off) .fbtn,:root:not(.fx-off) .chip{position:relative;overflow:hidden;transition:box-shadow .2s,background .15s}
+  :root:not(.fx-off) .fbtn:hover:not(:disabled),:root:not(.fx-off) .chip:hover{box-shadow:0 6px 18px rgba(79,70,229,.18)}
+  :root:not(.fx-off) .fbtn:active:not(:disabled),:root:not(.fx-off) .chip:active{box-shadow:0 1px 4px rgba(79,70,229,.2),inset 0 0 0 1px rgba(79,70,229,.3)}
   :root:not(.fx-off) .fbtn::after,:root:not(.fx-off) .chip::after{content:"";position:absolute;inset:0;pointer-events:none;
     background:linear-gradient(110deg,rgba(255,255,255,0) 30%,rgba(255,255,255,.75) 50%,rgba(255,255,255,0) 70%);transform:translateX(-120%)}
   :root:not(.fx-off) .fbtn:hover:not(:disabled)::after,:root:not(.fx-off) .chip:hover::after{transform:translateX(120%);transition:transform .65s ease}
@@ -3407,27 +3408,46 @@ function fxRakna(view) {
 /* ── Lutning, spotlight och skenet bakom glaset ─────────────────────────── */
 function fxRor(e) {
   if (e.pointerType !== "mouse" || !fxOn()) return;
+  fxLuta(e);
   const g = e.target.closest && e.target.closest(".glass");
   if (g) {
-    const r = g.getBoundingClientRect();
+    const r = FX.tilt && FX.tilt.el === g ? FX.tilt.rect : g.getBoundingClientRect();
     g.style.setProperty("--mx", e.clientX - r.left + "px");
     g.style.setProperty("--my", e.clientY - r.top + "px");
-  }
-  const k = e.target.closest && e.target.closest("#view .kpi, #view .cards > article.glass");
-  if (FX.tilt && FX.tilt !== k) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt.classList.remove("fx-tilt"); }
-  FX.tilt = k || null;
-  if (k) {
-    const r = k.getBoundingClientRect();
-    const dx = (e.clientX - r.left) / r.width - 0.5, dy = (e.clientY - r.top) / r.height - 0.5;
-    const styrka = Math.hypot(dx, dy);
-    k.classList.add("fx-tilt");
-    k.style.rotate = styrka < 0.01 ? "" : `${-dy} ${dx} 0 ${(styrka * 16).toFixed(2)}deg`;
-    k.style.translate = "0 -4px";
   }
   FX.mal = [e.clientX, e.clientY];
   const glow = document.getElementById("fxGlow");
   glow.classList.add("on");
   if (!FX.glowLoop) FX.glowLoop = requestAnimationFrame(fxGlowSteg);
+}
+/* Bara KPI-rutorna lutar. De har inga länkar eller knappar, så inget
+   klickmål kan flytta sig undan pekaren — det var precis vad som hände när
+   research-korten lutade. Lutningen räknas mot rutans oroterade läge, som
+   sparas när pekaren kommer in; räknad mot det lutade läget matar lutningen
+   sig själv och rutan fladdrar i kanterna. */
+function fxLuta(e) {
+  const t = FX.tilt;
+  if (t && t.el.isConnected) {
+    const r = t.rect;
+    if (e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom) return fxVinkla(t, e);
+  }
+  fxRata();
+  const k = e.target.closest && e.target.closest("#view .kpi");
+  if (!k) return;
+  FX.tilt = { el: k, rect: k.getBoundingClientRect() };
+  fxVinkla(FX.tilt, e);
+}
+function fxVinkla(t, e) {
+  const r = t.rect;
+  const dx = (e.clientX - r.left) / r.width - 0.5, dy = (e.clientY - r.top) / r.height - 0.5;
+  t.el.classList.add("fx-tilt");
+  t.el.style.transform = `perspective(700px) rotateX(${(-dy * 12).toFixed(2)}deg) rotateY(${(dx * 12).toFixed(2)}deg) translateY(-4px)`;
+}
+function fxRata() {
+  if (!FX.tilt) return;
+  FX.tilt.el.style.transform = "";
+  FX.tilt.el.classList.remove("fx-tilt");
+  FX.tilt = null;
 }
 function fxGlowSteg() {
   const glow = document.getElementById("fxGlow");
@@ -3515,7 +3535,7 @@ function fxSatt(pa) {
   if (!pa) {
     document.getElementById("fxGlow").classList.remove("on");
     FX.bitar = [];
-    if (FX.tilt) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt = null; }
+    fxRata();
   }
   try { localStorage.setItem("planvy-fx", pa ? "pa" : "av"); } catch (e) { /* lagringen är en bekvämlighet */ }
 }
@@ -3532,12 +3552,14 @@ function fxInit() {
   addEventListener("pointermove", fxRor, { passive: true });
   document.documentElement.addEventListener("mouseleave", () => {
     document.getElementById("fxGlow").classList.remove("on");
-    if (FX.tilt) { FX.tilt.style.rotate = ""; FX.tilt.style.translate = ""; FX.tilt.classList.remove("fx-tilt"); FX.tilt = null; }
+    fxRata();
   });
+  /* Den sparade rutan gäller bara så länge sidan står still. */
+  addEventListener("scroll", fxRata, { passive: true });
   addEventListener("pointerdown", (e) => {
     if (e.target.closest && e.target.closest("button, a, select, .chip, input[type=range]")) fxGnista(e.clientX, e.clientY);
   }, { passive: true });
-  addEventListener("resize", () => { const c = document.getElementById("fxCanvas"); if (!FX.loop) { c.width = 0; c.height = 0; } });
+  addEventListener("resize", () => { fxRata(); const c = document.getElementById("fxCanvas"); if (!FX.loop) { c.width = 0; c.height = 0; } });
 }
 
 function parseHash() {

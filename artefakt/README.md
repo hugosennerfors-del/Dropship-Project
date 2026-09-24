@@ -17,7 +17,7 @@ hämtad från n8n-workflowet **Plan-vy · Intelligence-API** (körning 1387).
 | `verify.mjs` | Playwright-kontroller: vyer, marknader, mobil (48 st) |
 | `verify-research.mjs` | Playwright-kontroller: research-körningen, med mockad koppling (26 st) |
 | `verify-tillagg.mjs` | Playwright-kontroller: Kassa, Test, Risk, policy, CSV (127 st) |
-| `verify-fx.mjs` | Playwright-kontroller: effekterna, med rörelse på (20 st) |
+| `verify-fx.mjs` | Playwright-kontroller: effekterna, med rörelse på (29 st) |
 | `index.html` | Det som publiceras — genererad, redigera den inte för hand |
 
 ## Bygga och kontrollera
@@ -118,7 +118,7 @@ research-körning och en CSV-export ger konfetti. Röda lägen pulserar.
 Två spärrar stänger av allt: systemets "minska rörelse" och knappen
 **Effekter** i toppraden, som minns sitt läge i webbläsaren.
 
-Tre regler håller effekterna ärliga:
+Fyra regler håller effekterna ärliga:
 
 - En uppräknad siffra slutar alltid på exakt den text vyn skrev. Ritas vyn om
   mitt i inflygningen fortsätter animationerna där de var, i stället för att
@@ -127,6 +127,12 @@ Tre regler håller effekterna ärliga:
   reglage ritar om vyn men flyger inte in den igen.
 - Konfettins fysik räknas i tid och inte i bildrutor, så den tar lika lång tid
   på en 120 Hz-skärm som på en seg telefon, och duken frigörs när den är klar.
+- Inget som går att klicka på lutar, flyttar sig eller ändrar storlek. Bara
+  KPI-rutorna lutar, och de har sitt perspektiv i sin egen transform. Första
+  versionen lutade även research-korten med perspektivet satt på hela listan,
+  som är över 20 000 px hög; då hamnade försvinnandepunkten långt under kortet,
+  en lutning på 6° drog isär det och "Öppna analys" flyttade sig 167 px bort
+  från pekaren. `verify-fx.mjs` kör exakt det fallet.
 
 De tre funktionssviterna kör med "minska rörelse" på, eftersom uppräknade
 siffror mitt i en animation annars hade gjort varje textkontroll till ett
