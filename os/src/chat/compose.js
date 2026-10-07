@@ -1,0 +1,214 @@
+// Deterministic answers written from the database. Used when Claude is not
+// available, and as the data Claude's tools return. Every number comes from
+// the rows; product mentions are [[id]] tokens the chat turns into links.
+
+import { query, SORTS, AD_TEST_GBP } from "../core/query.js";
+import { FIELD } from "../core/fields.js";
+import { opWord } from "../core/nlq.js";
+import { MARKETS } from "../core/markets.js";
+
+const cur = (r) => r.currency || "GBP";
+export function m(x, currency) {
+  if (x == null || !Number.isFinite(x)) return "—";
+  if (currency === "SEK") return `${Math.round(x).toLocaleString("sv-SE")} kr`;
+  const s = Math.abs(x).toLocaleString("en-GB", { minimumFractionDigits: Math.abs(x) >= 1000 ? 0 : 2, maximumFractionDigits: Math.abs(x) >= 1000 ? 0 : 2 });
+  return `${x < 0 ? "−" : ""}£${s}`;
+}
+const p1 = (x) => (x == null ? "—" : `${Math.round(x * 10) / 10}%`);
+const r0 = (x) => (x == null ? "—" : Math.round(x));
+
+export function filterLabel(f, market) {
+  if (f.field === "text") return `matches “${f.value}”`;
+  const fd = FIELD[f.field];
+  const label = fd?.label || f.field;
+  const fmtV = (v) => (fd?.type === "money" ? m(v, MARKETS[market]?.currency) : fd?.type === "pct" ? `${v}%` : Array.isArray(v) ? v.join(", ") : v);
+  if (f.op === "between") return `${label} between ${fmtV(f.value[0])} and ${fmtV(f.value[1])}`;
+  if (f.op === "in") return `${label}: ${(Array.isArray(f.value) ? f.value : [f.value]).join(" or ")}`;
+  return `${label} ${opWord(f.op)} ${fmtV(f.value)}`;
+}
+
+// One line per product, the facts the reasoning rests on.
+export function productLine(r, i) {
+  const bits = [
+    `opportunity **${r0(r.opportunity)}**`,
+    `margin ${p1(r.margin)}`,
+    `${m(r.profit, cur(r))} profit/order after est. CAC`,
+    `demand ${r0(r.demand)}`,
+    `competition ${r0(r.competition)}`,
+    r.stage,
+    `confidence ${r0(r.confidence)}`,
+  ];
+  return `${i != null ? `${i + 1}. ` : "- "}[[${r.id}]] — ${bits.join(" · ")}`;
+}
+
+export function whyLine(r, why) {
+  const pos = why?.positives?.[0], neg = why?.negatives?.[0];
+  const parts = [];
+  if (pos) parts.push(`strongest point: ${pos.text.toLowerCase()} (${pos.detail})`);
+  if (neg) parts.push(`biggest drag: ${neg.text.toLowerCase()} (${neg.detail})`);
+  return parts.length ? `   ${parts.join("; ")}.` : "";
+}
+
+// Which filters exclude the most rows, and the closest matches.
+export function nearMisses(rows, spec, n = 5) {
+  const fs = spec.filters || [];
+  const pass = (r, f) => query([r], { filters: [f] }).rows.length === 1;
+  const scored = rows.map((r) => ({ r, fails: fs.filter((f) => !pass(r, f)) }))
+    .filter((x) => x.fails.length < fs.length)
+    .sort((a, b) => a.fails.length - b.fails.length || (b.r.opportunity ?? 0) - (a.r.opportunity ?? 0));
+  const blockers = fs.map((f) => ({ f, excluded: rows.filter((r) => !pass(r, f)).length })).sort((a, b) => b.excluded - a.excluded);
+  return { closest: scored.slice(0, n), blockers };
+}
+
+export function answerQuery(rows, spec, ctx) {
+  const market = ctx.market;
+  const res = query(rows, { ...spec, limit: spec.limit || 10 });
+  const labels = (spec.filters || []).map((f) => filterLabel(f, market));
+  const sortLabel = typeof spec.sort === "string" ? SORTS[spec.sort]?.label : null;
+  const lines = [];
+  const scope = spec.within ? `Of the ${spec.within.length} products in the last answer, ` : "";
+  if (!res.total) {
+    const nm = nearMisses(spec.within ? rows.filter((r) => spec.within.includes(r.id)) : rows, spec);
+    lines.push(`${scope}no ${MARKETS[market].name} product in the database meets all of: ${labels.join(", ") || "your conditions"}.`);
+    if (nm.blockers.length) {
+      lines.push("", `The strictest condition is **${filterLabel(nm.blockers[0].f, market)}**, which rules out ${nm.blockers[0].excluded} of ${rows.length} products.`);
+    }
+    if (nm.closest.length) {
+      lines.push("", "Closest matches (missing conditions in brackets):");
+      nm.closest.forEach((x, i) => lines.push(`${productLine(x.r, i)} (misses ${x.fails.map((f) => filterLabel(f, market)).join(", ")})`));
+      return { text: lines.join("\n"), ids: nm.closest.map((x) => x.r.id), spec, total: 0 };
+    }
+    return { text: lines.join("\n"), ids: [], spec, total: 0 };
+  }
+  lines.push(`${scope}${res.total} ${res.total === 1 ? "product matches" : "products match"}${labels.length ? ` ${labels.join(", ")}` : ""} in the ${MARKETS[market].name}. ${res.total > res.rows.length ? `Top ${res.rows.length}, ` : ""}ranked by ${(sortLabel || "opportunity").toLowerCase()}:`);
+  lines.push("");
+  res.rows.forEach((r, i) => {
+    lines.push(productLine(r, i));
+    const w = whyLine(r, ctx.whyOf?.(r.id));
+    if (w) lines.push(w);
+  });
+  lines.push("", confidenceNote(res.rows));
+  return { text: lines.join("\n"), ids: res.rows.map((r) => r.id), spec, total: res.total };
+}
+
+export function confidenceNote(rs) {
+  if (!rs.length) return "";
+  const avg = rs.reduce((a, r) => a + (r.confidence || 0), 0) / rs.length;
+  const proven = rs.filter((r) => r.validation === "Strong" || r.validation === "Medium").length;
+  return `Average data confidence is ${Math.round(avg)}/100${proven ? `; ${proven} of ${rs.length} have commercial evidence` : "; none has commercial evidence in the database yet"}. Treat AI-estimated values as hypotheses to test.`;
+}
+
+export function answerPick(rows, spec, ctx) {
+  const res = query(rows, { ...spec, limit: 5 });
+  if (!res.rows.length) return answerQuery(rows, spec, ctx);
+  const best = res.rows[0];
+  const lines = [];
+  if (spec.sort === "safest") {
+    const det = ctx.scoresOf?.(best.id);
+    const top = det?.riskDetail?.factors?.slice(0, 3).map((f) => `${f.label.toLowerCase()} ${Math.round(f.value)}`) || [];
+    lines.push(`The safest of these is [[${best.id}]] with a risk score of **${best.risk}/100**, the lowest in the group.`);
+    if (top.length) lines.push(`Its main remaining risks: ${top.join(", ")}.`);
+    if (best.redFlags?.length) lines.push(`Red flags to check: ${best.redFlags.join(", ")}.`);
+  } else {
+    lines.push(`My pick from these is [[${best.id}]]: evidence-weighted opportunity **${best.evidenceWeighted}**, opportunity ${best.opportunity}, confidence ${best.confidence}.`);
+    const w = whyLine(best, ctx.whyOf?.(best.id));
+    if (w) lines.push(w.trim());
+  }
+  lines.push("", `Ranked by ${(SORTS[spec.sort]?.label || spec.sort || "opportunity").toLowerCase()}:`);
+  res.rows.forEach((r, i) => lines.push(`${i + 1}. [[${r.id}]] — risk ${r.risk} · opportunity ${r.opportunity} · ${m(r.profit, cur(r))}/order · ${r.stage}`));
+  return { text: lines.join("\n"), ids: res.rows.map((r) => r.id), spec, total: res.total };
+}
+
+// Why is A better than B: component by component.
+export function answerWhy(a, b, ctx) {
+  const sa = ctx.scoresOf?.(a.id), sb = ctx.scoresOf?.(b.id);
+  const lines = [];
+  const better = (a.opportunity ?? 0) >= (b.opportunity ?? 0) ? [a, b, sa, sb] : [b, a, sb, sa];
+  const [x, y, sx, sy] = better;
+  lines.push(`[[${x.id}]] scores **${x.opportunity}** against **${y.opportunity}** for [[${y.id}]]${x.id !== a.id ? " (so the premise is the other way round)" : ""}.`);
+  if (sx && sy) {
+    const diffs = sx.components.map((c) => {
+      const o = sy.components.find((d) => d.key === c.key);
+      return { label: c.label, d: Math.round((c.points - (o?.points ?? 0)) * 10) / 10, a: c.value, b: o?.value };
+    }).filter((d) => Math.abs(d.d) >= 0.5).sort((p, q) => q.d - p.d);
+    const plus = diffs.filter((d) => d.d > 0), minus = diffs.filter((d) => d.d < 0);
+    if (plus.length) {
+      lines.push("", "Where it gains points:");
+      plus.slice(0, 5).forEach((d) => lines.push(`- ${d.label}: ${d.a} vs ${d.b} (+${d.d} points)`));
+    }
+    if (minus.length) {
+      lines.push("", "Where it loses points:");
+      minus.slice(0, 4).forEach((d) => lines.push(`- ${d.label}: ${d.a} vs ${d.b} (${d.d} points)`));
+    }
+    const capX = sx.caps?.length ? sx.caps.find((c) => c.cap === sx.cap) : null, capY = sy.caps?.length ? sy.caps.find((c) => c.cap === sy.cap) : null;
+    if (capY && capY.cap < (sy.afterRisk ?? 100)) lines.push("", `[[${y.id}]] is also capped at ${capY.cap}: ${capY.label.toLowerCase()}.`);
+    if (capX && capX.cap < (sx.afterRisk ?? 100)) lines.push("", `[[${x.id}]] is capped at ${capX.cap}: ${capX.label.toLowerCase()}.`);
+    lines.push("", `Risk: ${x.risk} vs ${y.risk}. Data confidence: ${x.confidence} vs ${y.confidence}. Profit per order after estimated CAC: ${m(x.profit, cur(x))} vs ${m(y.profit, cur(y))}.`);
+  }
+  return { text: lines.join("\n"), ids: [x.id, y.id] };
+}
+
+export function answerEconomics(rs, ctx) {
+  const lines = [];
+  for (const r of rs.slice(0, 3)) {
+    const c = cur(r);
+    lines.push(`**[[${r.id}]]** (${MARKETS[r.market].name})`);
+    lines.push(`- Price ${m(r.price, c)} incl. VAT → ${m(r.revenueEx, c)} ex VAT`);
+    if (r._s?.variableCost === "V") lines.push(`- Your observed cost per order ${m(r.variableCost, c)} (product, shipping, fees)`);
+    else lines.push(`- Landed cost ${m(r.landedCost, c)} (supplier ${m(r.supplierPrice, c)} + freight + duty), shipping ${m(r.shipping, c)}, fees ${m(r.paymentFees, c)}, packaging ${m(r.packaging, c)}`);
+    lines.push(`- Gross margin ${p1(r.margin)}; contribution after ${p1(r.returnRate)} returns ${m(r.contribution, c)}`);
+    lines.push(`- CAC ${m(r.cac, c)} (${statusWord(r._s?.cac)}) → profit ${m(r.profit, c)} per order, net margin ${p1(r.netMargin)}`);
+    lines.push(`- Break-even ROAS ${r.breakEvenRoas ?? "—"}× vs ROAS at this CAC ${r.roas ?? "—"}×; max CAC ${m(r.maxCac, c)}`);
+    lines.push(`- Launch cost ${m(r.startupCost, c)}; ${r.breakEvenOrders ? `break-even after ${r.breakEvenOrders} orders` : "never breaks even at this CAC"}`);
+    lines.push("");
+  }
+  lines.push("Open a product to change any input in the calculator; your numbers replace the estimates.");
+  return { text: lines.join("\n"), ids: rs.slice(0, 3).map((r) => r.id) };
+}
+const statusWord = (s) => ({ V: "verified", E: "estimated", A: "AI estimate", N: "unknown" }[s] || "modelled");
+
+export function answerBudget(rows, spec, ctx) {
+  const budget = spec.budgetGBP;
+  const res = query(rows, { ...spec, limit: 5 });
+  const lines = [];
+  const scope = spec.within ? rows.filter((r) => spec.within.includes(r.id)) : rows;
+  if (!res.rows.length) {
+    const cheapest = [...scope].sort((a, b) => toGBP(a.startupCost, a) - toGBP(b.startupCost, b)).slice(0, 4);
+    lines.push(`None of ${spec.within ? "these" : "the products"} fits a launch budget of **£${budget.toLocaleString("en-GB")}**. The budget has to cover the first stock order at MOQ, three samples, compliance, three UGC videos and a £${AD_TEST_GBP} ad test.`);
+    lines.push("", "Cheapest to launch:");
+    cheapest.forEach((r, i) => lines.push(`${i + 1}. [[${r.id}]] — about ${m(toGBP(r.startupCost, r) + AD_TEST_GBP, "GBP")} including the ad test (MOQ ${r.moq ?? "—"})`));
+    lines.push("", "Negotiating a lower first order (many suppliers accept 50 units for a sample run) is the fastest way to bring these within budget.");
+    return { text: lines.join("\n"), ids: cheapest.map((r) => r.id) };
+  }
+  const best = res.rows[0];
+  lines.push(`With £${budget.toLocaleString("en-GB")} I would start with [[${best.id}]]: it fits the budget (about ${m(toGBP(best.startupCost, best) + AD_TEST_GBP, "GBP")} including a £${AD_TEST_GBP} ad test) and has the best evidence-weighted opportunity (${best.evidenceWeighted}) of the products that fit.`);
+  const w = whyLine(best, ctx.whyOf?.(best.id));
+  if (w) lines.push(w.trim());
+  if ((best.profit ?? 0) <= 0) lines.push("", `Be aware that it loses money per order at the estimated CAC (${m(best.profit, cur(best))}). Run the test to measure your real CAC before ordering more stock.`);
+  if (res.rows.length > 1) {
+    lines.push("", "Also within budget:");
+    res.rows.slice(1).forEach((r, i) => lines.push(`${i + 2}. [[${r.id}]] — launch ≈ ${m(toGBP(r.startupCost, r) + AD_TEST_GBP, "GBP")} · evidence-weighted ${r.evidenceWeighted}`));
+  }
+  return { text: lines.join("\n"), ids: res.rows.map((r) => r.id) };
+}
+const toGBP = (x, r) => (x == null ? Infinity : x * (r.currency === "SEK" ? MARKETS.SE.fxToGBP : 1));
+
+export function answerProduct(r, ctx) {
+  const why = ctx.whyOf?.(r.id);
+  const lines = [`**[[${r.id}]]** — ${r.stage}, opportunity **${r.opportunity}**, risk ${r.risk}, data confidence ${r.confidence}.`];
+  if (r.overview) lines.push("", r.overview);
+  if (why?.positives?.length) { lines.push("", "Why it could work:"); why.positives.slice(0, 4).forEach((p) => lines.push(`- ${p.text} (${p.detail})`)); }
+  if (why?.negatives?.length) { lines.push("", "Why it could fail:"); why.negatives.slice(0, 4).forEach((p) => lines.push(`- ${p.text} (${p.detail})`)); }
+  if (r.redFlags?.length) lines.push("", `Red flags: ${r.redFlags.join(", ")}.`);
+  lines.push("", `Validation: commercial evidence ${r.validation}, interest ${r.interest}.`);
+  return { text: lines.join("\n"), ids: [r.id] };
+}
+
+export const HELP = [
+  "I search and rank the product database. Try:",
+  "- *Show products with margin > 60, price < £80 and competition < 40*",
+  "- *Find products that cost under £30 and sell for at least £60*",
+  "- *Emerging products with high margin and low competition*",
+  "- *Top 5 pet products for TikTok*",
+  "Then ask follow-ups: *Which one is the safest?* · *Why is number 3 better than number 1?* · *Which would you choose with £2,000?* · *Show me the unit economics*",
+].join("\n");

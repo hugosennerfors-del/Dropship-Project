@@ -1,0 +1,1258 @@
+{
+ "meta": {
+  "description": "Raw evidence: every sourced claim the database relies on. Append-only. A record is never edited to change its meaning; a newer observation gets a new id.",
+  "levels": {
+   "A": "Primary: register, regulator, court, official statistics, governing body, own data",
+   "B": "Industry data with stated method",
+   "C": "Modelled estimate tool, company self-report, or projection",
+   "D": "Trade media, vendor blog, product test, press article",
+   "E": "Single claim without traceable method"
+  },
+  "kinds": {
+   "sales": "Commercial: sales value or GMV",
+   "revenue": "Commercial: a company's reported turnover",
+   "units": "Commercial: units or orders sold (often modelled)",
+   "reviews": "Commercial: review counts (people bought it)",
+   "own_sales": "Commercial: your own store's sales",
+   "search": "Interest: search volume or search growth",
+   "social": "Interest: social views or virality",
+   "participation": "Interest: people doing the activity the product serves",
+   "population": "Context: size of the customer base",
+   "media": "Interest: press coverage of a trend",
+   "price": "Market price points",
+   "competitor": "Competitor presence or strength",
+   "regulatory": "Law, regulation, court decision",
+   "context": "Costs and benchmarks (returns, CPM, shipping)",
+   "supply": "Sourcing: MOQ, supplier prices, testing costs"
+  },
+  "via": {
+   "repo-research-2026-09-14": "The earlier research report in this repository (about 60 web searches, chapters 1–15). Claims carried over with that report's source and level.",
+   "web-search-2026-10-07": "Web searches run while building this database. Amazon UK, eBay UK, retailer sites and Google Trends could not be fetched from this environment, so these are secondary sources found through search.",
+   "supabase-2026-09-24": "Your own store database."
+  }
+ },
+ "evidence": [
+  {
+   "id": "ev:own-sales-posture",
+   "level": "C",
+   "kind": "own_sales",
+   "market": "SE",
+   "products": [
+    "posture-corrector"
+   ],
+   "claim": "Posture Corrector, September 2026: 40 orders, 10,000 SEK incl. VAT (250 SEK per order), 4,200 SEK ad spend, CAC 105 SEK, contribution 80 SEK per order before ads, POAS 0.76.",
+   "observed": "2026-09",
+   "via": "supabase-2026-10-07",
+   "source": {
+    "title": "Supabase intel.v_own_sales",
+    "publisher": "Your store database"
+   },
+   "unverified": true,
+   "note": "Self-reported: the orders were entered by hand in Supabase (no Shopify order ids, placeholder product ids). Becomes level A when real Shopify orders sync."
+  },
+  {
+   "id": "ev:own-sales-sunset",
+   "level": "C",
+   "kind": "own_sales",
+   "market": "SE",
+   "products": [
+    "sunset-projector"
+   ],
+   "claim": "LED Sunset Lamp, September 2026: 30 orders, 9,000 SEK incl. VAT (300 SEK per order), 5,200 SEK ad spend, CAC 173 SEK, contribution 155 SEK per order before ads, POAS 0.89.",
+   "observed": "2026-09",
+   "via": "supabase-2026-10-07",
+   "source": {
+    "title": "Supabase intel.v_own_sales",
+    "publisher": "Your store database"
+   },
+   "unverified": true,
+   "note": "Self-reported: the orders were entered by hand in Supabase (no Shopify order ids, placeholder product ids). Becomes level A when real Shopify orders sync."
+  },
+  {
+   "id": "ev:uk-vat-135",
+   "level": "A",
+   "kind": "regulatory",
+   "market": "UK",
+   "products": [],
+   "claim": "Sellers established outside the UK must register for UK VAT and charge it at the point of sale on goods of £135 or less sold directly to UK consumers. There is no registration threshold for non-UK sellers. Online marketplaces account for the VAT when they facilitate the sale.",
+   "observed": "2021-01",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "Changes to VAT treatment of overseas goods sold to customers from 1 January 2021",
+    "publisher": "HM Revenue & Customs (gov.uk)",
+    "url": "https://www.gov.uk/government/publications/changes-to-vat-treatment-of-overseas-goods-sold-to-customers-from-1-january-2021/changes-to-vat-treatment-of-overseas-goods-sold-to-customers-from-1-january-2021"
+   }
+  },
+  {
+   "id": "ev:uk-cosmetics-rp",
+   "level": "A",
+   "kind": "regulatory",
+   "market": "UK",
+   "products": [],
+   "claim": "Cosmetic products must be notified on SCPN before being placed on the GB market, and only a UK-based Responsible Person can submit the notification.",
+   "observed": "2021-01",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "Cosmetic Products Enforcement Regulations — statutory guidance",
+    "publisher": "gov.uk",
+    "url": "https://gov.uk/government/publications/cosmetic-products-enforcement-regulations-2013/regulation-20091223-and-the-cosmetic-products-enforcement-regulations-2013-great-britain"
+   }
+  },
+  {
+   "id": "ev:uk-meta-cpm",
+   "level": "C",
+   "kind": "context",
+   "market": "UK",
+   "products": [],
+   "claim": "UK ecommerce Meta CPM about £11.81 in 2026; ecommerce CPA typically £10–80+; Q4 CPMs run 20–40 % above Q1; Meta CPM rose about 20 % year on year in 2025.",
+   "observed": "2026",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "Facebook advertising costs UK: benchmarks (2026)",
+    "publisher": "PhotonPay / Adligator / ContentStudio",
+    "url": "https://adligator.com/blog/meta-ads-cpm-by-country-benchmarks"
+   }
+  },
+  {
+   "id": "ev:uk-parcel-prices",
+   "level": "D",
+   "kind": "context",
+   "market": "UK",
+   "products": [],
+   "claim": "UK parcels up to 2 kg: Evri from about £2.62, Royal Mail 2nd Class £4.39, Royal Mail Tracked 48 about £3.40–4.60. Royal Mail's fuel surcharge rose from 11 % to 16 % from 3 May 2026. Business account rates differ.",
+   "observed": "2026",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "How much does it cost to ship a package in the UK",
+    "publisher": "ShippyPro / Easyship",
+    "url": "https://www.shippypro.com/blog/en/how-much-does-it-cost-to-ship-a-package-in-the-uk"
+   }
+  },
+  {
+   "id": "ev:uk-returns",
+   "level": "C",
+   "kind": "context",
+   "market": "UK",
+   "products": [],
+   "claim": "UK non-food online returns about 19.5 % in 2025 (21 % in 2024). Apparel about 23 %, beauty about 12 %, electronics about 11 %. Each returned parcel costs a UK DTC brand roughly £10–25 in reverse logistics.",
+   "observed": "2025",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "UK ecommerce return rate benchmark",
+    "publisher": "eightx / Ingrid Return Economics 2026",
+    "url": "https://eightx.co/blog/uk-ecommerce-return-rate-benchmark"
+   }
+  },
+  {
+   "id": "ev:tiktok-shop-uk",
+   "level": "C",
+   "kind": "sales",
+   "market": "UK",
+   "products": [],
+   "claim": "TikTok Shop UK GMV projected at about £6.4 bn in 2026, up from £3.7 bn in 2024. The UK is about 65 % of TikTok Shop's European GMV. Beauty and personal care grew 60 % year on year in 2025.",
+   "observed": "2026",
+   "via": "web-search-2026-10-07",
+   "note": "Projection, not reported GMV.",
+   "source": {
+    "title": "The UK is TikTok Shop's most important market",
+    "publisher": "ECDB",
+    "url": "https://ecdb.com/blog/the-uk-is-tiktok-shop-s-most-important-market/5265"
+   }
+  },
+  {
+   "id": "ev:fastmoss-uk-h1",
+   "level": "B",
+   "kind": "sales",
+   "market": "UK",
+   "products": [],
+   "claim": "TikTok Shop UK top 10 products, January–May 2026, were led by beauty: Dr.Melaxin Calcium Multi Balm £2.49 M, DR.DENT Purple Strips £2.37 M, medicube Zero Pore Pads £1.73 M; top 10 total £13.8 M.",
+   "observed": "2026-05",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Best-selling TikTok Shop products UK 2026",
+    "publisher": "FastMoss",
+    "url": "https://www.fastmoss.com/blog/best-selling-tiktok-shop-products-uk-2026/"
+   }
+  },
+  {
+   "id": "ev:kalodata-uk",
+   "level": "B",
+   "kind": "sales",
+   "market": "UK",
+   "products": [],
+   "claim": "Top 50 TikTok Shop shops by market, 31 Mar–29 Apr 2026: UK €52.58 M, DE €12.39 M, FR €7.59 M. Affiliate (creator) share of UK sales about 82 %.",
+   "observed": "2026-04",
+   "via": "repo-research-2026-09-14",
+   "note": "Read through search excerpts; the page itself was not reachable.",
+   "source": {
+    "title": "Top 50 shops on TikTok Shop in Europe, April 2026",
+    "publisher": "Kalodata",
+    "url": "https://www.kalodata.com/blog/tiktok/top-50-shops-on-tiktok-shop-in-europe-april-2026/"
+   }
+  },
+  {
+   "id": "ev:uk-pet-population",
+   "level": "B",
+   "kind": "population",
+   "market": "UK",
+   "products": [
+    "dog-drying-coat",
+    "dog-car-hammock",
+    "pet-grooming-vacuum",
+    "pet-dryer-box",
+    "cordless-pet-fountain",
+    "automatic-litter-box"
+   ],
+   "claim": "UK Pet Food survey, January 2026 (8,951 interviews): 15.5 million dogs in UK homes, up from 12.5 million five years earlier; 41 % of households own a dog, up from 33 % in 2021; about 13 million cats in 31 % of households.",
+   "observed": "2026-01",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "Britain's dog ownership boom as 15.5 million dogs now live in UK homes",
+    "publisher": "UK Pet Food",
+    "url": "https://www.ukpetfood.org/resource/britain-s-dog-ownership-boom-as-15-5-million-dogs-now-live-in-uk-homes.html"
+   }
+  },
+  {
+   "id": "ev:pdsa-paw-2025",
+   "level": "B",
+   "kind": "population",
+   "market": "UK",
+   "products": [
+    "dog-drying-coat",
+    "dog-car-hammock",
+    "pet-grooming-vacuum",
+    "cordless-pet-fountain"
+   ],
+   "claim": "PDSA PAW Report 2025: an estimated 11.1 million dogs (highest ever) and 10.5 million cats in the UK.",
+   "observed": "2025",
+   "via": "web-search-2026-10-07",
+   "note": "Conflicts with UK Pet Food's 15.5 million dogs: the two surveys use different methods. Both show dog ownership at a record high.",
+   "source": {
+    "title": "PDSA Animal Wellbeing (PAW) Report 2025",
+    "publisher": "PDSA",
+    "url": "https://www.pdsa.org.uk/media/15783/pdsa-paw-mini-report-2025.pdf"
+   }
+  },
+  {
+   "id": "ev:fediaf",
+   "level": "A",
+   "kind": "population",
+   "market": "EU",
+   "products": [
+    "dog-drying-coat",
+    "cordless-pet-fountain",
+    "automatic-litter-box",
+    "pet-grooming-vacuum"
+   ],
+   "claim": "306 million pets in 140 million EU households (49 %); 90 million dog households; 108 million cat households; accessories and vet services €24.6 bn, growing 9 %.",
+   "observed": "2025",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "FEDIAF Facts & Figures",
+    "publisher": "FEDIAF",
+    "url": "https://europeanpetfood.org/about/statistics/"
+   }
+  },
+  {
+   "id": "ev:se-dog-register",
+   "level": "A",
+   "kind": "population",
+   "market": "SE",
+   "products": [
+    "dog-drying-coat",
+    "dog-car-hammock",
+    "pet-grooming-vacuum",
+    "pet-dryer-box"
+   ],
+   "claim": "1,079,000 registered dogs and 782,724 registered owners in Sweden (1 Sep 2026). 56,801 new registrations in 2025, the lowest in eight years, down from about 78,000 in 2021.",
+   "observed": "2026-09",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Statistik ur hundregistret",
+    "publisher": "Jordbruksverket",
+    "url": "https://jordbruksverket.se/e-tjanster-databaser-och-appar/e-tjanster-och-databaser-djur/hundregistret/statistik-ur-hundregistret"
+   }
+  },
+  {
+   "id": "ev:ruff-tumble-ch",
+   "level": "A",
+   "kind": "revenue",
+   "market": "UK",
+   "products": [
+    "dog-drying-coat"
+   ],
+   "claim": "The Ruff and Tumble Dog Company Ltd (11097169), the self-described UK market leader in dog drying coats, files as a micro entity: turnover under £1 M, balance sheet under £500 k (2024 accounts).",
+   "observed": "2024",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Companies House filing 11097169",
+    "publisher": "Companies House / Endole / Pomanda"
+   }
+  },
+  {
+   "id": "ev:ruff-tumble-reviews",
+   "level": "C",
+   "kind": "reviews",
+   "market": "UK",
+   "products": [
+    "dog-drying-coat"
+   ],
+   "claim": "Ruff & Tumble holds 5 stars on Trustpilot with roughly 1,746–2,275 reviews (count varies between snapshots).",
+   "observed": "2026-09",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Trustpilot — Ruff & Tumble",
+    "publisher": "Trustpilot"
+   }
+  },
+  {
+   "id": "ev:ruff-tumble-price",
+   "level": "C",
+   "kind": "price",
+   "market": "UK",
+   "products": [
+    "dog-drying-coat"
+   ],
+   "claim": "Ruff & Tumble dog drying coats are priced £43.95–54.95 (double-layer cotton towelling).",
+   "observed": "2026-09",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Ruff and Tumble dog coats",
+    "publisher": "ruffandtumbledogcoats.com",
+    "url": "https://ruffandtumbledogcoats.com/"
+   }
+  },
+  {
+   "id": "ev:galaxus-dog-returns",
+   "level": "B",
+   "kind": "context",
+   "market": "EU",
+   "products": [
+    "dog-drying-coat"
+   ],
+   "claim": "Return rate 1.2 % for pet accessories overall but 11 % for dog clothing; sizing causes 80 % of dog-clothing returns.",
+   "observed": "2025",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Galaxus return data 2025 (via adscale)",
+    "publisher": "Galaxus"
+   }
+  },
+  {
+   "id": "ev:flapen-de",
+   "level": "C",
+   "kind": "search",
+   "market": "EU",
+   "products": [
+    "dog-drying-coat"
+   ],
+   "claim": "Amazon DE niche analysis for 'hundebademantel': score 29/100 'Skip it'; search volume −34.6 % over 90 days; peak September–December with 3× seasonal swing.",
+   "observed": "2026-09",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon DE niche analysis — hundebademantel",
+    "publisher": "Flapen"
+   }
+  },
+  {
+   "id": "ev:de-dogcoat-prices",
+   "level": "D",
+   "kind": "price",
+   "market": "EU",
+   "products": [
+    "dog-drying-coat"
+   ],
+   "claim": "German dog drying coats sell between €12.49 and €54.99 (TrendPet €45.99–54.99, Rudelkönig €36.95, UOSIA €25.19, HOMELEVEL €18.49, Bestlivings €12.49).",
+   "observed": "2026-09",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Hundebademantel Vergleich",
+    "publisher": "vergleich.org / countrydog.de",
+    "url": "https://www.vergleich.org/hundebademantel/"
+   }
+  },
+  {
+   "id": "ev:dogcoat-moq",
+   "level": "D",
+   "kind": "supply",
+   "market": "CN",
+   "products": [
+    "dog-drying-coat"
+   ],
+   "claim": "Alibaba listings put pet drying robes near $9 per unit; MOQ usually 100–200, quality private label from about 300; samples in 5–7 working days. Listings, not quotes.",
+   "observed": "2026-09",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Alibaba listings",
+    "publisher": "Alibaba"
+   }
+  },
+  {
+   "id": "ev:dryrobe-ch",
+   "level": "A",
+   "kind": "revenue",
+   "market": "UK",
+   "products": [
+    "changing-robe"
+   ],
+   "claim": "Dryrobe Limited (08782079): turnover £19.9 M (December 2023), net assets £12.6 M, cash £13.09 M (up from £10.57 M in 2022).",
+   "observed": "2023-12",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Companies House filing 08782079",
+    "publisher": "Companies House / Pomanda / Endole"
+   }
+  },
+  {
+   "id": "ev:dryrobe-latest",
+   "level": "B",
+   "kind": "revenue",
+   "market": "UK",
+   "products": [
+    "changing-robe"
+   ],
+   "claim": "Dryrobe's latest reported turnover is about £22 M, on a path from £1 M (2016) and £1.5 M (2017) to £19.9 M (2023): growth has slowed to roughly +10 %.",
+   "observed": "2025",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Yahoo Finance UK / Forbes coverage of Dryrobe",
+    "publisher": "Yahoo Finance UK"
+   }
+  },
+  {
+   "id": "ev:red-paddle-ch",
+   "level": "A",
+   "kind": "revenue",
+   "market": "UK",
+   "products": [
+    "changing-robe"
+   ],
+   "claim": "Red Paddle Co Limited (01371094), owner of Red Original and the Pro Change Robe, reported £8 M turnover and £3 M gross profit.",
+   "observed": "2024",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Companies House filing 01371094",
+    "publisher": "Companies House"
+   }
+  },
+  {
+   "id": "ev:uk-openwater",
+   "level": "B",
+   "kind": "participation",
+   "market": "UK",
+   "products": [
+    "changing-robe",
+    "portable-ice-bath"
+   ],
+   "claim": "UK regular open-water swimmers rose from about 266,000 (2016/17) to 543,000 (2023/24); outdoor swimming groups grew 340 % between 2019 and 2024; 7.5 million people take a dip at least occasionally.",
+   "observed": "2024",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Open water swimming has doubled in popularity since 2017",
+    "publisher": "Outdoor Swimmer Magazine",
+    "url": "https://outdoorswimmer.com/news/open-water-swimming-has-doubled-in-popularity-since-2017/"
+   }
+  },
+  {
+   "id": "ev:uk-bathing-sites",
+   "level": "B",
+   "kind": "participation",
+   "market": "UK",
+   "products": [
+    "changing-robe"
+   ],
+   "claim": "The UK designated 13 new official bathing water sites in 2026, and coverage describes the changing robe as an established part of British outdoor life.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Bathing water designations 2026",
+    "publisher": "UK press coverage"
+   }
+  },
+  {
+   "id": "ev:dryrobe-ipec",
+   "level": "A",
+   "kind": "regulatory",
+   "market": "UK",
+   "products": [
+    "changing-robe"
+   ],
+   "claim": "IPEC, 4 December 2025 (HHJ Melissa Clarke): Dryrobe Limited won against Caesr Group Ltd ('D-Robe Outdoors') for trade mark infringement and passing off. The counterclaim that 'dryrobe' is generic was rejected. Over 30 customers had tried to return D-Robe products to Dryrobe. Dryrobe enforces its mark with crawler monitoring and an external enforcement firm.",
+   "observed": "2025-12",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Genericism and brand protection: lessons from the Dryrobe case",
+    "publisher": "DWF / Managing IP / Marks & Clerk",
+    "url": "https://dwfgroup.com/en/news-and-insights/insights/2026/2/genericism-and-brand-protection-lessons-from-the-dryrobe-case"
+   }
+  },
+  {
+   "id": "ev:dryrobe-price",
+   "level": "C",
+   "kind": "price",
+   "market": "UK",
+   "products": [
+    "changing-robe"
+   ],
+   "claim": "Dryrobe Advance sells at £170–185. About 200 brands compete in UK changing robes (Red Original, Northcore, Voited, Passenger, Alpkit, Fourth Element, Regatta, Saltrock, Decathlon…).",
+   "observed": "2026-09",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Dryrobe pricing and competitor list",
+    "publisher": "Wikipedia / retailer pages"
+   }
+  },
+  {
+   "id": "ev:outerwear-returns",
+   "level": "B",
+   "kind": "context",
+   "market": "global",
+   "products": [
+    "changing-robe",
+    "heated-insoles",
+    "led-running-vest"
+   ],
+   "claim": "Outerwear returns run 20–30 %, clothing 30–40 %; size and fit cause 53 % of clothing returns; bulky packaging raises reverse-logistics cost.",
+   "observed": "2025",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Return benchmarks",
+    "publisher": "Richpanel / Kiwi Sizing / Bold Metrics"
+   }
+  },
+  {
+   "id": "ev:changing-robe-moq",
+   "level": "D",
+   "kind": "supply",
+   "market": "CN",
+   "products": [
+    "changing-robe"
+   ],
+   "claim": "OEM suppliers offer changing robes from MOQ 10 (better pricing from 100+); samples in 7–14 days; PU-coated nylon shells with fleece or sherpa linings; $18–35 per unit for complex garments.",
+   "observed": "2026-09",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "OEM supplier listings",
+    "publisher": "Lebao Sport / LEAPY OEM"
+   }
+  },
+  {
+   "id": "ev:visit-sweden-sauna",
+   "level": "B",
+   "kind": "search",
+   "market": "SE",
+   "products": [
+    "changing-robe",
+    "portable-ice-bath"
+   ],
+   "claim": "International search interest in sauna in Sweden +47 % in 2024; Swedes' own sauna search interest +141 %.",
+   "observed": "2024",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Visit Sweden — bada bastu",
+    "publisher": "Visit Sweden via Turismnytt",
+    "url": "https://www.turismnytt.se/visit-sweden-upplev-sverige-och-bara-bada-bastu/"
+   }
+  },
+  {
+   "id": "ev:rspb-birdwatch",
+   "level": "A",
+   "kind": "participation",
+   "market": "UK",
+   "products": [
+    "smart-bird-feeder",
+    "hedgehog-house"
+   ],
+   "claim": "RSPB Big Garden Birdwatch 2026: 650,279 participants counted 9+ million birds; Big Schools' Birdwatch had a record 143,000 participants.",
+   "observed": "2026-03",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "The Big Garden Birdwatch 2026 results are in",
+    "publisher": "RSPB",
+    "url": "https://www.rspb.org.uk/whats-happening/news/the-big-garden-birdwatch-twentysix-results-are-in"
+   }
+  },
+  {
+   "id": "ev:uk-birdwatchers",
+   "level": "B",
+   "kind": "participation",
+   "market": "UK",
+   "products": [
+    "smart-bird-feeder"
+   ],
+   "claim": "Over 4 million birdwatchers in the UK, up from 2.7 million eight years ago; regular birdwatching +47 % since 2018; Gen Z participation +1,088 %.",
+   "observed": "2026-05",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Young Britons fuel birdwatching boom",
+    "publisher": "Envirolink",
+    "url": "https://www.envirolink.org/2026/05/01/young-britons-fuel-birdwatching-boom-as-gen-z-embraces-nature-hobby/"
+   }
+  },
+  {
+   "id": "ev:glimpse-bird-feeders",
+   "level": "C",
+   "kind": "search",
+   "market": "global",
+   "products": [
+    "smart-bird-feeder"
+   ],
+   "claim": "'Bird feeders' about 135,000 searches, +233 % in six months. The same source says the smart pet-gadget hype has cooled and momentum moved to food and enrichment.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Pet trends 2026",
+    "publisher": "Glimpse / risingtrends",
+    "url": "https://www.risingtrends.co/trends/pet-trends-2026"
+   }
+  },
+  {
+   "id": "ev:bird-buddy",
+   "level": "C",
+   "kind": "units",
+   "market": "global",
+   "products": [
+    "smart-bird-feeder"
+   ],
+   "claim": "Bird Buddy: about €4.2 M from 23,000 Kickstarter backers (2020), $3.14 M from 10,134 backers (2023), $8.5 M VC, 100,000+ feeders sold; reported 'Kickstarter to $100 M in revenue'.",
+   "observed": "2023",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Bird Buddy raises $8.5M",
+    "publisher": "Bird Buddy blog / intellinews / Slovenia Times",
+    "url": "https://blog.mybirdbuddy.com/post/bird-buddy-raises-8-5m-to-reconnect-people-with-nature"
+   }
+  },
+  {
+   "id": "ev:asin-pet-vacuum",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "pet-grooming-vacuum"
+   ],
+   "claim": "Amazon US 'pet grooming vacuum for dogs': 123 tracked products; top 10 sell 2,000–10,000 units a month; #1 about 10,000 a month.",
+   "observed": "2026-03",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:repo-ce-testing",
+   "level": "C",
+   "kind": "supply",
+   "market": "EU",
+   "products": [
+    "pet-grooming-vacuum",
+    "cordless-pet-fountain",
+    "walking-pad",
+    "compact-dehumidifier",
+    "heated-clothes-airer",
+    "heated-throw"
+   ],
+   "claim": "CE testing (EMC + LVD + RoHS) for a small household appliance costs about $3,000–8,000; OEM MOQ 100–300 units for own-brand electrical goods; battery producer responsibility fees apply on top.",
+   "observed": "2026-09",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Certification lab price ranges and El-Kretsen fees",
+    "publisher": "Certification labs / El-Kretsen"
+   }
+  },
+  {
+   "id": "ev:asin-fountain",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "cordless-pet-fountain"
+   ],
+   "claim": "Amazon US 'wireless pet water fountain': 134 tracked products; top 10 sell 3,000–30,000 a month; #1 about 30,000 a month; $20–50 band is 56 % of the assortment.",
+   "observed": "2026-06",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:fountain-seasonality",
+   "level": "C",
+   "kind": "search",
+   "market": "global",
+   "products": [
+    "cordless-pet-fountain"
+   ],
+   "claim": "Cat water fountain search interest peaks in September (index 92), December and January (93); 'cat water fountains' about 49,500 searches.",
+   "observed": "2026-01",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Search volume analysis",
+    "publisher": "keyword tools via search excerpts"
+   }
+  },
+  {
+   "id": "ev:asin-dryer-box",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "pet-dryer-box"
+   ],
+   "claim": "Amazon US 'pet dryer box': #1 product about 30,000 units a month. No European signal or brand found.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:asin-vacuum-sealer",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "handheld-vacuum-sealer"
+   ],
+   "claim": "Amazon US: portable vacuum sealer for clothes #1 about 40,000 a month; handheld vacuum sealer top product over 10,000 orders in April 2026.",
+   "observed": "2026-04",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:pet-car-seat-market",
+   "level": "D",
+   "kind": "context",
+   "market": "global",
+   "products": [
+    "dog-car-hammock"
+   ],
+   "claim": "Pet car seat market reported at $3.4 bn in 2026, growing 4.7 % a year. Low-quality market reports; direction only.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Market reports",
+    "publisher": "various"
+   }
+  },
+  {
+   "id": "ev:asin-walking-pad",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "walking-pad"
+   ],
+   "claim": "Amazon US walking pads: top ASIN over 9,000 orders in March 2026; $100–200 band is 42 % of the assortment.",
+   "observed": "2026-03",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:addwin-fascia",
+   "level": "C",
+   "kind": "sales",
+   "market": "US",
+   "products": [
+    "ems-fascia-ring"
+   ],
+   "claim": "ADDWIN Fascia Ring R10 sold about $1.78 M on TikTok Shop US in July 2026. Listings use slimming and toning claims.",
+   "observed": "2026-07",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "TikTok Shop analysis",
+    "publisher": "trend article citing TikTok Shop data"
+   }
+  },
+  {
+   "id": "ev:glimpse-litter",
+   "level": "C",
+   "kind": "search",
+   "market": "global",
+   "products": [
+    "automatic-litter-box"
+   ],
+   "claim": "'Automatic litter boxes' about 74,000 searches; market estimates $1.89–1.99 bn (conflicting definitions).",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Pet trends 2026",
+    "publisher": "Glimpse / market reports",
+    "url": "https://www.risingtrends.co/trends/pet-trends-2026"
+   }
+  },
+  {
+   "id": "ev:litter-robot-price",
+   "level": "C",
+   "kind": "price",
+   "market": "US",
+   "products": [
+    "automatic-litter-box"
+   ],
+   "claim": "Litter-Robot sells at $599–799 (LR4 cut to $699 at the LR5 launch); PetSafe ScoopFree ~$399, Neakasa M1 Lite $299.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Product comparisons",
+    "publisher": "various"
+   }
+  },
+  {
+   "id": "ev:asin-car-vacuum",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "handheld-car-vacuum"
+   ],
+   "claim": "Amazon US car vacuum #1 about 40,000 units a month, #2 about 10,000; identical units sold under dozens of brands.",
+   "observed": "2026-07",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:asin-heated-socks",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "heated-insoles"
+   ],
+   "claim": "Amazon US 'electric socks' top ASIN over 8,000 orders in April 2026 versus just over 400 for 'womens heated vest' in March — feet, not torsos, carry the demand.",
+   "observed": "2026-04",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:fortune-genz-camera",
+   "level": "B",
+   "kind": "media",
+   "market": "US",
+   "products": [
+    "retro-digicam"
+   ],
+   "claim": "Fortune, July 2026: Gen Z's analogue aesthetic is reviving the camera market; retro digital cameras have higher search volume than retro film or instant.",
+   "observed": "2026-07",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Gen Z film camera market revival",
+    "publisher": "Fortune",
+    "url": "https://fortune.com/2026/07/14/gen-z-film-camera-market-revival/"
+   }
+  },
+  {
+   "id": "ev:asin-spin-scrubber",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "spin-scrubber"
+   ],
+   "claim": "Three spin-scrubber ASINs near 10,000 a month on Amazon US, but the category leaders are falling: Leebein −20 % and Hoto Wand −40 % month on month. 33 M+ TikTok views.",
+   "observed": "2026-07",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:aura-frames",
+   "level": "C",
+   "kind": "revenue",
+   "market": "US",
+   "products": [
+    "digital-photo-frame"
+   ],
+   "claim": "Aura Frames grew from $1.4 M ARR (2023) to $3.7 M ARR (2024); about 20 % of sales tied to influencer content.",
+   "observed": "2024",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Aura Frames",
+    "publisher": "getlatka",
+    "url": "https://getlatka.com/companies/aura-frames"
+   },
+   "note": "getlatka figures are often incomplete and look low for a brand of Aura's size; use only as a sign that the brand grows through influencers."
+  },
+  {
+   "id": "ev:asin-sunrise",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "sunrise-alarm"
+   ],
+   "claim": "Amazon US sunrise alarm clocks: top 10 sell 1,000–8,000 a month; Philips and Hatch Restore 3 lead.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:mdr-light-therapy",
+   "level": "B",
+   "kind": "regulatory",
+   "market": "EU",
+   "products": [
+    "sunrise-alarm"
+   ],
+   "claim": "Light devices with therapeutic claims (SAD, depression) fall under the Medical Device Regulation 2017/745; the line is drawn by the claim, not the hardware.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Red and blue light therapy devices and EU compliance",
+    "publisher": "Obelis",
+    "url": "https://www.obelis.net/news/red-and-blue-light-therapy-devices-and-eu-compliance/"
+   }
+  },
+  {
+   "id": "ev:asin-moisture",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "moisture-absorber"
+   ],
+   "claim": "Amazon US 'hanging dehumidifier bags' #1 about 30,000 a month, #2 20,000. Germany, the UK and France make up 48 % of European dehumidifier demand.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates and market reports",
+    "publisher": "asinsight / market reports",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:asin-grow-light",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "design-grow-light"
+   ],
+   "claim": "Amazon US grow lights: 153 tracked products, top 10 sell 1,000–4,000 a month; the $20–50 band is 46 % of the assortment.",
+   "observed": "2026-07",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:asin-galaxy-projector",
+   "level": "C",
+   "kind": "units",
+   "market": "US",
+   "products": [
+    "sunset-projector"
+   ],
+   "claim": "One ASIN is #1 on at least four galaxy/star projector keywords (8,000–10,000 a month each, one −10 %). Sunset projector content has 89 M+ TikTok views.",
+   "observed": "2026-07",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Amazon unit estimates",
+    "publisher": "asinsight",
+    "url": "https://www.asinsight.com/"
+   }
+  },
+  {
+   "id": "ev:repo-cpm-se",
+   "level": "C",
+   "kind": "context",
+   "market": "SE",
+   "products": [],
+   "claim": "Meta CPM in Sweden about $9.10–13.5 versus about $20.9 globally and $11.81 in the UK.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Facebook CPM by country",
+    "publisher": "Lebesgue / superads / Adligator",
+    "url": "https://lebesgue.io/facebook-ads/facebook-cpm-by-country"
+   }
+  },
+  {
+   "id": "ev:repo-eu-duty",
+   "level": "A",
+   "kind": "regulatory",
+   "market": "EU",
+   "products": [],
+   "claim": "The EU €150 customs duty exemption was removed on 1 July 2026, with a €3 per declaration line charge from 1 July 2026 to 1 July 2028.",
+   "observed": "2025-11",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "E-commerce: €150 customs duty exemption threshold to be removed",
+    "publisher": "European Commission",
+    "url": "https://taxation-customs.ec.europa.eu/news/e-commerce-150-eur-customs-duty-exemption-threshold-be-removed-2026-2025-11-13_en"
+   }
+  },
+  {
+   "id": "ev:repo-eu-withdrawal",
+   "level": "A",
+   "kind": "regulatory",
+   "market": "EU",
+   "products": [],
+   "claim": "EU consumers have a 14-day right of withdrawal on distance purchases; a withdrawal button is mandatory from 19 June 2026.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "EU withdrawal button",
+    "publisher": "Crowell & Moring / europa.eu",
+    "url": "https://www.crowell.com/en/insights/client-alerts/from-checkout-to-opt-out-the-eu-withdrawal-button-is-here-what-e-commerce-businesses-need-to-know"
+   }
+  },
+  {
+   "id": "ev:kustom-returns",
+   "level": "B",
+   "kind": "context",
+   "market": "SE",
+   "products": [],
+   "claim": "Swedish e-commerce return rate 5.9 % overall and 22.8 % for fashion, based on 78.6 million purchases.",
+   "observed": "2026",
+   "via": "repo-research-2026-09-14",
+   "source": {
+    "title": "Behind the Returns 2026",
+    "publisher": "Kustom via Ehandel.com",
+    "url": "https://ehandel.com/report-2026-return-rate-within-swedish-e-commerce-and-fashion/"
+   }
+  },
+  {
+   "id": "ev:ehs-damp",
+   "level": "A",
+   "kind": "population",
+   "market": "UK",
+   "products": [
+    "moisture-absorber",
+    "compact-dehumidifier",
+    "heated-clothes-airer"
+   ],
+   "claim": "English Housing Survey: 5 % of homes in England had a damp problem in 2023, the highest rate in five years; severe condensation was the most common form (3 %). About 1.3 million damp homes housed 1.0 million dependent children.",
+   "observed": "2024",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "English Housing Survey 2023 to 2024: drivers and impacts of housing quality",
+    "publisher": "Ministry of Housing (gov.uk)",
+    "url": "https://www.gov.uk/government/statistics/english-housing-survey-2023-to-2024-drivers-and-impacts-of-housing-quality"
+   }
+  },
+  {
+   "id": "ev:uk-dehumidifier-sales",
+   "level": "D",
+   "kind": "sales",
+   "market": "UK",
+   "products": [
+    "compact-dehumidifier",
+    "moisture-absorber"
+   ],
+   "claim": "Press reports a 175 % rise in UK dehumidifier sales in 2025 with stock selling out; one supplier's sales grew from 150,000 units (2022) to 320,000 (2023); a survey claims over 60 % of Brits live with mould.",
+   "observed": "2025",
+   "via": "web-search-2026-10-07",
+   "note": "Press figures without published method.",
+   "source": {
+    "title": "Mould and damp now at five-year high / dehumidifier shortage",
+    "publisher": "Homebuilding & Renovating",
+    "url": "https://www.homebuilding.co.uk/news/mould-and-damp-now-at-five-year-high-in-englands-homes-survey-reveals"
+   }
+  },
+  {
+   "id": "ev:uk-heated-airer",
+   "level": "D",
+   "kind": "reviews",
+   "market": "UK",
+   "products": [
+    "heated-clothes-airer"
+   ],
+   "claim": "Heated clothes airers have been hard to get at Lakeland, Dunelm and Argos as energy bills rose; Lakeland's Dry:Soon has 100+ five-star reviews; Dunelm sells from about £40, John Lewis about £75; Aldi has launched one; Which? runs a 'best heated clothes airers' test.",
+   "observed": "2025",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "Best heated clothes airers",
+    "publisher": "Which? / Dunelm / Coventry Telegraph",
+    "url": "https://www.which.co.uk/reviews/clothes-airers/article/best-heated-clothes-airers-a9kG61C6xNs1"
+   }
+  },
+  {
+   "id": "ev:lta-padel",
+   "level": "A",
+   "kind": "participation",
+   "market": "UK",
+   "products": [
+    "padel-ball-pressuriser",
+    "padel-racket-backpack"
+   ],
+   "claim": "LTA, May 2026: Britain passed one million active padel players, up from 15,000 (2019), 129,000 (2023) and 400,000 (end 2024). 1,825 courts at 551 venues, up from 870 courts at 293 venues at the end of 2024. About 51,000 adults play at least twice a month. The government committed £3 M to covered courts in 2026/27.",
+   "observed": "2026-05",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "1,000,000 padel players in Britain",
+    "publisher": "LTA Padel",
+    "url": "https://www.ltapadel.org.uk/news/2026/may/1000000-padel-players-in-britain/"
+   }
+  },
+  {
+   "id": "ev:uk-cold-water",
+   "level": "D",
+   "kind": "search",
+   "market": "UK",
+   "products": [
+    "portable-ice-bath"
+   ],
+   "claim": "Interest in cold water therapy and ice baths reported up 633 % in the UK; cold therapy described as a roughly £350 M UK category; residential demand growing faster than commercial, which is still over 80 % of sales.",
+   "observed": "2026",
+   "via": "web-search-2026-10-07",
+   "note": "Vendor and press claims without published method.",
+   "source": {
+    "title": "The growing global demand for ice baths and cold plunges",
+    "publisher": "Brass Monkey / TechRound",
+    "url": "https://www.brassmonkey.co/en-us/blogs/journal/the-growing-global-demand-for-ice-baths-and-cold-plunges"
+   }
+  },
+  {
+   "id": "ev:sport-england-running",
+   "level": "A",
+   "kind": "participation",
+   "market": "UK",
+   "products": [
+    "led-running-vest"
+   ],
+   "claim": "Sport England Active Lives: over 7 million adults in England run regularly, the country's second most popular sporting activity.",
+   "observed": "2025",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "Active Lives survey",
+    "publisher": "Sport England (via press coverage)",
+    "url": "https://www.marieclaire.co.uk/life/health-fitness/running-boom"
+   }
+  },
+  {
+   "id": "ev:strava-run-clubs",
+   "level": "C",
+   "kind": "participation",
+   "market": "UK",
+   "products": [
+    "led-running-vest"
+   ],
+   "claim": "Strava's 2025 mid-year data: the number of UK run clubs on the platform tripled year on year; the Hackney Half 2026 sold out in two days.",
+   "observed": "2025",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "Strava mid-year report 2025",
+    "publisher": "T3 / Endurance Sportswire",
+    "url": "https://www.t3.com/active/running/strava-mid-year-report-2025"
+   }
+  },
+  {
+   "id": "ev:uk-energy-heating",
+   "level": "D",
+   "kind": "media",
+   "market": "UK",
+   "products": [
+    "heated-throw",
+    "heated-clothes-airer"
+   ],
+   "claim": "UK coverage of energy bills pushes households to cheaper heat sources: Uswitch put an electric blanket at about 28p a night and heated throws at about 5p an hour; Octopus Energy gave away 5,000 heated blankets.",
+   "observed": "2022–2025",
+   "via": "web-search-2026-10-07",
+   "note": "Partly dated (the 54 % price-cap rise was 2022).",
+   "source": {
+    "title": "Major energy firm gives away free electric blankets as bills soar",
+    "publisher": "JPI Media regional press",
+    "url": "https://www.yorkshirepost.co.uk/read-this/major-energy-firm-gives-away-free-electric-blankets-as-bills-soar-3639436"
+   }
+  },
+  {
+   "id": "ev:uk-hayfever-sufferers",
+   "level": "B",
+   "kind": "population",
+   "market": "UK",
+   "products": [
+    "window-pollen-screen"
+   ],
+   "claim": "Allergy UK: one in four adults and one in eight children have allergic rhinitis; over 10 million people in the UK are affected by hay fever. Lancet Countdown in Europe 2026: symptoms now last up to two weeks longer than in the 1990s.",
+   "observed": "2026",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "Hay fever statistics UK",
+    "publisher": "Allergy UK via Chemist-4-U / click2pharmacy",
+    "url": "https://www.chemist-4-u.com/guides/advice/hay-fever-capitals-uk/"
+   }
+  },
+  {
+   "id": "ev:uk-hayfever-otc",
+   "level": "C",
+   "kind": "sales",
+   "market": "UK",
+   "products": [
+    "window-pollen-screen"
+   ],
+   "claim": "OTC hay fever remedies in Great Britain sold about £197 M in 2024.",
+   "observed": "2024",
+   "via": "web-search-2026-10-07",
+   "note": "Category spend on remedies, not on window screens.",
+   "source": {
+    "title": "OTC hay fever remedies sales value Great Britain",
+    "publisher": "Statista",
+    "url": "https://statista.com/statistics/521841/otc-hayfever-remedies-sales-value-great-britain"
+   }
+  },
+  {
+   "id": "ev:uk-wildlife-gardening",
+   "level": "D",
+   "kind": "sales",
+   "market": "UK",
+   "products": [
+    "hedgehog-house"
+   ],
+   "claim": "Wildlife product sales are rising in UK gardening retail (one ladybird-and-lacewing box almost trebled); RHS and The Wildlife Trusts run 'Wild About Gardens' with 3,300 community gardening groups and 17,250 schools; hedgehog, sparrow and starling sightings keep falling.",
+   "observed": "2026",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "Getting Wild About Gardens",
+    "publisher": "The Wildlife Trusts / regional press",
+    "url": "https://www.wildlifetrusts.org/node/5347411"
+   }
+  },
+  {
+   "id": "ev:uk-matcha",
+   "level": "C",
+   "kind": "sales",
+   "market": "UK",
+   "products": [
+    "matcha-whisk-kit"
+   ],
+   "claim": "British matcha revenue was about £46 M in 2025, more than double the year before; UK sales rose 91 % in a single quarter; every major supermarket stocks matcha; a global shortage pushed Kyoto's 2026 tencha auction prices about 1.7× higher.",
+   "observed": "2026-03",
+   "via": "web-search-2026-10-07",
+   "source": {
+    "title": "It's not easy being green: inside the UK's matcha boom",
+    "publisher": "Pellicle / Just Drinks",
+    "url": "https://www.pelliclemag.com/home/2026/3/16/its-not-easy-being-green-inside-the-uks-matcha-boom"
+   }
+  }
+ ]
+}

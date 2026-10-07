@@ -1,0 +1,16 @@
+{
+ "meta": {
+  "source": "Supabase project E-Comercial, view intel.v_own_sales (orders, order_lines, ad_spend, campaign_product_map, products, returns)",
+  "retrieved": "2026-10-07",
+  "provenance": "Your own store tables. Rows count as Verified only when every order carries a Shopify id; these were entered by hand (no Shopify ids, placeholder product ids), so they are treated as self-reported.",
+  "refresh": "The page reads this view live through the n8n workflow 'Plan-vy · Intelligence-DB'; this file is the snapshot used at build time."
+ },
+ "rows": [
+  {"sku": "SPC-001", "name": "Posture Corrector", "market": "SE", "currency": "SEK", "period": "2026-09-01", "orders": 40, "units": 40,
+   "revenue_incl": 10000, "revenue_ex": 8000, "ad_spend": 4200, "cac": 105, "revenue_per_order": 250, "variable_cost_per_order": 120,
+   "return_rate_pct": null, "shop_orders": 0, "from_shop_sync": false, "first_order": "2026-09-05T11:00:00Z", "last_order": "2026-09-07T02:00:00Z"},
+  {"sku": "LSL-002", "name": "LED Sunset Lamp", "market": "SE", "currency": "SEK", "period": "2026-09-01", "orders": 30, "units": 30,
+   "revenue_incl": 9000, "revenue_ex": 7200, "ad_spend": 5200, "cac": 173.33, "revenue_per_order": 300, "variable_cost_per_order": 85,
+   "return_rate_pct": null, "shop_orders": 0, "from_shop_sync": false, "first_order": "2026-09-06T11:00:00Z", "last_order": "2026-09-07T16:00:00Z"}
+ ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "plan-vy-intelligence-os",
+  "private": true,
+  "version": "1.0.0",
+  "description": "UK-first e-commerce intelligence OS: local product database, scoring engine, product analysis and an AI chat that queries the database.",
+  "type": "module",
+  "scripts": {
+    "pipeline": "node --disable-warning=ExperimentalWarning pipeline/run.mjs",
+    "build": "node build.mjs",
+    "all": "node --disable-warning=ExperimentalWarning pipeline/run.mjs && node build.mjs",
+    "test": "node test/unit.mjs && node test/ui.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

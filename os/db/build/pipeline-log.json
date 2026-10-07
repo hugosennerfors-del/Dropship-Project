@@ -1,0 +1,59 @@
+{
+ "startedAt": "2026-10-07T11:53:48.158Z",
+ "stages": [
+  {
+   "name": "ingest",
+   "at": "2026-10-07T11:53:48.172Z",
+   "evidence": 72,
+   "candidates": 140,
+   "ownSales": 2,
+   "imports": 0,
+   "analysisProducts": 31,
+   "manualProducts": 0,
+   "overlays": 0
+  },
+  {
+   "name": "process",
+   "at": "2026-10-07T11:53:48.181Z",
+   "products": 31,
+   "candidates": 140,
+   "warnings": 17,
+   "errors": 0
+  },
+  {
+   "name": "score",
+   "at": "2026-10-07T11:53:48.218Z",
+   "rows": 50
+  }
+ ],
+ "warnings": [
+  "evidence ev:ruff-tumble-ch: no source URL",
+  "evidence ev:ruff-tumble-reviews: no source URL",
+  "evidence ev:galaxus-dog-returns: no source URL",
+  "evidence ev:flapen-de: no source URL",
+  "evidence ev:dogcoat-moq: no source URL",
+  "evidence ev:dryrobe-ch: no source URL",
+  "evidence ev:dryrobe-latest: no source URL",
+  "evidence ev:red-paddle-ch: no source URL",
+  "evidence ev:uk-bathing-sites: no source URL",
+  "evidence ev:dryrobe-price: no source URL",
+  "evidence ev:outerwear-returns: no source URL",
+  "evidence ev:changing-robe-moq: no source URL",
+  "evidence ev:repo-ce-testing: no source URL",
+  "evidence ev:fountain-seasonality: no source URL",
+  "evidence ev:pet-car-seat-market: no source URL",
+  "evidence ev:addwin-fascia: no source URL",
+  "evidence ev:litter-robot-price: no source URL"
+ ],
+ "errors": [],
+ "version": "1.0.0",
+ "counts": {
+  "products": 31,
+  "profiles": 50,
+  "uk": 31,
+  "se": 19,
+  "evidence": 72,
+  "candidates": 140
+ },
+ "finishedAt": "2026-10-07T11:53:48.219Z"
+}
