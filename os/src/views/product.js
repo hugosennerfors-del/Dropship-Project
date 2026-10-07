@@ -15,6 +15,7 @@ import { AGENTS, runAgent } from "../agents/index.js";
 import { session } from "../chat/engine.js";
 import { plink, provenanceLegend, aiUnavailableNote } from "./shared.js";
 import { errCopy } from "./radar.js";
+import { burstAt } from "../fx.js";
 
 const SECTIONS = [
   ["overview", "Overview"], ["score", "Opportunity score"], ["economics", "Profitability"], ["market", "Market opportunity"],
@@ -651,6 +652,7 @@ export function mount(root, { rerender, params, id }) {
     if (f.type === "score" && (value < 0 || value > 100)) { window.__toast?.("Scores go from 0 to 100."); return; }
     const res = await setOverlay(`${id}|${scope}|${field}`, { v: value, s: "V", src: ["user"], note, at: new Date().toISOString() });
     window.__toast?.(res.ok ? `${f.label} saved as verified.` : res.reason);
+    if (res.ok) burstAt(e.target, 70);
     rerender();
   });
   root.addEventListener("click", async (e) => {
@@ -692,6 +694,7 @@ export function mount(root, { rerender, params, id }) {
           window.__toast?.(msg);
         }
         ui.state = "idle"; ui.version = null;
+        burstAt(ag.isConnected ? ag : root.querySelector(`[data-agent="${key}"]`)?.closest(".agent"), 80);
       } catch (err) {
         ui.state = err?.code === "cancelled" ? "idle" : "error";
         ui.error = errCopy(err);

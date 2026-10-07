@@ -11,6 +11,7 @@ import { store, changed, addCandidates } from "./state.js";
 import { runWorkflow, mcpReady, MCP_FIX } from "./live.js";
 import { fromGenerator, ideasFrom, toCountry } from "./core/candidates.js";
 import { MARKETS } from "./core/markets.js";
+import { burstAt } from "./fx.js";
 
 export const RESEARCH = {
   workflowId: "jD6A7tOD1L8bdUd8",
@@ -68,6 +69,7 @@ async function run(topic, market, executionId, deadlineMs) {
     addCandidates(fresh);
     store.research = { ...store.research, state: "done", executionId: id, ids: fresh.map((c) => c.id), finishedAt: Date.now() };
     changed("research");
+    requestAnimationFrame(() => burstAt(document.querySelector("#r-run .panel"), 150));
     if (!location.hash.startsWith("#/research")) window.__toast?.(`Research done: ${fresh.length} new ideas for “${topic}”. They are under New research.`);
   } catch (e) {
     if (e?.code === "still_running") store.research = { ...store.research, state: "slow", executionId: e.executionId };

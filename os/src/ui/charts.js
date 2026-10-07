@@ -41,12 +41,25 @@ export function opportunityMap(rows, opts = {}) {
     <g>${ticks.map((t) => `<text x="${x(t)}" y="${H - B + 16}" text-anchor="middle">${t}</text><text x="${L - 8}" y="${y(t) + 3.5}" text-anchor="end">${t}</text>`).join("")}</g>
     <text class="lbl" x="${(L + W - R) / 2}" y="${H - 6}" text-anchor="middle">Competition →</text>
     <text class="lbl" transform="translate(12 ${(T + H - B) / 2}) rotate(-90)" text-anchor="middle">Demand →</text>
+    ${sweep(x(50), y(50), L, T, W - L - R, H - T - B)}
     ${pts.map((r) => {
       const rad = 3.5 + Math.max(0, r.opportunity - 15) / 6;
-      return `<a href="#/p/${attr(r.id)}" aria-label="${attr(`${r.name}: demand ${r.demand}, competition ${r.competition}, opportunity ${r.opportunity}`)}"><circle class="dot" cx="${x(r.competition).toFixed(1)}" cy="${y(r.demand).toFixed(1)}" r="${rad.toFixed(1)}" fill="${stageColor(r.stage)}" fill-opacity=".78" stroke="var(--surface)" stroke-width="1.5" data-tip="${attr(`${r.name} · opportunity ${r.opportunity} · demand ${r.demand} · competition ${r.competition} · ${r.stage}`)}"/></a>`;
+      return `<a href="#/p/${attr(r.id)}" aria-label="${attr(`${r.name}: demand ${r.demand}, competition ${r.competition}, opportunity ${r.opportunity}`)}"><circle class="dot" cx="${x(r.competition).toFixed(1)}" cy="${y(r.demand).toFixed(1)}" r="${rad.toFixed(1)}" fill="${stageColor(r.stage)}" fill-opacity=".8" stroke="#fff" stroke-width="1.5" data-tip="${attr(`${r.name} · opportunity ${r.opportunity} · demand ${r.demand} · competition ${r.competition} · ${r.stage}`)}"/></a>`;
     }).join("")}
     ${labels.join("")}
   </svg>`;
+}
+
+// A radar beam turning around the middle of the map (only drawn while
+// effects are on; it never takes a click).
+function sweep(cx, cy, px, py, pw, ph) {
+  const r = Math.hypot(pw, ph) / 2 + 8;
+  const at = (deg) => [cx + r * Math.cos((deg * Math.PI) / 180), cy + r * Math.sin((deg * Math.PI) / 180)];
+  const wedge = (a, b, o) => { const [x1, y1] = at(a), [x2, y2] = at(b); return `<path d="M${cx} ${cy}L${x1.toFixed(1)} ${y1.toFixed(1)}A${r.toFixed(1)} ${r.toFixed(1)} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}Z" fill="#818cf8" fill-opacity="${o}"/>`; };
+  const [bx, by] = at(0);
+  return `<clipPath id="oppClip"><rect x="${px}" y="${py}" width="${pw}" height="${ph}"/></clipPath>
+    <g clip-path="url(#oppClip)" aria-hidden="true"><g class="fx-sweep" style="transform-origin:${cx}px ${cy}px">${wedge(-40, -22, 0.05)}${wedge(-22, -9, 0.09)}${wedge(-9, 0, 0.16)}
+      <line x1="${cx}" y1="${cy}" x2="${bx.toFixed(1)}" y2="${by.toFixed(1)}" stroke="#4f46e5" stroke-opacity=".45" stroke-width="1.5"/></g></g>`;
 }
 
 export function stageLegend(stages) {
@@ -75,8 +88,8 @@ export function profitCurve(series, currency, opts = {}) {
     ${series.map((s) => {
       const y0 = y(-s.startup), y1 = y(s.profit * maxN - s.startup);
       const be = s.profit > 0 ? s.startup / s.profit : null;
-      return `<line x1="${x(0)}" y1="${y0.toFixed(1)}" x2="${x(maxN)}" y2="${y1.toFixed(1)}" stroke="${s.color}" stroke-width="${s.main ? 2.2 : 1.4}" ${s.main ? "" : 'stroke-dasharray="4 3"'}/>
-        ${be != null && be <= maxN ? `<circle cx="${x(be).toFixed(1)}" cy="${y(0).toFixed(1)}" r="${s.main ? 4 : 3}" fill="${s.color}" stroke="var(--surface)" stroke-width="1.5"><title>${esc(s.label)}: break-even after ${Math.ceil(be)} orders</title></circle>` : ""}
+      return `<path d="M${x(0)} ${y0.toFixed(1)}L${x(maxN)} ${y1.toFixed(1)}" fill="none" stroke="${s.color}" stroke-width="${s.main ? 2.2 : 1.4}" ${s.main ? 'class="draw" pathLength="1"' : 'class="fade" stroke-dasharray="4 3"'}/>
+        ${be != null && be <= maxN ? `<circle cx="${x(be).toFixed(1)}" cy="${y(0).toFixed(1)}" r="${s.main ? 4 : 3}" fill="${s.color}" stroke="#fff" stroke-width="1.5" class="fade"><title>${esc(s.label)}: break-even after ${Math.ceil(be)} orders</title></circle>` : ""}
         <text x="${(x(maxN) - 4).toFixed(1)}" y="${(y1 + (y1 < T + 10 ? 12 : -6)).toFixed(1)}" text-anchor="end" style="fill:${s.color};font-family:var(--font-sans);font-size:11px;font-weight:500">${esc(s.label)}</text>`;
     }).join("")}
   </svg>`;

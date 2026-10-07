@@ -48,6 +48,18 @@ without a click.
 The page reads Supabase through the viewer's n8n connector and falls back to
 the snapshot embedded at build time, so it always works.
 
+## Look
+
+Chroma Glass, the earlier Plan-vy palette: a cool light ground with slow
+cyan, violet and pink colour fields behind frosted-glass panels, indigo for
+data, Instrument Sans and IBM Plex Mono. Effects (panels rising in, a
+turning rainbow edge, a glow that follows the pointer, gradient headings,
+count-ups, charts that draw themselves, a radar beam, confetti when research
+or an analysis finishes) sit behind the system's "reduce motion" setting and
+the Effects switch in the top bar. Nothing that can be clicked tilts or
+moves away from the pointer; `npm test` checks every visible button with
+effects on.
+
 ## Layers
 
 ```
@@ -89,6 +101,8 @@ src/agents/       brand builder, improvement engine, review analyst,
 src/views/        radar, discover, research, product, trends, niches, compare, chat, data
 src/live.js       Supabase through n8n (any published workflow, polled to completion)
 src/research.js   new research from the search fields
+src/fx.js         effects: entrances, count-ups, glow, sparks, confetti
+src/styles/       app.css (Chroma Glass palette and components), fx.css (effects)
 src/state.js      the page's data layer
 pipeline/         run.mjs and its stages
 ```

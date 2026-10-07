@@ -12,6 +12,7 @@ import { startResearch, checkAgain, clearResearch, researchAvailable } from "../
 import { runProfiler } from "../agents/index.js";
 import { aiUnavailableNote, shortName } from "./shared.js";
 import { errCopy } from "./radar.js";
+import { burstAt } from "../fx.js";
 
 const ui = { q: "", qFrom: null, market: "", profiling: {}, listState: "idle" };
 
@@ -78,14 +79,14 @@ function runPanel() {
     <div class="panel-h"><div><h2>${fresh.length} new idea${fresh.length === 1 ? "" : "s"} for “${esc(r.topic)}”</h2><span class="sub">${esc(MARKETS[r.market]?.name || r.market)} · saved to Supabase · numbers are AI estimates</span></div>
       <button class="btn sm ghost" data-act="clear">${icon("x", 13)}Hide</button></div>
     ${store.sampleState === "ready" ? "" : `<div class="panel-b">${aiUnavailableNote()}</div>`}
-    <div class="r-grid">${fresh.map(card).join("")}</div>
+    <div class="r-grid">${fresh.map((c, i) => card(c, i)).join("")}</div>
     <div class="panel-b xs muted r-note">${glyph("A")}<span>Prices and costs include VAT. They and the CPA are the language model's guesses, not supplier quotes. Analysing an idea scores it against the database; it then appears in Discover, the rankings and the chat.</span></div>
   </section>`;
 }
 
-function card(c) {
+function card(c, i = 0) {
   const plan = c.adPlan || {};
-  return `<article class="r-card">
+  return `<article class="r-card" style="--k:${i}">
     <div class="r-card-h"><b>${esc(c.name)}</b>${glyph("A")}</div>
     ${c.notes ? `<p class="small muted">${esc(c.notes)}</p>` : ""}
     <dl class="r-nums">
@@ -220,6 +221,7 @@ export function mount(root, { rerender }) {
       try {
         const res = await runProfiler(cand);
         ui.profiling[id] = "done";
+        burstAt(root.querySelector("#r-run .panel") || root.querySelector("#rForm"), 90);
         window.__toast?.(res.saved ? "AI profile saved to the database. Open it to see its scores." : "AI profile added for this visit; it could not be saved.");
       } catch (err) { ui.profiling[id] = errCopy(err); }
       rerender();

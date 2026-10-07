@@ -250,6 +250,47 @@ const browser = await chromium.launch();
   await ctx.close();
 }
 
+// ── 4. Effects on: nothing may block a click ───────────────────────────
+// The earlier page once tilted its research cards so "Öppna analys" could
+// not be clicked. Every visible link and button must receive a click at its
+// centre while pages animate in and after they settle.
+{
+  console.log("Effects on");
+  const ctx = await browser.newContext({ viewport: { width: 1300, height: 900 }, reducedMotion: "no-preference" });
+  const page = await ctx.newPage();
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  const blocked = () => page.evaluate(() => {
+    const els = [...document.querySelectorAll("#os-main a, #os-main button, #os-rail a, #os-top button, #legacyRoot:not([hidden]) a, #legacyRoot:not([hidden]) button")]
+      .filter((el) => { const r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4 && r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth; });
+    return els.filter((el) => { const r = el.getBoundingClientRect(); const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return !hit || !(el === hit || el.contains(hit) || hit.contains(el)); })
+      .map((el) => (el.textContent || el.tagName).trim().slice(0, 30));
+  });
+  await page.goto(url + "#/radar");
+  await page.waitForTimeout(150);
+  ok(!(await page.evaluate(() => document.documentElement.classList.contains("fx-off"))), "effects are on by default");
+  let b = await blocked();
+  ok(!b.length, "nothing blocks a click while the radar animates in", b.join(", "));
+  await page.waitForTimeout(2000);
+  ok(await page.locator("#os-main .enter").count() === 0, "the entrance ends");
+  b = await blocked();
+  ok(!b.length, "nothing blocks a click once it has settled", b.join(", "));
+  for (const h of ["#/p/changing-robe", "#/research?q=padel", "#/store/kassa"]) {
+    await page.evaluate((h) => { location.hash = h; }, h);
+    await page.waitForTimeout(200);
+    const during = await blocked();
+    await page.waitForTimeout(1800);
+    const after = await blocked();
+    ok(!during.length && !after.length, `nothing blocks a click on ${h}`, [...during, ...after].join(", "));
+  }
+  const layers = await page.evaluate(() => ["osCanvas", "osGlow", "osBar"].map((id) => getComputedStyle(document.getElementById(id)).pointerEvents));
+  ok(layers.every((p) => p === "none"), "effect layers let clicks through", layers.join(","));
+  await page.click("#os-fx");
+  ok(await page.evaluate(() => document.documentElement.classList.contains("fx-off") && localStorage.getItem("planvy-intel-fx") === "off"), "the Effects switch turns them off and remembers it");
+  ok(!errors.length, "no page errors", errors.join("; "));
+  await ctx.close();
+}
+
 await browser.close();
 server.close();
 console.log(fail ? `✗ ${fail} failed, ${pass} passed` : `✓ ${pass} passed`);

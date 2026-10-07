@@ -26,6 +26,7 @@ const bundle = await build({
 });
 const js = bundle.outputFiles[0].text;
 const css = await readFile(join(root, "src/styles/app.css"), "utf8");
+const fxCss = await readFile(join(root, "src/styles/fx.css"), "utf8");
 const dataset = await readFile(join(root, "db/build/dataset.json"), "utf8");
 
 // ── Legacy store workspace ─────────────────────────────────────────────
@@ -42,18 +43,15 @@ let legacyCss = head.slice(head.indexOf("<style>") + 7, head.lastIndexOf("</styl
 const fxStart = legacyCss.indexOf("/* ── Effekter");
 if (fxStart > 0) legacyCss = legacyCss.slice(0, fxStart);
 legacyCss = scopeCss(renameVars(legacyCss.replace(/\/\*[\s\S]*?\*\//g, "")), ".legacy");
+// The workspace keeps its own Chroma Glass colours (the page now uses the
+// same palette); only its frame is replaced by the page's: the colour
+// fields, menu, top bar and effects layers belong to the page.
 legacyCss += `
-.legacy{--lg-bg:transparent;--lg-ink:var(--fg);--lg-ink2:var(--fg-2);--lg-ink3:var(--fg-3);--lg-hair-strong:var(--border-strong);
---lg-pos:var(--good);--lg-pos-ink:var(--good);--lg-neg:var(--bad);--lg-neg-ink:var(--bad);--lg-warn:var(--warn);--lg-warn-ink:var(--warn);
---lg-series:var(--accent);--lg-series-ink:var(--accent);--lg-glass:var(--surface);--lg-glass-br:var(--border);--lg-shadow:none;
---lg-hair:var(--border);--lg-accent:var(--accent);--lg-r:12px;--lg-sans:var(--font-sans);--lg-mono:var(--font-mono);--lg-cyan:var(--accent);
---lg-violet:var(--accent);--lg-pink:var(--accent);min-height:0;font-size:14px;background:transparent}
+.legacy{min-height:0;font-size:14px;background:transparent}
 .legacy .field,.legacy .side,.legacy .top,.legacy .scrim,.legacy .fxbar,.legacy .fxcanvas,.legacy .glow,.legacy .fxbtn{display:none!important}
 .legacy .shell{display:block;min-height:0}
 .legacy .main{min-width:0}
-.legacy .glass{backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none}
-.legacy .flat{background:var(--surface-2);border-color:var(--border)}
-.legacy tbody tr:hover{background:var(--surface-2)}
+.legacy .glass{position:relative}
 .legacy .wrap{max-width:1240px;margin:0 auto}
 `;
 
@@ -63,8 +61,12 @@ legacyApp = replaceOnce(legacyApp, 'const raw = (location.hash || "#/").slice(1)
 legacyApp = legacyApp.replace(/(["`])#\//g, "$1#/store/");
 legacyApp = legacyApp.replace(/href="#\$\{href\}"/g, 'href="#/store${href}"');
 legacyApp = replaceOnce(legacyApp, "function render() {\n", "function render() {\n  if (!(location.hash || '').startsWith('#/store')) return;\n");
-// The effects belong to the old design; they stay off here.
-legacyApp = replaceOnce(legacyApp, 'fxSatt(sparat !== "av");', "fxSatt(false);");
+// Effects run in the page's fx module (src/fx.js): the workspace's own
+// effects stay idle and hand their entrances and confetti over to it.
+legacyApp = replaceOnce(legacyApp, 'const fxOn = () => !fxLugn.matches && !document.documentElement.classList.contains("fx-off");', "const fxOn = () => false;");
+legacyApp = replaceOnce(legacyApp, 'fxSatt(sparat !== "av");', "void sparat;");
+legacyApp = replaceOnce(legacyApp, "function fxEfterRender(path) {\n", "function fxEfterRender(path) {\n  if (window.__fx) { window.__fx.enter(document.getElementById('view'), 'store:' + path); return; }\n");
+legacyApp = replaceOnce(legacyApp, "function fxFest(x, y, antal = 110) {\n", "function fxFest(x, y, antal = 110) {\n  if (window.__fx) return window.__fx.burst(x, y, antal);\n");
 
 const legacyBody = renameVars(body);
 
@@ -73,11 +75,14 @@ const html = `<title>Plan-vy Intelligence</title>
 <meta name="description" content="UK-first e-commerce research: product database, scoring, analysis and an AI chat that queries the database.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 ${css}
+${fxCss}
 ${legacyCss}
 </style>
+<div class="chroma" aria-hidden="true"><i class="b1"></i><i class="b2"></i><i class="b3"></i></div>
+<div class="fx-glow" id="osGlow" aria-hidden="true"></div>
 <div class="os">
   <aside class="rail" id="os-rail" aria-label="Navigation"></aside>
   <button class="scrim" id="os-scrim" aria-label="Close the menu"></button>
@@ -89,6 +94,8 @@ ${legacyBody}
     </div>
   </div>
 </div>
+<div class="fx-bar" id="osBar" aria-hidden="true"></div>
+<canvas class="fx-canvas" id="osCanvas" aria-hidden="true"></canvas>
 <div id="tip" role="tooltip"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script type="application/json" id="dataset">${esc(dataset)}</script>

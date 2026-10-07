@@ -7,6 +7,7 @@ import { init, connect, store, onChange, rows, setMarket, dataSourceLabel } from
 import { esc, attr, icon, scoreChip } from "./ui/dom.js";
 import { MARKETS } from "./core/markets.js";
 import { startResearch, researchAvailable } from "./research.js";
+import { initFx, enter as fxEnter, fxEnabled, setFx, burstAt } from "./fx.js";
 import * as radar from "./views/radar.js";
 import * as discover from "./views/discover.js";
 import * as research from "./views/research.js";
@@ -68,6 +69,7 @@ function render(force) {
   if (current.key === key && current.root && !force) {
     current.root.innerHTML = out.html;
     current.refresh?.();
+    fxEnter(current.root, key);
     return;
   }
   const keepScroll = current.key === key ? window.scrollY : null;
@@ -76,13 +78,16 @@ function render(force) {
   root.className = out.full ? "view full" : "view";
   root.innerHTML = out.html;
   document.getElementById("os-main").replaceChildren(root);
-  const mounted = mod.mount?.(root, { rerender: () => render(), params, id });
+  // A view that has been left (its root replaced) no longer redraws the page:
+  // an agent finishing after you moved on must not wipe what you typed.
+  const mounted = mod.mount?.(root, { rerender: () => { if (root.isConnected) render(); }, params, id });
   current = {
     key, root, mod,
     cleanup: typeof mounted === "function" ? mounted : mounted?.cleanup || null,
     refresh: mounted?.refresh || null,
   };
   window.scrollTo(0, keepScroll ?? 0);
+  fxEnter(root, key);
   closeDrawer();
 }
 
@@ -125,6 +130,7 @@ function renderTop(parts, storeMode, title) {
     <nav class="crumbs" aria-label="Breadcrumbs">${storeMode ? `<a href="#/radar">Research</a><span>/</span><b>Store</b>`
       : `${crumbs.map(([h, l]) => `<a href="${h}">${esc(l)}</a><span>/</span>`).join("")}<b>${esc(label)}</b>`}</nav>
     <span class="spacer"></span>
+    <button class="fxbtn" id="os-fx" aria-pressed="${fxEnabled()}" title="Animations and effects on or off">${icon("spark", 14)}<span>Effects</span></button>
     ${storeMode ? "" : `<button class="cmdk" id="os-cmdk" aria-label="Search or research">${icon("search", 14)}<span>Search or research</span><kbd>⌘K</kbd></button>
     <div class="seg" role="group" aria-label="Market">${Object.values(MARKETS).map((x) => `<button data-set-market="${x.code}" aria-pressed="${x.code === m}" aria-label="${x.name}"><span>${x.code === "UK" ? 'UK<span class="hide-sm">&nbsp;· £</span>' : 'S<span class="hide-sm">weden · kr</span><span class="show-sm">E</span>'}</span></button>`).join("")}</div>`}`;
 }
@@ -225,6 +231,7 @@ function closeDrawer() { document.getElementById("os-rail")?.classList.remove("o
 function boot() {
   const dataset = JSON.parse(document.getElementById("dataset").textContent);
   init(dataset);
+  initFx();
   initTips();
   addEventListener("hashchange", () => render());
   document.addEventListener("click", (e) => {
@@ -232,6 +239,14 @@ function boot() {
     const mk = t.closest?.("[data-set-market]");
     if (mk) { setMarket(mk.dataset.setMarket); return; }
     if (t.closest?.("#os-cmdk")) { openPalette(); return; }
+    const fxb = t.closest?.("#os-fx");
+    if (fxb) {
+      const on = !fxEnabled();
+      setFx(on);
+      fxb.setAttribute("aria-pressed", String(on));
+      if (on) { current.key = ""; render(true); burstAt(document.getElementById("os-fx"), 70); }
+      return;
+    }
     if (t.closest?.("#os-burger")) { openDrawer(); return; }
     if (t.closest?.("#os-scrim")) { closeDrawer(); return; }
     // Table rows link to the product unless a control inside was clicked.
