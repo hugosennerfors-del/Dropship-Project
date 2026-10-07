@@ -11,7 +11,8 @@ const cur = (r) => r.currency || "GBP";
 export function m(x, currency) {
   if (x == null || !Number.isFinite(x)) return "—";
   if (currency === "SEK") return `${Math.round(x).toLocaleString("sv-SE")} kr`;
-  const s = Math.abs(x).toLocaleString("en-GB", { minimumFractionDigits: Math.abs(x) >= 1000 ? 0 : 2, maximumFractionDigits: Math.abs(x) >= 1000 ? 0 : 2 });
+  const d = Math.abs(x) >= 1000 || Number.isInteger(x) ? 0 : 2;
+  const s = Math.abs(x).toLocaleString("en-GB", { minimumFractionDigits: d, maximumFractionDigits: d });
   return `${x < 0 ? "−" : ""}£${s}`;
 }
 const p1 = (x) => (x == null ? "—" : `${Math.round(x * 10) / 10}%`);
@@ -64,7 +65,7 @@ export function answerQuery(rows, spec, ctx) {
   const market = ctx.market;
   const res = query(rows, { ...spec, limit: spec.limit || 10 });
   const labels = (spec.filters || []).map((f) => filterLabel(f, market));
-  const sortLabel = typeof spec.sort === "string" ? SORTS[spec.sort]?.label : null;
+  const sortLabel = typeof spec.sort === "string" ? SORTS[spec.sort]?.label || FIELD[spec.sort]?.label : spec.sort?.label || null;
   const lines = [];
   const scope = spec.within ? `Of the ${spec.within.length} products in the last answer, ` : "";
   if (!res.total) {
@@ -80,7 +81,9 @@ export function answerQuery(rows, spec, ctx) {
     }
     return { text: lines.join("\n"), ids: [], spec, total: 0 };
   }
-  lines.push(`${scope}${res.total} ${res.total === 1 ? "product matches" : "products match"}${labels.length ? ` ${labels.join(", ")}` : ""} in the ${MARKETS[market].name}. ${res.total > res.rows.length ? `Top ${res.rows.length}, ` : ""}ranked by ${(sortLabel || "opportunity").toLowerCase()}:`);
+  const sl = sortLabel || "highest opportunity";
+  const ranked = `ranked by ${/^[A-Z][a-z]/.test(sl) && !/^(TikTok|Meta|Instagram|Google|SEO|UGC|AOV)/.test(sl) ? sl[0].toLowerCase() + sl.slice(1) : sl}:`;
+  lines.push(`${scope}${res.total} ${res.total === 1 ? "product matches" : "products match"}${labels.length ? ` ${labels.join(", ")}` : ""} in the ${MARKETS[market].name}. ${res.total > res.rows.length ? `Top ${res.rows.length}, ${ranked}` : ranked[0].toUpperCase() + ranked.slice(1)}`);
   lines.push("");
   res.rows.forEach((r, i) => {
     lines.push(productLine(r, i));
@@ -212,3 +215,90 @@ export const HELP = [
   "- *Top 5 pet products for TikTok*",
   "Then ask follow-ups: *Which one is the safest?* · *Why is number 3 better than number 1?* · *Which would you choose with £2,000?* · *Show me the unit economics*",
 ].join("\n");
+
+// Products to stay away from, with the reasons. With a trend filter this
+// answers "trending but poor potential".
+export function answerAvoid(rows, spec, ctx) {
+  const pool = query(rows, { filters: spec.filters, within: spec.within }).rows;
+  const scoreOf = (r) => (r.redFlags || []).length * 6 + (100 - (r.opportunity ?? 50)) + ((r.profit ?? 0) <= 0 ? 10 : 0);
+  const bad = pool.filter((r) => (r.opportunity ?? 100) < 40 || (r.redFlags || []).some((f) => /saturated|loses money|regulatory|ip|restricted|bad margins/i.test(f)))
+    .sort((a, b) => scoreOf(b) - scoreOf(a)).slice(0, spec.limit || 6);
+  const trending = (spec.filters || []).some((f) => f.field === "trend");
+  if (!bad.length) return { text: `Nothing in this selection looks like a clear avoid: every product scores 40 or more without a serious red flag.`, ids: [] };
+  const lines = [trending
+    ? `These products get attention but the numbers behind them are weak. Trend is not the same as a business:`
+    : `I would avoid or deprioritise these ${bad.length}, mainly because of the red flags below:`, ""];
+  bad.forEach((r, i) => {
+    const d = ctx.scoresOf?.(r.id);
+    const crit = (d?.redFlags || []).filter((f) => f.severity === "critical").map((f) => f.title.toLowerCase());
+    const warn = (d?.redFlags || []).filter((f) => f.severity !== "critical").map((f) => f.title.toLowerCase());
+    lines.push(`${i + 1}. [[${r.id}]] — opportunity **${r.opportunity}**, trend ${r0(r.trend)}, ${r.stage.toLowerCase()}, ${m(r.profit, cur(r))} profit/order`);
+    lines.push(`   ${crit.length ? `Deal-breakers: ${crit.join(", ")}. ` : ""}${warn.length ? `Also: ${warn.slice(0, 3).join(", ")}.` : ""}`.trimEnd());
+  });
+  lines.push("", "A product can still work if you fix its main problem (a better product, a higher price, an organic channel), but none of these should be a first test.");
+  return { text: lines.join("\n"), ids: bad.map((r) => r.id) };
+}
+
+// "Which product would you test first?" — the best evidence-weighted
+// product that can make money, with a test plan.
+export function answerFirst(rows, spec, ctx) {
+  const pool = query(rows, { filters: spec.filters, within: spec.within, sort: "evidence" }).rows;
+  if (!pool.length) return answerQuery(rows, spec, ctx);
+  const profitable = pool.filter((r) => (r.profit ?? 0) > 0);
+  const pick = profitable[0] || pool[0];
+  const why = ctx.whyOf?.(pick.id);
+  const c = cur(pick);
+  const lines = [`I would test [[${pick.id}]] first.`, ""];
+  lines.push(`- Evidence-weighted opportunity **${pick.evidenceWeighted}** (opportunity ${pick.opportunity}, data confidence ${pick.confidence}), the best ${profitable[0] ? "of the products that make money at the estimated CAC" : "in the database"}.`);
+  if (why?.positives?.length) lines.push(`- Strongest points: ${why.positives.slice(0, 3).map((x) => `${x.text.toLowerCase()} (${x.detail})`).join("; ")}.`);
+  if (why?.negatives?.length) lines.push(`- What could sink it: ${why.negatives.slice(0, 2).map((x) => `${x.text.toLowerCase()} (${x.detail})`).join("; ")}.`);
+  lines.push(`- Economics: ${m(pick.price, c)} price, ${p1(pick.margin)} gross margin, ${m(pick.profit, c)} per order after an estimated ${m(pick.cac, c)} CAC.`);
+  lines.push("", "How I would test it:");
+  lines.push(`1. Order samples and confirm the supplier price (the margin rests on ${pick._s?.supplierPrice === "A" ? "an AI estimate" : "an estimate"}).`);
+  lines.push(`2. Spend about £300 on ads to measure the real CAC. Stop if it is above ${m(pick.maxCac, c)}, the break-even CAC.`);
+  lines.push(`3. Launch cost before ads: about ${m(pick.startupCost, c)}${pick.breakEvenOrders ? `; ${pick.breakEvenOrders} orders to pay it back` : ""}.`);
+  if (!profitable.length) lines.push("", `None of the products makes money at the estimated CAC, so treat this as the least weak option and focus the test on a higher price or a cheaper channel.`);
+  else if (profitable.length > 1) lines.push("", `Runner-up: [[${profitable[1].id}]] (evidence-weighted ${profitable[1].evidenceWeighted}).`);
+  return { text: lines.join("\n"), ids: [pick.id, ...(profitable[1] ? [profitable[1].id] : [])] };
+}
+
+// Niche finder from the database: niches and micro-niches ranked by a
+// blend of opportunity, demand–competition gap and margin.
+export function answerNiches(rows, spec, ctx, nichesFn) {
+  const pool = query(rows, { filters: spec.filters.filter((f) => f.field !== "profit"), within: spec.within }).rows;
+  const wantProfit = (spec.filters || []).some((f) => f.field === "profit");
+  let ns = nichesFn(pool, "niche").map((n) => {
+    const ps = pool.filter((r) => n.products.includes(r.id));
+    const profitable = ps.filter((r) => (r.profit ?? 0) > 0).length;
+    return { ...n, profitable, ps, rank: (n.opportunity ?? 0) * 0.5 + (n.gap ?? 0) * 0.3 + (((n.margin ?? 30) - 30) / 45) * 100 * 0.2 };
+  });
+  if (wantProfit) ns = ns.filter((n) => n.profitable > 0);
+  ns.sort((a, b) => b.rank - a.rank);
+  const lines = [`${wantProfit ? "Niches with at least one product that makes money at the estimated CAC" : "The strongest niches in the database"}, ${MARKETS[ctx.market].name}:`, ""];
+  ns.slice(0, spec.limit || 6).forEach((n, i) => {
+    const best = n.ps.find((r) => r.id === n.best) || n.ps[0];
+    lines.push(`${i + 1}. **${n.name}** (${n.category}) — ${n.count} product${n.count > 1 ? "s" : ""}, demand ${r0(n.demand)}, competition ${r0(n.competition)}, margin ${p1(n.margin)}, avg opportunity ${r0(n.opportunity)}`);
+    lines.push(`   Micro-niche: ${best?.microNiche || "—"}. Customer: ${best?.targetCustomer || "—"}`);
+    if (best?.painPoint) lines.push(`   Problem: ${best.painPoint}`);
+    lines.push(`   Best product: [[${best.id}]]${n.profitable ? `; ${n.profitable} profitable at est. CAC` : ""}.`);
+  });
+  if (!ns.length) lines.push("No niche matches. Remove a condition or run the niche scout for new ideas.");
+  lines.push("", "These come from the products already analysed. The niche scout on the Niches page asks Claude for niches the database does not cover yet.");
+  return { text: lines.join("\n"), ids: ns.slice(0, spec.limit || 6).map((n) => n.best) };
+}
+
+// "Best for TikTok / Instagram / Meta": the top products per platform.
+export function answerPlatforms(rows, spec, ctx, platforms) {
+  const others = (spec.filters || []).filter((f) => !platforms.includes(f.field));
+  const pool = query(rows, { filters: others, within: spec.within }).rows;
+  const lines = [`Best fit per channel, ${MARKETS[ctx.market].name} (potential 0–100, then opportunity):`, ""];
+  const ids = [];
+  for (const k of platforms) {
+    const top = [...pool].filter((r) => r[k] != null).sort((a, b) => b[k] - a[k] || b.opportunity - a.opportunity).slice(0, 3);
+    lines.push(`**${FIELD[k]?.label || k}**`);
+    top.forEach((r, i) => { lines.push(`${i + 1}. [[${r.id}]] — ${k} ${r0(r[k])}, opportunity ${r.opportunity}, ${m(r.profit, cur(r))}/order`); ids.push(r.id); });
+    lines.push("");
+  }
+  lines.push("Channel scores are AI estimates from the product's format (visual demo, impulse, giftability) and the UK audience; ad-library and creator data are not connected yet.");
+  return { text: lines.join("\n"), ids: [...new Set(ids)] };
+}

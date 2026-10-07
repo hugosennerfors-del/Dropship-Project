@@ -241,7 +241,7 @@ export async function runProfiler(candidate, { signal, onText } = {}) {
   const mk = { evidence: [] };
   for (const k of PROFILE_MARKET) if (out?.market?.[k] != null) { const w = wrap(k, out.market[k]); if (w) mk[k] = w; }
   for (const k of ["marketSize", "reviewSentiment"]) mk[k] = { v: null, s: "N", note: "No data: profiled by AI from an inbox idea." };
-  const record = { id, source: "agent", fromCandidate: candidate.id, createdAt: new Date().toISOString(), evidence: [], core, markets: { [market]: mk } };
+  const record = { id, source: "agent", fromCandidate: candidate.id, candidateId: candidate.sourceId || null, createdAt: new Date().toISOString(), evidence: [], core, markets: { [market]: mk } };
   const saved = await saveRun({ agent: "profiler", productId: id, market, candidateId: candidate.id, output: { name: core.name.v } });
   const res = await saveUserProduct(record);
   return { id, runId: saved.id, saved: res.ok };

@@ -34,7 +34,7 @@ export const products = [
       contentAngles: A(["Cold-water swim spots by region", "What to wear for a winter dip", "Community swim group features"]),
       differentiationOpportunities: A(["Three lining weights for different temperatures", "Sizing built for women and smaller swimmers", "Repair service and recycled materials"]),
       uspOpportunities: A(["Warm in under two minutes", "Fits under — and over — a wetsuit"]),
-      reasonsWork: A(["A category that carries a £22 M company and an £8 M second player", "UK open-water swimmers doubled to 543,000; 13 new bathing sites in 2026", "High AOV absorbs high returns: still about €63 profit per order after 25 % returns in the earlier model", "Natural Christmas gift"]),
+      reasonsWork: A(["A category that carries a £22 M company and an £8 M second player", "UK open-water swimmers doubled to 543,000; 13 new bathing sites in 2026", "A high order value leaves room to absorb 20–30 % returns", "Natural Christmas gift"]),
       reasonsFail: A(["About 200 competing brands; Dryrobe is slowing and the category is maturing", "20–30 % returns and bulky return parcels", "Dryrobe actively enforces its trade mark"]),
       keyRisks: A(["Trade mark (never 'dryrobe' or 'dry robe')", "Returns", "Quality of the first batch"]),
     },

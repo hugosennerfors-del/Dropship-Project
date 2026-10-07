@@ -2948,7 +2948,7 @@ function viewTest() {
 
 /* ═══ Risk ═════════════════════════════════════════════════════════════════ */
 const TROSKLAR = [
-  { kod: "GB", namn: "Storbritannien", belopp: 85000, valuta: "GBP", vad: "VAT-registrering", not: "Gäller omsättning i Storbritannien under rullande 12 månader." },
+  { kod: "GB", namn: "Storbritannien", belopp: 0, valuta: "GBP", vad: "VAT-registrering", not: "Ingen tröskel för ett företag utanför Storbritannien: registreringen krävs från första försäljningen till brittiska kunder. Sändningar på högst 135 £ momsas i kassan av dig (eller av marknadsplatsen). Gränsen 90 000 £ gäller bara företag etablerade i Storbritannien." },
   { kod: "EU", namn: "EU (OSS)", belopp: 10000, valuta: "EUR", vad: "OSS-registrering", not: "Gäller total distansförsäljning till alla EU-länder tillsammans. Tröskeln är låg och passeras lätt." },
   { kod: "US", namn: "USA", belopp: 100000, valuta: "USD", vad: "Economic nexus", not: "Gäller PER DELSTAT och varierar. 100 000 dollar eller 200 transaktioner är det vanligaste, men inte universellt." },
   { kod: "AU", namn: "Australien", belopp: 75000, valuta: "AUD", vad: "GST-registrering", not: "Gäller omsättning i Australien under 12 månader." },
@@ -3039,10 +3039,11 @@ function viewRisk() {
         <tbody>${TROSKLAR.map((t) => {
           const o = oms[t.kod] || 0;
           const andel = t.belopp > 0 ? o / t.belopp : 0;
-          const lage = o === 0 ? ["Ingen försäljning", "p-neu"] : andel >= 0.8 ? ["Nära tröskeln", "p-neg"] : andel >= 0.5 ? ["Halvvägs", "p-warn"] : ["God marginal", "p-pos"];
+          const lage = t.belopp === 0 ? (o === 0 ? ["Krävs vid första försäljningen", "p-warn"] : ["Registrering krävs", "p-neg"])
+            : o === 0 ? ["Ingen försäljning", "p-neu"] : andel >= 0.8 ? ["Nära tröskeln", "p-neg"] : andel >= 0.5 ? ["Halvvägs", "p-warn"] : ["God marginal", "p-pos"];
           return `<tr><td><b style="font-weight:500">${esc(t.namn)}</b><span class="muted" style="display:block;font-size:11.5px">${esc(t.not)}</span></td>
             <td class="muted">${esc(t.vad)}</td>
-            <td class="r num">${nf({ maximumFractionDigits: 0 }).format(t.belopp)} ${esc(t.valuta)}</td>
+            <td class="r num">${t.belopp === 0 ? "Ingen" : nf({ maximumFractionDigits: 0 }).format(t.belopp) + " " + esc(t.valuta)}</td>
             <td class="r num">${o > 0 ? nf({ maximumFractionDigits: 0 }).format(o) : "—"}</td>
             <td>${pill(lage[0], lage[1])}</td></tr>`;
         }).join("")}</tbody></table></div>

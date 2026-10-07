@@ -8,7 +8,7 @@
     "pipeline": "node --disable-warning=ExperimentalWarning pipeline/run.mjs",
     "build": "node build.mjs",
     "all": "node --disable-warning=ExperimentalWarning pipeline/run.mjs && node build.mjs",
-    "test": "node test/unit.mjs && node test/ui.mjs"
+    "test": "node test/unit.mjs && node build.mjs && node test/smoke.mjs && node test/ui.mjs"
   },
   "devDependencies": {
     "esbuild": "0.28.2"

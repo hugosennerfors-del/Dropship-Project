@@ -237,6 +237,10 @@ export function localAnswer(text, market) {
       break;
     }
     case "pick": ans = C.answerPick(mrows, spec, ctx); break;
+    case "avoid": ans = C.answerAvoid(mrows, spec, ctx); break;
+    case "first": ans = C.answerFirst(mrows, spec, ctx); break;
+    case "niches": ans = C.answerNiches(mrows, spec, ctx, niches); break;
+    case "platforms": ans = C.answerPlatforms(mrows, spec, ctx, p.platforms); break;
     case "budget": ans = C.answerBudget(mrows, spec, ctx); break;
     case "product": {
       const id = p.refIds[0] || p.productIds[0];
@@ -246,9 +250,9 @@ export function localAnswer(text, market) {
     }
     default: ans = C.answerQuery(mrows, spec, ctx);
   }
-  if (["query", "pick", "budget"].includes(p.intent)) {
+  if (["query", "pick", "budget", "avoid", "first", "niches", "platforms"].includes(p.intent)) {
     trace.push({ kind: "query", market: m, applied: (p.filters || []).map((f) => C.filterLabel(f, m)).concat(p.budgetGBP ? [`launch budget £${p.budgetGBP}`] : []),
-      sort: SORTS[spec.sort]?.label || spec.sort, total: ans.total ?? ans.ids.length, ids: ans.ids, within: !!p.within });
+      sort: typeof spec.sort === "string" ? SORTS[spec.sort]?.label || spec.sort : spec.sort?.label, total: ans.total ?? ans.ids.length, ids: ans.ids, within: !!p.within });
   }
   return { ...ans, parsed: p, market: m, trace };
 }

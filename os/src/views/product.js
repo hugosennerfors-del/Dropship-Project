@@ -17,7 +17,7 @@ import { plink, provenanceLegend, aiUnavailableNote } from "./shared.js";
 import { errCopy } from "./radar.js";
 
 const SECTIONS = [
-  ["overview", "Overview"], ["score", "Opportunity score"], ["economics", "Profitability"], ["market", "Market"],
+  ["overview", "Overview"], ["score", "Opportunity score"], ["economics", "Profitability"], ["market", "Market opportunity"],
   ["competition", "Competition"], ["marketing", "Marketing & brand"], ["customer", "Customer"], ["validation", "Validation"],
   ["risk", "Risk"], ["data", "Data confidence"], ["agents", "AI agents"],
 ];
@@ -131,7 +131,7 @@ function secOverview(p, b, r) {
   const kv = (k, x) => x ? `<div>${esc(FIELD[k]?.label || k)}</div><div>${valueCell(k, x, r.currency, ei)}</div>` : "";
   return `<section class="p-sec" id="sec-overview">
     <h2>Overview</h2>
-    ${c.overview?.v ? `<p class="prose" style="font-size:15px">${esc(c.overview.v)} <span style="vertical-align:-1px">${glyph(c.overview.s)}</span></p>` : ""}
+    ${c.overview?.v ? `<div class="prose" style="font-size:15px"><p>${esc(c.overview.v)} <span style="display:inline-block;vertical-align:-1px" data-tip="${attr(tipOf(c.overview, store.evidenceIndex))}">${glyph(c.overview.s)}</span></p></div>` : ""}
     <div class="grid g2">
       <div class="panel"><div class="panel-h"><h3>Why it could work</h3></div><div class="panel-b why">
         ${why.positives.slice(0, 5).map((x) => `<div class="why-item"><span class="pts pos">+${x.points}</span><span>${esc(x.text)}<small>${esc(x.detail)}</small></span></div>`).join("") || '<p class="small muted">No component scores above neutral.</p>'}
@@ -312,7 +312,8 @@ function secMarket(p, b, r, d, m) {
   const conn = (id) => CONNECTORS.find((c) => c.id === id);
   const connFor = { amazon: "amazon-uk", ebay: "ebay-uk", etsy: "etsy", "tiktok-shop": "tiktok-shop", google: "google-shopping", meta: "meta-ad-library", tiktok: "instagram", instagram: "instagram" };
   return `<section class="p-sec" id="sec-market">
-    <h2>Market <small>${esc(MARKETS[m].name)}</small></h2>
+    <h2>Market opportunity <small>${esc(MARKETS[m].name)}</small></h2>
+    <div class="callout${marketTone(r)}">${icon("info", 16)}<span>${esc(marketSummary(r, mk))}</span></div>
     <div class="grid g2">
       <div class="panel"><div class="panel-b"><div class="kv">
         ${kv("relevance", mk.relevance)}${kv("demand", mk.demand)}${kv("searchDemand", mk.searchDemand)}${kv("trend", mk.trend)}
@@ -337,6 +338,20 @@ function secMarket(p, b, r, d, m) {
       <div class="panel-b xs muted" style="border-top:1px solid var(--border)">Amazon UK, eBay UK, Etsy and TikTok Shop need an API connection before the page can show listings, prices or sales. See Data → Connectors.</div>
     </div>
   </section>`;
+}
+
+function marketTone(r) {
+  const gap = (r.demand ?? 50) - (r.competition ?? 50);
+  return gap >= 10 && ["Emerging", "Early Growth", "Growing"].includes(r.stage) ? " good" : gap <= -15 || ["Saturated", "Declining"].includes(r.stage) ? " warn" : "";
+}
+function marketSummary(r, mk) {
+  const gap = (r.demand ?? 50) - (r.competition ?? 50);
+  const size = mk.marketSize?.v ? `Market size: ${mk.marketSize.v}.` : "No reliable market-size data.";
+  const growth = isNum(mk.growth?.v) ? ` Estimated growth about ${mk.growth.v}% a year.` : "";
+  const room = gap >= 10 ? `Demand (${r.demand}) is ahead of competition (${r.competition}), so there is room for a new seller.`
+    : gap <= -15 ? `Competition (${r.competition}) is well ahead of demand (${r.demand}): a new seller needs a clearly better product or a channel others ignore.`
+    : `Demand (${r.demand}) and competition (${r.competition}) are roughly balanced: the opportunity depends on differentiation.`;
+  return `${room} Stage: ${r.stage.toLowerCase()}. ${size}${growth}`;
 }
 
 // ── Competition ────────────────────────────────────────────────────────
@@ -381,7 +396,8 @@ function secMarketing(p, b, r) {
     <div class="panel"><div class="panel-h"><h3>Channel potential</h3><span class="sub">0–100 · AI estimates unless marked</span></div>
       <div class="panel-b grid g4" style="gap:12px 24px">${ch.map(([k, src]) => { const x = src[k]; return `<div class="stack" style="gap:5px"><div class="row between small"><span class="val">${x ? glyph(x.s) : glyph("N")}${esc(FIELD[k].label.replace(" potential", ""))}</span><span class="mono">${int(x?.v)}</span></div>${meter(x?.v, { label: FIELD[k].label })}</div>`; }).join("")}</div></div>
     <div class="grid g2">
-      <div class="panel"><div class="panel-h"><h3>Brand</h3><span class="row" style="gap:8px"><span class="small muted">Brandability</span>${scoreChip(c.brandability?.v, { label: "Brandability" })}</span></div><div class="panel-b stack">
+      <div class="panel"><div class="panel-h"><h3>Brand potential</h3><span class="row" style="gap:8px"><span class="small muted">Brandability</span>${scoreChip(c.brandability?.v, { label: "Brandability" })}</span></div><div class="panel-b stack">
+        <p class="small"><b style="font-weight:500">${esc(brandVerdict(c, r).title)}</b> ${esc(brandVerdict(c, r).text)}</p>
         ${text("brandAngle", c.brandAngle)}${text("landingPageAngle", c.landingPageAngle)}
         <div class="kv">${["repeat", "subscription", "bundle"].map((k) => `<div>${esc(FIELD[k].label)}</div><div>${c[k] ? valueCell(k, c[k], r.currency, ei) : "—"}</div>`).join("")}
         ${mk.upsellValue ? `<div>Upsell value</div><div>${valueCell("upsellValue", mk.upsellValue, r.currency, ei)}</div>` : ""}</div>
@@ -389,6 +405,14 @@ function secMarketing(p, b, r) {
       <div class="panel"><div class="panel-h"><h3>Angles</h3></div><div class="panel-b stack">${text("adAngles", c.adAngles)}${text("contentAngles", c.contentAngles)}</div></div>
     </div>
   </section>`;
+}
+
+function brandVerdict(c, r) {
+  const b = c.brandability?.v ?? 50, d = c.differentiation?.v ?? 50, rep = c.repeat?.v ?? 20;
+  const late = ["Peak", "Declining", "Saturated"].includes(r.stage);
+  if (b >= 70 && d >= 50) return { title: "Good basis for a long-term brand.", text: `People can tell a better version apart (differentiation ${d}), the category carries identity and story (brandability ${b})${rep >= 40 ? ", and customers come back" : ""}.${late ? " The market is late in its cycle, so the brand has to win on quality, not novelty." : ""}` };
+  if (b >= 55) return { title: "A brand is possible, but not automatic.", text: `Brandability ${b} and differentiation ${d}: it needs a clear angle (see the differentiation opportunities) to avoid competing on price.${rep < 30 ? " Few repeat purchases, so the brand has to earn new customers each time." : ""}` };
+  return { title: "Hard to build a brand on.", text: `Brandability ${b}, differentiation ${d}: buyers see it as a commodity. Treat it as a product test, or bundle it into a broader brand.` };
 }
 
 // ── Customer ───────────────────────────────────────────────────────────
@@ -681,8 +705,9 @@ export function mount(root, { rerender, params, id }) {
       root.querySelectorAll("[data-toc]").forEach((a) => a.classList.toggle("on", a.dataset.toc === en.target.id.slice(4)));
     }
   }, { rootMargin: "-80px 0px -70% 0px" }) : null;
-  if (io) root.querySelectorAll(".p-sec").forEach((s) => io.observe(s));
-  return () => io?.disconnect();
+  const observe = () => { if (io) { io.disconnect(); root.querySelectorAll(".p-sec").forEach((s) => io.observe(s)); } };
+  observe();
+  return { cleanup: () => io?.disconnect(), refresh: observe };
 }
 
 async function saveCalc(id) {

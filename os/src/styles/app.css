@@ -512,6 +512,7 @@ button.li { border: 0; border-bottom: 1px solid var(--border); background: none;
   .page-head h1 { font-size: 21px; }
 }
 @media (min-width: 901px) { .scrim { display: none !important; } }
+@media (min-width: 641px) { .show-sm { display: none !important; } }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }

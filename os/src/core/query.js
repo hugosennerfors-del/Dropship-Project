@@ -53,6 +53,9 @@ export const SORTS = {
   "budget1000": { label: "Best for £1,000 budget", budgetGBP: 1000, dir: "desc",
     note: "Launch cost plus a £300 ad test must fit in £1,000; ranked by evidence-weighted opportunity." },
   "confidence": { label: "Best evidence", field: "confidence", dir: "desc" },
+  "trend": { label: "Highest trend", field: "trend", dir: "desc" },
+  "gap": { label: "Demand minus competition", score: (r) => (r.demand == null || r.competition == null ? null : r.demand - r.competition), dir: "desc",
+    note: "Demand score minus competition score: high when buyers want more than sellers supply." },
 };
 
 export const AD_TEST_GBP = 300;

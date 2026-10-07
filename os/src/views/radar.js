@@ -1,6 +1,6 @@
 // Opportunity Radar: the week's summary of the database for one market.
 
-import { store, rows } from "../state.js";
+import { store, rows, product } from "../state.js";
 import { esc, attr, int, money, pct, icon, md, isoWeek, STAGE_ORDER, scoreChip, dateLabel } from "../ui/dom.js";
 import { productItem } from "../ui/table.js";
 import { opportunityMap, stageLegend, stageBar } from "../ui/charts.js";
@@ -89,6 +89,11 @@ export function render() {
         <div class="panel-b">${stageBar(stageCounts, rs.length || 1)}</div>
       </section>
 
+      <section class="panel">
+        <div class="panel-h"><h2>Market risks</h2><span class="sub">most common red flags across ${rs.length} products</span></div>
+        <div class="list">${riskRows(rs).map((x) => `<div class="li"><span class="sev sev-${x.severity}"></span><span class="body"><b>${esc(x.title)}</b><small style="white-space:normal">${x.ids.slice(0, 6).map((id) => plink(id)).join(", ")}${x.ids.length > 6 ? ` and ${x.ids.length - 6} more` : ""}</small></span><span class="side"><span class="metric">${x.ids.length}</span></span></div>`).join("") || '<div class="empty">No red flags.</div>'}</div>
+      </section>
+
       <div class="grid g3">
         ${block("Fastest growing", "trend acceleration", q({ sort: "growing" }), (r) => `${r.trendAcceleration > 0 ? "+" : ""}${int(r.trendAcceleration)}%`)}
         ${block("Highest margin", "gross, before ads", q({ sort: "margin" }), (r) => pct(r.margin, 0))}
@@ -119,6 +124,20 @@ export function render() {
       <p class="xs muted">Data generated ${dateLabel(store.dataset.meta.generated)}. ${esc(store.dataset.meta.note)}</p>
     </div>`,
   };
+}
+
+function riskRows(rs) {
+  const by = new Map();
+  for (const r of rs) {
+    const p = product(r.id);
+    for (const f of p?.built?.[store.market]?.scored?._detail?.redFlags || []) {
+      if (!by.has(f.title)) by.set(f.title, { title: f.title, severity: f.severity, ids: [] });
+      const x = by.get(f.title);
+      x.ids.push(r.id);
+      if (f.severity === "critical") x.severity = "critical";
+    }
+  }
+  return [...by.values()].sort((a, b) => (b.severity === "critical") - (a.severity === "critical") || b.ids.length - a.ids.length).slice(0, 6);
 }
 
 function briefBlock() {
