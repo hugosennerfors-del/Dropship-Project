@@ -29,8 +29,21 @@ Supabase (project "E-Comercial")
 
 n8n
 ├── Plan-vy · Intelligence-DB     the page's read/write API (POST, private path)
-└── Plan-vy · Intelligence-sync   loads db/build/supabase-sync.json from GitHub, daily 05:47
+├── Plan-vy · Intelligence-sync   loads db/build/supabase-sync.json from GitHub, daily 05:47
+└── Plan-vy · Research-generator  new research: five ideas for a niche and market, with
+                                  costing and an ad plan, saved in public.product_candidates
 ```
+
+## New research from the search fields
+
+Type a niche or product in the top-bar search (⌘K), the box on Discover, the
+New research page, or ask the chat ("research padel accessories", "gör
+research på hundleksaker"). The search finds what the database already has;
+**Research** runs the Research generator for the current market (the UK is
+sent as `GB`). The ideas appear at once, are saved in Supabase, and count as
+AI estimates until **Analyse** turns one into a scored profile. A run takes
+about half a minute and uses the workflow's OpenAI credits, so nothing starts
+without a click.
 
 The page reads Supabase through the viewer's n8n connector and falls back to
 the snapshot embedded at build time, so it always works.
@@ -67,13 +80,15 @@ the new build into Supabase the next morning, or run it by hand in n8n.
 
 ```
 src/core/         fields (the vocabulary), markets, provenance, economics,
-                  scoring, inherit (UK → SE), ownsales, profile, query, nlq, insights
+                  scoring, inherit (UK → SE), ownsales, profile, query, nlq, insights,
+                  candidates (research-inbox ideas)
 src/chat/         engine (Claude with page tools, or local answers), compose
 src/agents/       brand builder, improvement engine, review analyst,
                   market adapter, scenario commentary, comparison judge,
                   niche scout, weekly brief, inbox profiler
-src/views/        radar, discover, product, trends, niches, compare, chat, data
-src/live.js       Supabase through n8n
+src/views/        radar, discover, research, product, trends, niches, compare, chat, data
+src/live.js       Supabase through n8n (any published workflow, polled to completion)
+src/research.js   new research from the search fields
 src/state.js      the page's data layer
 pipeline/         run.mjs and its stages
 ```

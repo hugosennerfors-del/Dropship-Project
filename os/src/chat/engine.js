@@ -5,7 +5,7 @@
 
 import { store, rows as rowsOf, product, row } from "../state.js";
 import { query, SORTS, niches } from "../core/query.js";
-import { parseQuestion } from "../core/nlq.js";
+import { parseQuestion, researchTopic } from "../core/nlq.js";
 import { schemaForAI } from "../core/fields.js";
 import { MARKETS } from "../core/markets.js";
 import { computeEconomics, scenario, profitAt, breakEvenRevenue, targetRoas } from "../core/economics.js";
@@ -242,6 +242,7 @@ export function localAnswer(text, market) {
     case "niches": ans = C.answerNiches(mrows, spec, ctx, niches); break;
     case "platforms": ans = C.answerPlatforms(mrows, spec, ctx, p.platforms); break;
     case "budget": ans = C.answerBudget(mrows, spec, ctx); break;
+    case "research": ans = C.answerResearch(p.topic, mrows, ctx); break;
     case "product": {
       const id = p.refIds[0] || p.productIds[0];
       const r = mrows.find((x) => x.id === id);
@@ -263,6 +264,16 @@ export async function ask(text, { market, onText, onTrace, signal }) {
   const trace = [];
   const push = (t) => { trace.push(t); onTrace?.(trace.slice()); };
   const userTurn = { role: "user", content: text + contextNote(market) };
+
+  // A request for new research is answered by the page: what the database
+  // already has, and a button that starts the n8n run (it costs credits, so
+  // neither the page nor Claude starts it unasked).
+  if (researchTopic(text)) {
+    const local = localAnswer(text, market);
+    remember(local.ids);
+    session.turns.push(userTurn, { role: "assistant", content: local.text });
+    return { text: local.text, ids: local.ids, trace: local.trace, mode: "local", action: local.action };
+  }
 
   if (store.sample && store.sampleState === "ready") {
     const history = session.turns.slice(-12);

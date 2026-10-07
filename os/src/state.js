@@ -13,6 +13,7 @@ import { resolveProduct } from "./core/inherit.js";
 import { applyOwnSales } from "./core/ownsales.js";
 import { MARKETS, PRIMARY_MARKET } from "./core/markets.js";
 import { liveAvailable, liveRead, liveWrite, MCP_FIX } from "./live.js";
+import { normaliseCandidate } from "./core/candidates.js";
 
 const DB_PREFIX = "intel";
 const listeners = new Set();
@@ -27,6 +28,8 @@ export const store = {
   userProducts: [],       // agent, manual and imported products
   ownSalesRows: [],
   candidates: null,       // live inbox, loaded on demand
+  inboxTotal: 0,          // ideas in public.product_candidates
+  research: { state: "idle" }, // the research run started from a search field (research.js)
   runs: [],
   watch: [],
   compare: [],
@@ -46,6 +49,7 @@ export function init(dataset) {
   store.evidenceIndex = Object.fromEntries(dataset.evidence.map((e) => [e.id, e]));
   store.overlays = { ...(dataset.overlays || {}) };
   store.ownSalesRows = dataset.ownSales?.rows || [];
+  store.inboxTotal = dataset.candidates.length;
   const pref = loadPref();
   if (pref.market && MARKETS[pref.market]) store.market = pref.market;
   if (Array.isArray(pref.compare)) store.compare = pref.compare.slice(0, 5);
@@ -136,6 +140,7 @@ export async function refreshLive() {
     const r = await liveRead({ since: store.dataset.meta.generated });
     applyLive(r);
     store.live = { state: "ready", error: "", at: r.generatedAt, info: { evidenceCount: r.evidenceCount, inbox: r.inbox, lastPipelineRun: r.lastPipelineRun, productIndex: r.productIndex } };
+    if (Number.isFinite(r.inbox?.total)) store.inboxTotal = Math.max(r.inbox.total, store.candidates?.length || 0);
   } catch (e) {
     store.live = { state: "offline", error: MCP_FIX[e?.code] || e?.message || "The live database could not be reached.", at: null };
   }
@@ -167,25 +172,29 @@ function applyLive(r) {
 export async function loadCandidates() {
   if (store.live.state !== "ready") return store.dataset.candidates;
   const r = await liveRead({ since: "9999-01-01T00:00:00Z", candidates: true });
-  store.candidates = (r.candidates || []).map((c) => normaliseCandidate(c));
+  // Ideas from a research run this visit keep their full ad plan; the
+  // database read carries only the hook and angle.
+  const fresh = new Map((store.candidates || []).filter((c) => c.adPlan?.script?.length).map((c) => [c.sourceId || c.id, c.adPlan]));
+  store.candidates = (r.candidates || []).map((c) => {
+    const n = normaliseCandidate(c);
+    const plan = fresh.get(n.sourceId);
+    return plan ? { ...n, adPlan: plan } : n;
+  });
+  store.inboxTotal = store.candidates.length;
   changed("candidates");
   return store.candidates;
 }
 
-function normaliseCandidate(c) {
-  const market = c.country === "GB" ? "UK" : c.country;
-  const i = c.inputs || {};
-  const vat = market === "SE" ? 0.25 : market === "UK" ? 0.2 : 0;
-  const price = Number(i.salePriceInclVat) || null, cost = Number(i.costPerUnitInclVat);
-  let margin = null;
-  if (price) {
-    const revEx = price / (1 + vat);
-    margin = Math.round(((revEx - cost / (1 + vat) - (Number(i.shippingCostPerOrder) || 0) / (1 + vat) - (Number(i.transactionFeePerOrder) || 0)) / revEx) * 1000) / 10;
-  }
-  return { id: c.id, sourceId: c.sourceId, name: c.name, market, currency: { SE: "SEK", UK: "GBP", US: "USD" }[market] || "USD", niche: c.niche, notes: c.notes,
-    price, cost, cpa: Number(i.expectedCpaInclVat) || null, margin, researchDate: c.researchDate, trendSource: c.trendSource, adPlan: c.adPlan || null,
-    status: "AI estimated", analysed: !!c.analysed };
+// Ideas a research run just saved: first in the list, replacing any copy.
+export function addCandidates(fresh) {
+  const base = store.candidates || store.dataset.candidates;
+  const keys = new Set(fresh.map((c) => c.sourceId || c.id));
+  store.candidates = [...fresh, ...base.filter((c) => !keys.has(c.sourceId || c.id))];
+  store.inboxTotal += fresh.length;
+  changed("candidates");
 }
+
+export const allCandidates = () => store.candidates || store.dataset.candidates;
 
 // ── Page storage fallback ──────────────────────────────────────────────
 async function loadPageStore(db) {

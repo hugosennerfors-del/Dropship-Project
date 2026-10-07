@@ -144,6 +144,43 @@ const COMBO_PARTS = [
   { re: /\b(risk)/, key: "risk", score: (r) => (r.risk == null ? null : 100 - r.risk) },
 ];
 
+// "research dog toys", "gör research på hundleksaker", "find new products in
+// padel": a request for new research rather than a question about the
+// database. Returns {topic, market} with the topic in the user's spelling.
+const RESEARCH_RES = [
+  /^(?:run |do |start )?(?:a )?(?:new )?research(?: on| into| about| for)?\s+(.+)$/,
+  /^(?:gor|kor|starta)\s+(?:en )?(?:ny )?research\s+(?:pa|om|inom|kring|for|av)\s+(.+)$/,
+  /^researcha\s+(.+)$/,
+  /^(?:find|discover|generate|get)\s+(?:me\s+)?(?:some\s+)?new\s+(?:product\s+ideas|products|ideas)\s+(?:in|for|within|about|around)\s+(.+)$/,
+  /^(?:hitta|ta fram|sok|generera)\s+(?:mig\s+)?(?:nagra\s+)?nya\s+(?:produktideer|produkter|ideer)\s+(?:inom|for|i|om|kring|pa)\s+(.+)$/,
+];
+const POLITE = /^(?:please|can you|could you|would you|kan du|skulle du|snalla)\s+/;
+const TRAILING_MARKET = /\s+(?:in|for|i|pa)\s+(?:the\s+)?(uk|united kingdom|britain|great britain|storbritannien|england|sweden|sverige)$/;
+
+export function researchTopic(text) {
+  const orig = String(text || "").normalize("NFC").replace(/\s+/g, " ").trim().replace(/[?.!]+$/, "");
+  const folded = fold(orig);
+  // Folding keeps positions for ordinary text, so the topic can be cut from
+  // the original and keep its å, ä and ö.
+  const same = folded.length === orig.length;
+  const polite = folded.match(POLITE);
+  const off = polite ? polite[0].length : 0;
+  const t = folded.slice(off);
+  for (const re of RESEARCH_RES) {
+    const m = t.match(re);
+    if (!m) continue;
+    let topic = m[1];
+    const start = off + m[0].length - m[1].length;
+    let market = null;
+    const tm = topic.match(TRAILING_MARKET);
+    if (tm) { market = /swe|sver/.test(tm[1]) ? "SE" : "UK"; topic = topic.slice(0, tm.index); }
+    const out = (same ? orig.slice(start, start + topic.length) : topic).replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+    if (out.length < 2 || /^(products?|produkter|first|forst|this|that|it|them|dessa|den)$/.test(fold(out))) return null;
+    return { topic: out, market };
+  }
+  return null;
+}
+
 export function parseQuestion(text, ctx = {}) {
   const t = " " + fold(text).replace(/[“”"]/g, " ").replace(/\s+/g, " ") + " ";
   const out = { filters: [], sort: null, limit: null, market: null, budgetGBP: null, within: null,
@@ -314,6 +351,8 @@ export function parseQuestion(text, ctx = {}) {
   if (out.intent === "query" && out.platforms.length >= 2) out.intent = "platforms";
   if (out.intent === "pick" && !out.sort) out.sort = /\b(safe|saker)/.test(t) ? "safest" : "evidence";
   if (out.intent === "budget" && !out.sort) out.sort = "evidence";
+  const research = researchTopic(text);
+  if (research) { out.intent = "research"; out.topic = research.topic; if (research.market) out.market = research.market; }
   return out;
 }
 

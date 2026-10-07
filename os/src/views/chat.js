@@ -5,6 +5,7 @@ import { esc, attr, icon, md, money, pct, scoreChip } from "../ui/dom.js";
 import { ask, session, resetChat, ERROR_COPY } from "../chat/engine.js";
 import { MARKETS } from "../core/markets.js";
 import { plink } from "./shared.js";
+import { startResearch, researchAvailable } from "../research.js";
 
 let busy = null; // AbortController while answering
 const KEY = "planvy-intel-chat";
@@ -27,6 +28,7 @@ const SUGGESTIONS = [
   "Emerging products with strong TikTok potential",
   "Which products have the best long-term brand potential?",
   "Which product would you choose with a £2,000 budget?",
+  "Research padel accessories",
 ];
 
 function stepText(t) {
@@ -48,9 +50,22 @@ function msgHTML(msg) {
     <div class="who">${icon(msg.mode === "claude" ? "spark" : "data", 13)} ${msg.mode === "claude" ? "Claude, using the database" : "Answered from the database"}</div>
     ${msg.trace?.length ? `<div class="steps">${msg.trace.map((t) => `<div class="step">${icon("search", 12)}<span>${esc(stepText(t))}</span></div>`).join("")}</div>` : ""}
     <div class="prose" data-body>${msg.pending && !msg.text ? '<span class="thinking"><i></i><i></i><i></i>&nbsp;Thinking</span>' : md(msg.text, link)}</div>
+    ${msg.action?.kind === "research" ? researchAction(msg.action) : ""}
     ${msg.note ? `<div class="callout">${icon("info", 16)}<span>${esc(msg.note)}</span></div>` : ""}
     ${msg.truncated ? '<p class="xs muted">The answer was cut short. Ask for less at a time.</p>' : ""}
   </div>`;
+}
+
+// The button under a "research X" answer. Research costs credits, so it
+// only starts when you press it.
+function researchAction(a) {
+  const where = a.market === "UK" ? "the UK" : MARKETS[a.market]?.name || a.market;
+  const r = store.research;
+  if (r.state === "running" || (r.state === "done" && r.topic === a.topic)) {
+    return `<div class="row"><a class="btn sm" href="#/research?q=${attr(encodeURIComponent(r.topic))}">${icon("spark", 13)}${r.state === "running" ? `Research on “${esc(r.topic)}” is running: follow it` : `See the new ideas for “${esc(r.topic)}”`}</a></div>`;
+  }
+  if (!researchAvailable()) return '<p class="xs muted">New research needs the n8n connector: open the page on claude.ai and allow n8n.</p>';
+  return `<div class="row"><button class="btn sm primary" data-research="${attr(a.topic)}" data-market="${attr(a.market)}">${icon("spark", 13)}Research “${esc(a.topic)}” in ${esc(where)}</button><span class="xs muted">about 30 seconds · uses your n8n workflow's OpenAI credits</span></div>`;
 }
 
 function sidePanel() {
@@ -129,7 +144,7 @@ export function mount(root, { rerender: rerender0 }) {
         onText: ({ text: t }) => { msg.text = t; const b = body(); if (b) { b.innerHTML = md(t, (id) => plink(id)); scroll(); } },
         onTrace: (tr) => { msg.trace = tr; paintTrace(); },
       });
-      msg.text = res.text; msg.trace = res.trace || msg.trace; msg.mode = res.mode; msg.truncated = res.truncated;
+      msg.text = res.text; msg.trace = res.trace || msg.trace; msg.mode = res.mode; msg.truncated = res.truncated; msg.action = res.action || null;
       if (res.error) msg.note = ERROR_COPY[res.error] || ERROR_COPY.upstream_error;
     } catch (e) {
       if (e?.code === "cancelled") { msg.text = msg.text || e.text || "Stopped."; }
@@ -152,6 +167,13 @@ export function mount(root, { rerender: rerender0 }) {
   root.addEventListener("click", (e) => {
     const s = e.target.closest("[data-suggest]");
     if (s) { send(s.dataset.suggest); return; }
+    const rs = e.target.closest("[data-research]");
+    if (rs) {
+      const r = startResearch(rs.dataset.research, rs.dataset.market);
+      if (!r.ok) { window.__toast?.(r.reason); return; }
+      location.hash = "#/research?q=" + encodeURIComponent(rs.dataset.research);
+      return;
+    }
     if (e.target.closest("[data-act=stop]")) { busy?.abort(); return; }
     if (e.target.closest("[data-act=reset]")) { resetChat(); save(); rerender(); }
   });

@@ -11,6 +11,7 @@ import { STATUS, isVal } from "../../src/core/provenance.js";
 import { resolveProduct } from "../../src/core/inherit.js";
 import { applyOverlays } from "../../src/core/profile.js";
 import { applyOwnSales } from "../../src/core/ownsales.js";
+import { normaliseCandidate } from "../../src/core/candidates.js";
 
 const STRUCTURAL = new Set(["evidence", "inherit"]);
 const PLAIN = new Set(["kind"]);
@@ -84,30 +85,4 @@ function checkBlock(p, scope, block, errors, warnings) {
     if (f.scope === "market" && scope === "core") warnings.push(`${p.id}: ${k} is a market field but sits in core`);
     if (f.scope === "core" && scope !== "core") warnings.push(`${p.id}/${scope}: ${k} is a core field but sits in a market block`);
   }
-}
-
-const CURRENCY = { SE: "SEK", GB: "GBP", UK: "GBP", US: "USD" };
-
-function normaliseCandidate(c, analysedNames) {
-  const market = c.country === "GB" ? "UK" : c.country;
-  const i = c.inputs || {};
-  const currency = CURRENCY[c.country] || "USD";
-  const vat = market === "SE" ? 0.25 : market === "UK" ? 0.2 : 0;
-  const price = i.salePriceInclVat, cost = i.costPerUnitInclVat;
-  let margin = null, profit = null;
-  if (price && cost != null) {
-    const revEx = price / (1 + vat);
-    const costEx = cost / (1 + vat);
-    const ship = (i.shippingCostPerOrder || 0) / (1 + vat);
-    const fees = i.transactionFeePerOrder || 0;
-    margin = Math.round(((revEx - costEx - ship - fees) / revEx) * 1000) / 10;
-    profit = Math.round((revEx - costEx - ship - fees - (i.expectedCpaInclVat || 0) / (1 + vat)) * 100) / 100;
-  }
-  return {
-    id: c.id, sourceId: c.sourceId, name: c.name, market, currency, niche: c.niche, notes: c.notes,
-    price, cost, shipping: i.shippingCostPerOrder, fees: i.transactionFeePerOrder, cpa: i.expectedCpaInclVat,
-    margin, profit, researchDate: c.researchDate, trendSource: c.trendSource, adPlan: c.adPlan || null,
-    status: "AI estimated", analysed: analysedNames.has(String(c.name || "").toLowerCase()),
-    importFile: c.importFile,
-  };
 }

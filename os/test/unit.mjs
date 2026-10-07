@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 import { computeEconomics } from "../src/core/economics.js";
 import { MARKETS } from "../src/core/markets.js";
 import { val } from "../src/core/provenance.js";
-import { parseQuestion } from "../src/core/nlq.js";
+import { parseQuestion, researchTopic } from "../src/core/nlq.js";
+import { fromGenerator, ideasFrom, researchRuns, toCountry } from "../src/core/candidates.js";
 import { query } from "../src/core/query.js";
 import { resolveProduct } from "../src/core/inherit.js";
 import { applyOwnSales } from "../src/core/ownsales.js";
@@ -66,6 +67,41 @@ const near = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
   ok(relaxed.filters.find((f) => f.field === "competition")?.value === 55, "relatively low relaxes the threshold");
   const m = parseQuestion("products under 300 kr", { market: "UK" });
   ok(near(m.filters[0].value, 23.4, 0.1), "kronor converted to pounds in the UK", JSON.stringify(m.filters));
+}
+// Requests for new research, from a search field or the chat.
+{
+  ok(researchTopic("research dog toys")?.topic === "dog toys", "research X");
+  const sv = researchTopic("Gör research på hundleksaker i Sverige");
+  ok(sv?.topic === "hundleksaker" && sv.market === "SE", "Swedish request with a market", JSON.stringify(sv));
+  ok(researchTopic("Kan du hitta nya produkter inom kallbad?")?.topic === "kallbad", "polite Swedish request");
+  const en = researchTopic("Find new products in cold-water swimming for the UK");
+  ok(en?.topic === "cold-water swimming" && en.market === "UK", "English request with a market", JSON.stringify(en));
+  ok(researchTopic("Hitta nya produkter för hundägare")?.topic === "hundägare", "the topic keeps å, ä and ö");
+  ok(researchTopic("Which products should I research first?") === null, "a question about research is not a request");
+  ok(researchTopic("Show products with margin > 60") === null, "an ordinary question is not research");
+  ok(parseQuestion("Research padel accessories", {}).intent === "research", "the parser marks it");
+  ok(toCountry("UK") === "GB" && toCountry("SE") === "SE", "the generator calls the UK GB");
+}
+// A row from the Research generator becomes an inbox idea with honest numbers.
+{
+  const row = { id: "0b9d2f4e-1111-2222-3333-444455556666", name: "Padel grip kit", country: "GB", niche: "padel", cost_per_unit_incl_vat: "6.00",
+    sale_price_incl_vat: "24.00", shipping_cost_per_order: "3.60", transaction_fee_per_order: "0.72", expected_cpa_incl_vat: "9.00", expected_units_per_order: "1",
+    notes: "Grip tape and overgrips", ad_plan: JSON.stringify({ hook: "Your grip is slipping", angle: "Sweaty hands", script: ["0-3 s: close-up"] }), research_date: "2026-10-07" };
+  const c = fromGenerator(row, { executionId: "9", index: 0, country: "GB", niche: "padel", date: "2026-10-07" });
+  ok(c.id === "n8n-0b9d2f4e" && c.sourceId === row.id && c.market === "UK" && c.currency === "GBP", "ids and market match the database read", JSON.stringify(c));
+  // Ex VAT: 20 − 5 − 3 − 0.72 = 11.28 → 56.4 %; less the CPA guess (7.50) = 3.78.
+  ok(near(c.margin, 56.4, 0.05) && near(c.profit, 3.78, 0.01), "margin and profit after the CPA guess", `${c.margin} ${c.profit}`);
+  ok(c.adPlan.hook === "Your grip is slipping" && c.adPlan.script.length === 1, "ad plan read from JSON text");
+  const bare = fromGenerator({ name: "No id yet", cost_per_unit_incl_vat: 6, sale_price_incl_vat: 24 }, { executionId: "9", index: 2, country: "GB", niche: "padel", date: "2026-10-07" });
+  ok(bare.id === "new-9-2" && bare.sourceId === null && bare.niche === "padel", "an unsaved item still gets an id and its topic");
+  const nodes = ["Spara i product_candidates", "Dela upp kandidater"];
+  const out = (name, items) => ({ [name]: [{ data: { main: [items.map((json) => ({ json }))] } }] });
+  ok(ideasFrom(out(nodes[0], [row, row]), nodes).length === 2, "ideas come from the saved rows");
+  const fell = ideasFrom({ ...out(nodes[0], [{ success: true }]), ...out(nodes[1], [{ name: "A" }, { name: "B" }, { name: "C" }]) }, nodes);
+  ok(fell.length === 3 && fell[0].name === "A", "a save step without rows falls back to the ideas before it");
+  ok(ideasFrom({}, nodes).length === 0, "no ideas, no rows");
+  const runs = researchRuns([c, { ...c, id: "b" }, { ...c, id: "c", niche: "dogs", market: "SE", researchDate: "2026-10-01" }]);
+  ok(runs.length === 2 && runs[0].topic === "padel" && runs[0].count === 2, "earlier research grouped by topic, market and day", JSON.stringify(runs));
 }
 // The dataset builds, inherits honestly and applies own sales.
 {

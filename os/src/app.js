@@ -1,13 +1,15 @@
 // Plan-vy Intelligence — the page.
 //
-// Hash routes:  #/radar  #/discover  #/p/<id>  #/trends  #/niches  #/compare
-//               #/chat   #/data?tab=…  #/store/…  (the store workspace)
+// Hash routes:  #/radar  #/discover  #/research?q=…  #/p/<id>  #/trends
+//               #/niches  #/compare  #/chat  #/data?tab=…  #/store/…
 
 import { init, connect, store, onChange, rows, setMarket, dataSourceLabel } from "./state.js";
 import { esc, attr, icon, scoreChip } from "./ui/dom.js";
 import { MARKETS } from "./core/markets.js";
+import { startResearch, researchAvailable } from "./research.js";
 import * as radar from "./views/radar.js";
 import * as discover from "./views/discover.js";
+import * as research from "./views/research.js";
 import * as productView from "./views/product.js";
 import * as trends from "./views/trends.js";
 import * as nichesView from "./views/niches.js";
@@ -17,10 +19,10 @@ import * as data from "./views/data.js";
 
 const NAV = [
   { group: "Research", items: [
-    ["#/radar", "Radar", "radar"], ["#/discover", "Discover", "search"], ["#/trends", "Early trends", "trend"],
-    ["#/niches", "Niches", "niche"], ["#/compare", "Compare", "compare"], ["#/chat", "Ask the database", "chat"],
+    ["#/radar", "Radar", "radar"], ["#/discover", "Discover", "search"], ["#/research", "New research", "spark"],
+    ["#/trends", "Early trends", "trend"], ["#/niches", "Niches", "niche"], ["#/compare", "Compare", "compare"], ["#/chat", "Ask the database", "chat"],
   ] },
-  { group: "Data", items: [["#/data", "Data and sources", "data"], ["#/data?tab=inbox", "Research inbox", "inbox"]] },
+  { group: "Data", items: [["#/data", "Data and sources", "data"]] },
   { group: "Store (Sweden)", items: [
     ["#/store/", "Overview", "store"], ["#/store/products", "Products", "box"], ["#/store/kassa", "Kassa", "cash"],
     ["#/store/test", "Test", "flask"], ["#/store/risk", "Risk", "shield"], ["#/store/kalender", "Kalender", "calendar"],
@@ -29,7 +31,7 @@ const NAV = [
 ];
 
 const ROUTES = {
-  radar: radar, discover: discover, trends: trends, niches: nichesView, compare: compare, chat: chat, data: data,
+  radar: radar, discover: discover, research: research, trends: trends, niches: nichesView, compare: compare, chat: chat, data: data,
 };
 
 function parse() {
@@ -46,6 +48,8 @@ let current = { key: "", root: null, cleanup: null, refresh: null };
 // listeners and module state survive; navigating creates a new root.
 function render(force) {
   const { path, parts, params } = parse();
+  // The research inbox moved into New research.
+  if (path === "/data" && params.get("tab") === "inbox") { history.replaceState(null, "", "#/research"); return render(force); }
   const storeMode = parts[0] === "store";
   document.getElementById("legacyRoot").hidden = !storeMode;
   document.getElementById("os-main").hidden = storeMode;
@@ -100,7 +104,7 @@ function renderRail(path, params) {
     return path === h || path.startsWith(h + "/");
   };
   const src = dataSourceLabel();
-  const count = { "#/data?tab=inbox": store.live.info?.inbox?.total ?? store.dataset.candidates.length, "#/compare": store.compare.length || "" };
+  const count = { "#/research": store.research.state === "running" ? "…" : store.inboxTotal, "#/compare": store.compare.length || "" };
   document.getElementById("os-rail").innerHTML = `
     <div class="brand"><span class="brand-mark">${icon("radar", 14)}</span><span class="brand-name">Plan-vy <span>Intelligence</span></span></div>
     <div class="rail-scroll">${NAV.map((g) => `<nav class="nav nav-group" aria-label="${attr(g.group)}"><div class="nav-label">${esc(g.group)}</div>
@@ -121,26 +125,32 @@ function renderTop(parts, storeMode, title) {
     <nav class="crumbs" aria-label="Breadcrumbs">${storeMode ? `<a href="#/radar">Research</a><span>/</span><b>Store</b>`
       : `${crumbs.map(([h, l]) => `<a href="${h}">${esc(l)}</a><span>/</span>`).join("")}<b>${esc(label)}</b>`}</nav>
     <span class="spacer"></span>
-    ${storeMode ? "" : `<button class="cmdk" id="os-cmdk" aria-label="Search products">${icon("search", 14)}<span>Search products</span><kbd>⌘K</kbd></button>
-    <div class="seg" role="group" aria-label="Market">${Object.values(MARKETS).map((x) => `<button data-set-market="${x.code}" aria-pressed="${x.code === m}" aria-label="${x.name}">${x.code === "UK" ? 'UK<span class="hide-sm">&nbsp;· £</span>' : 'S<span class="hide-sm">weden · kr</span><span class="show-sm">E</span>'}</button>`).join("")}</div>`}`;
+    ${storeMode ? "" : `<button class="cmdk" id="os-cmdk" aria-label="Search or research">${icon("search", 14)}<span>Search or research</span><kbd>⌘K</kbd></button>
+    <div class="seg" role="group" aria-label="Market">${Object.values(MARKETS).map((x) => `<button data-set-market="${x.code}" aria-pressed="${x.code === m}" aria-label="${x.name}"><span>${x.code === "UK" ? 'UK<span class="hide-sm">&nbsp;· £</span>' : 'S<span class="hide-sm">weden · kr</span><span class="show-sm">E</span>'}</span></button>`).join("")}</div>`}`;
 }
 
 // ── Command palette ────────────────────────────────────────────────────
 function openPalette() {
   const ov = document.createElement("div");
   ov.className = "overlay";
-  ov.innerHTML = `<div class="palette" role="dialog" aria-label="Search products"><input id="pal-q" type="text" placeholder="Search products, niches or pages…" autocomplete="off"><div class="list" id="pal-list"></div></div>`;
+  ov.innerHTML = `<div class="palette" role="dialog" aria-label="Search or research"><input id="pal-q" type="text" placeholder="Search products, niches or pages, or research something new…" autocomplete="off"><div class="list" id="pal-list"></div></div>`;
   document.body.appendChild(ov);
   const q = ov.querySelector("#pal-q"), list = ov.querySelector("#pal-list");
   let sel = 0, items = [];
-  const pages = [["Radar", "#/radar"], ["Discover", "#/discover"], ["Early trends", "#/trends"], ["Niches", "#/niches"], ["Compare", "#/compare"], ["Ask the database", "#/chat"], ["Data and sources", "#/data"], ["Research inbox", "#/data?tab=inbox"], ["Store: Kassa", "#/store/kassa"], ["Store: Risk", "#/store/risk"]];
+  const pages = [["Radar", "#/radar"], ["Discover", "#/discover"], ["New research", "#/research"], ["Early trends", "#/trends"], ["Niches", "#/niches"], ["Compare", "#/compare"], ["Ask the database", "#/chat"], ["Data and sources", "#/data"], ["Store: Kassa", "#/store/kassa"], ["Store: Risk", "#/store/risk"]];
+  const where = store.market === "UK" ? "the UK" : MARKETS[store.market].name;
   const paint = () => {
-    const t = q.value.trim().toLowerCase();
+    const raw = q.value.trim(), t = raw.toLowerCase();
     const prods = rows().filter((r) => !t || `${r.name} ${r.niche} ${r.category}`.toLowerCase().includes(t)).sort((a, b) => b.opportunity - a.opportunity).slice(0, 8)
       .map((r) => ({ href: `#/p/${r.id}`, html: `<span class="body"><b>${esc(r.name)}</b><small>${esc(r.niche)} · ${esc(r.stage)}</small></span>${scoreChip(r.opportunity)}` }));
     const pg = pages.filter(([l]) => !t || l.toLowerCase().includes(t)).slice(0, 5).map(([l, h]) => ({ href: h, html: `<span class="body"><b>${esc(l)}</b><small>Page</small></span>` }));
-    const ask = t ? [{ href: "#/chat", ask: q.value.trim(), html: `<span class="body"><b>Ask: “${esc(q.value.trim())}”</b><small>Search the database in plain language</small></span>${icon("chat", 16)}` }] : [];
-    items = [...prods, ...pg, ...ask];
+    // New research from the search field: n8n researches the text as a niche.
+    const res = raw.length >= 2 ? [{ research: raw, html: `<span class="body"><b>Research “${esc(raw)}” in ${esc(where)}</b><small>${researchAvailable()
+      ? store.research.state === "running" ? `Research on “${esc(store.research.topic)}” is running; this opens it` : "n8n finds five new product ideas with costing and an ad plan · about 30 s"
+      : "Needs the n8n connector: open the page on claude.ai"}</small></span>${icon("spark", 16)}` }] : [];
+    const ask = raw ? [{ href: "#/chat", ask: raw, html: `<span class="body"><b>Ask: “${esc(raw)}”</b><small>Search the database in plain language</small></span>${icon("chat", 16)}` }] : [];
+    // With no match in the database, researching it is the likely intent.
+    items = prods.length ? [...prods, ...pg, ...res, ...ask] : [...res, ...pg, ...ask];
     sel = Math.min(sel, Math.max(0, items.length - 1));
     list.innerHTML = items.map((x, i) => `<button class="li" data-i="${i}" aria-selected="${i === sel}">${x.html}</button>`).join("") || '<div class="empty">Nothing found.</div>';
   };
@@ -148,7 +158,13 @@ function openPalette() {
     const x = items[i];
     if (!x) return;
     close();
-    if (x.ask) location.hash = "#/discover?q=" + encodeURIComponent(x.ask);
+    if (x.research) {
+      if (store.research.state !== "running") {
+        const r = startResearch(x.research, store.market);
+        if (!r.ok) toast(r.reason);
+      }
+      location.hash = "#/research?q=" + encodeURIComponent(store.research.state === "running" ? store.research.topic : x.research);
+    } else if (x.ask) location.hash = "#/discover?q=" + encodeURIComponent(x.ask);
     else location.hash = x.href;
   };
   const close = () => { ov.remove(); document.removeEventListener("keydown", key, true); };
@@ -235,7 +251,7 @@ function boot() {
       // Live data and edits re-render the current view in place.
       if (!document.getElementById("legacyRoot").hidden) { renderRail(parse().path, parse().params); return; }
       if (what === "market") { render(true); return; }
-      else if (["connect", "live", "overlay", "products", "runs", "settings", "pagestore", "candidates", "watch", "compare"].includes(what)) {
+      else if (["connect", "live", "overlay", "products", "runs", "settings", "pagestore", "candidates", "watch", "compare", "research"].includes(what)) {
         const busy = document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName) && current.root?.contains(document.activeElement);
         if (!busy) render();
         else renderRail(parse().path, parse().params);

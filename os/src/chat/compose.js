@@ -4,7 +4,7 @@
 
 import { query, SORTS, AD_TEST_GBP } from "../core/query.js";
 import { FIELD } from "../core/fields.js";
-import { opWord } from "../core/nlq.js";
+import { opWord, fold } from "../core/nlq.js";
 import { MARKETS } from "../core/markets.js";
 
 const cur = (r) => r.currency || "GBP";
@@ -214,6 +214,7 @@ export const HELP = [
   "- *Emerging products with high margin and low competition*",
   "- *Top 5 pet products for TikTok*",
   "Then ask follow-ups: *Which one is the safest?* · *Why is number 3 better than number 1?* · *Which would you choose with £2,000?* · *Show me the unit economics*",
+  "For something the database does not cover yet: *Research padel accessories* or *Gör research på hundleksaker*. n8n then finds five new ideas.",
 ].join("\n");
 
 // Products to stay away from, with the reasons. With a trend filter this
@@ -301,4 +302,19 @@ export function answerPlatforms(rows, spec, ctx, platforms) {
   }
   lines.push("Channel scores are AI estimates from the product's format (visual demo, impulse, giftability) and the UK audience; ad-library and creator data are not connected yet.");
   return { text: lines.join("\n"), ids: [...new Set(ids)] };
+}
+
+// "Research dog toys": what the database already has on the topic, and an
+// action that starts the n8n Research generator (the chat shows a button;
+// research costs credits, so it never starts on its own).
+export function answerResearch(topic, rows, ctx) {
+  const name = MARKETS[ctx.market].name;
+  const ws = fold(topic).split(/[\s,]+/).filter((w) => w.length > 1);
+  const found = rows.filter((r) => { const h = fold(`${r.name} ${r.niche || ""} ${r.microNiche || ""} ${r.category || ""} ${r.subcategory || ""}`); return ws.every((w) => h.includes(w)); })
+    .sort((a, b) => b.opportunity - a.opportunity);
+  const lines = found.length
+    ? [`${found.length} analysed ${name} product${found.length === 1 ? "" : "s"} already match “${topic}”:`, ...found.slice(0, 5).map((r, i) => `${i + 1}. [[${r.id}]] — opportunity ${r.opportunity}, margin ${p1(r.margin)}, ${m(r.profit, cur(r))}/order`)]
+    : [`Nothing in the ${name} database matches “${topic}” yet.`];
+  lines.push("", `New research runs your n8n Research generator: five product ideas for “${topic}” in ${name}, with costing and an ad plan, saved to Supabase. Their numbers are a language model's guesses until you analyse one.`);
+  return { text: lines.join("\n"), ids: found.slice(0, 5).map((r) => r.id), action: { kind: "research", topic, market: ctx.market } };
 }

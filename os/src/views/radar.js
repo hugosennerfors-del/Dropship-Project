@@ -48,7 +48,7 @@ export function render() {
       </header>
 
       <section class="panel stats">
-        <div class="stat"><span class="k">Products in ${esc(cfg.name)}</span><span class="v">${rs.length}</span><span class="d">${store.dataset.candidates.length} more ideas in the inbox</span></div>
+        <div class="stat"><span class="k">Products in ${esc(cfg.name)}</span><span class="v">${rs.length}</span><span class="d">${store.inboxTotal} more ideas under <a href="#/research">New research</a></span></div>
         <div class="stat"><span class="k">Profitable at est. CAC</span><span class="v">${profitable}</span><span class="d">after returns and ads</span></div>
         <div class="stat"><span class="k">Early stage</span><span class="v">${early}</span><span class="d">emerging or early growth</span></div>
         <div class="stat"><span class="k">With proof of sales</span><span class="v">${proven}</span><span class="d">strong or medium commercial evidence</span></div>

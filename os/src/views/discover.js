@@ -9,6 +9,7 @@ import { parseQuestion } from "../core/nlq.js";
 import { filterLabel } from "../chat/compose.js";
 import { MARKETS } from "../core/markets.js";
 import { session } from "../chat/engine.js";
+import { startResearch, researchAvailable } from "../research.js";
 
 const NUMERIC = [
   { field: "price", op: ">=", label: "Price from", money: true },
@@ -57,7 +58,8 @@ function results(market) {
     ${SORTS[state.sort]?.note && !state.colSort ? `<div class="panel-b xs muted" style="padding-block:8px;border-bottom:1px solid var(--border)">${esc(sortLabel)}: ${esc(SORTS[state.sort].note)}</div>` : ""}
     ${productTable(res.rows, { sortable: true, sortKey: state.colSort || (SORTS[state.sort]?.field ?? null), sortDir: state.colSort ? state.colDir : (SORTS[state.sort]?.dir || "desc"), compare: true, rank: true,
       columns: ["opportunity", "stage", "price", "margin", "profit", "demand", "trend", "competition", "risk", "confidence"],
-      empty: "No products match all filters. Remove the strictest one (the chips above) or ask the chat for the closest matches." })}`;
+      empty: "No products match all filters. Remove the strictest one (the chips above) or ask the chat for the closest matches." })}
+    ${!res.total && state.nl && researchAvailable() ? `<div class="panel-b row" style="border-top:1px solid var(--border);justify-content:space-between"><span class="small muted">Nothing in the database fits “${esc(state.nl)}”. n8n can research it as a new niche.</span><button class="btn sm primary" data-act="research">${icon("spark", 13)}Research it in ${esc(market === "UK" ? "the UK" : MARKETS[market].name)}</button></div>` : ""}`;
 }
 
 const get = (field, op) => state.filters.find((f) => f.field === field && f.op === op)?.value;
@@ -86,6 +88,7 @@ export function render(params) {
         <label for="nl" class="sr">Describe the products you want</label>
         <input id="nl" type="search" value="${attr(state.nl)}" placeholder="e.g. margin over 60, price under £80, low competition, good for TikTok" style="flex:1;border:0;box-shadow:none;height:34px;font-size:14px">
         <button class="btn primary" type="submit">Apply</button>
+        <button class="btn" type="button" data-act="research"${researchAvailable() ? "" : " disabled"} title="${attr(researchAvailable() ? "Have n8n research the text as a niche: five new product ideas with costing and an ad plan" : "New research needs the n8n connector")}">${icon("spark", 14)}<span class="hide-sm">Research new</span></button>
       </form>
 
       <section class="panel">
@@ -198,6 +201,14 @@ export function mount(root, { rerender }) {
       e.stopPropagation();
       if (!toggleCompare(c.dataset.compare)) window.__toast?.("You can compare up to five products.");
       paint(); return;
+    }
+    if (t.closest("[data-act=research]")) {
+      const text = (root.querySelector("#nl")?.value || state.nl || "").trim();
+      if (!text) { window.__toast?.("Write a niche or product in the box first, then research it."); root.querySelector("#nl")?.focus(); return; }
+      const r = startResearch(text, m());
+      if (!r.ok) { window.__toast?.(r.reason); return; }
+      location.hash = "#/research?q=" + encodeURIComponent(text);
+      return;
     }
     if (t.closest("[data-act=ask]")) {
       const res = query(rows(m()), spec());

@@ -1,19 +1,18 @@
 // Data: where every number comes from. Pipeline layers, the live database,
-// evidence, the research inbox, connectors, your edits and settings.
+// evidence, connectors, your edits and settings. Research ideas live under
+// New research (views/research.js).
 
-import { store, rows, product, setOverlay, saveSettings, refreshLive, loadCandidates, archiveUserProduct, changed } from "../state.js";
-import { esc, attr, int, pct, money, icon, glyph, statusPill, dateLabel, scoreChip } from "../ui/dom.js";
+import { store, rows, product, setOverlay, saveSettings, refreshLive, archiveUserProduct } from "../state.js";
+import { esc, attr, int, money, icon, glyph, statusPill, dateLabel } from "../ui/dom.js";
 import { FIELD } from "../core/fields.js";
 import { MARKETS } from "../core/markets.js";
 import { CONNECTOR_STATUS } from "../core/connectors.js";
 import { EVIDENCE_LEVELS } from "../core/provenance.js";
-import { runProfiler } from "../agents/index.js";
 import { LIVE } from "../live.js";
-import { provenanceLegend, aiUnavailableNote } from "./shared.js";
-import { errCopy } from "./radar.js";
+import { provenanceLegend } from "./shared.js";
 
-const TABS = [["overview", "Overview"], ["evidence", "Evidence"], ["inbox", "Research inbox"], ["connectors", "Connectors"], ["edits", "Your edits"], ["settings", "Settings"]];
-let ui = { evLevel: "", evKind: "", evMarket: "", evQ: "", inboxMarket: "", inboxQ: "", profiling: {}, inboxState: "idle", exportMsg: "" };
+const TABS = [["overview", "Overview"], ["evidence", "Evidence"], ["connectors", "Connectors"], ["edits", "Your edits"], ["settings", "Settings"]];
+let ui = { evLevel: "", evKind: "", evMarket: "", evQ: "", exportMsg: "" };
 
 export function render(params) {
   const tab = params?.get?.("tab") || "overview";
@@ -25,8 +24,8 @@ export function render(params) {
         <h1>Data and sources</h1>
         <p>Every value carries a status, and every estimate cites its evidence. This is where the data comes from, how it moves through the pipeline and what you have changed.</p>
       </div>${provenanceLegend()}</header>
-      <nav class="tabs" role="tablist">${TABS.map(([k, l]) => `<a href="#/data?tab=${k}" role="tab" aria-selected="${tab === k}">${l}${k === "inbox" ? ` <span class="muted mono xs">${store.live.info?.inbox?.total ?? store.dataset.candidates.length}</span>` : ""}</a>`).join("")}</nav>
-      ${({ overview, evidence, inbox, connectors, edits, settings })[tab]?.() || overview()}
+      <nav class="tabs" role="tablist">${TABS.map(([k, l]) => `<a href="#/data?tab=${k}" role="tab" aria-selected="${tab === k}">${l}</a>`).join("")}</nav>
+      ${({ overview, evidence, connectors, edits, settings })[tab]?.() || overview()}
     </div>`,
   };
 }
@@ -40,7 +39,7 @@ function overview() {
   return `
     <section class="panel"><div class="panel-h"><h2>Pipeline</h2><span class="sub">each layer is kept; adding data never overwrites an earlier analysis</span></div>
       <div class="layers">
-        <div class="layer"><span class="n">${ds.evidence.length}</span><span class="t">Raw data</span><small>Evidence records, ${ds.candidates.length} inbox ideas, your store's sales</small></div>
+        <div class="layer"><span class="n">${ds.evidence.length}</span><span class="t">Raw data</span><small>Evidence records, ${int(store.inboxTotal)} <a href="#/research">research ideas</a>, your store's sales</small></div>
         <div class="layer"><span class="n">${ds.products.length}</span><span class="t">Processed</span><small>Validated records, market inheritance resolved, your edits applied</small></div>
         <div class="layer"><span class="n">${ds.products.length + store.userProducts.length}</span><span class="t">AI analysis</span><small>Versioned analyses with a status on every value</small></div>
         <div class="layer"><span class="n">${uk + se}</span><span class="t">Scores</span><small>Opportunity, risk, confidence, stage, red flags</small></div>
@@ -117,33 +116,6 @@ function evidence() {
   </section>`;
 }
 
-function inbox() {
-  const cands = store.candidates || store.dataset.candidates;
-  const q = ui.inboxQ.toLowerCase();
-  const list = cands.filter((c) => (!ui.inboxMarket || c.market === ui.inboxMarket) && (!q || `${c.name} ${c.niche} ${c.notes}`.toLowerCase().includes(q)));
-  const markets = [...new Set(cands.map((c) => c.market))];
-  const profiled = new Map(store.userProducts.filter((p) => p.fromCandidate).map((p) => [p.fromCandidate, p.id]));
-  return `
-    <div class="callout">${icon("info", 16)}<span>These ${cands.length} ideas come from the n8n Research generator (table <code>product_candidates</code> in Supabase). Their prices, costs and CPA are a language model's guesses, not quotes, so they stay out of the rankings until analysed. “Analyse” writes an AI profile into the database, labelled as AI estimates.</span></div>
-    ${aiUnavailableNote()}
-    <section class="panel">
-      <div class="panel-b row" style="gap:10px">
-        <label class="field" style="flex:2 1 220px"><span>Search</span><input id="inboxQ" type="search" value="${attr(ui.inboxQ)}" placeholder="Name, niche or note"></label>
-        <label class="field"><span>Market</span><select id="inboxMarket"><option value="">All</option>${markets.map((k) => `<option${ui.inboxMarket === k ? " selected" : ""}>${esc(k)}</option>`).join("")}</select></label>
-        ${store.live.state === "ready" ? `<button class="btn sm" data-act="inbox-live" style="align-self:flex-end">${ui.inboxState === "loading" ? "Loading…" : store.candidates ? "Reload from Supabase" : "Load live from Supabase"}</button>` : ""}
-      </div>
-      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Idea</th><th>Market</th><th class="r">Price</th><th class="r">Margin</th><th class="hide-sm">Researched</th><th class="r"></th></tr></thead><tbody>
-      ${list.slice(0, 200).map((c) => {
-        const pid = profiled.get(c.id);
-        const st = ui.profiling[c.id];
-        return `<tr><td><div class="pname" style="min-width:220px"><b style="font-weight:500">${esc(c.name)}</b><small>${esc(c.niche || "")}</small></div>${c.notes ? `<div class="xs muted" style="max-width:56ch;margin-top:2px">${esc(String(c.notes).slice(0, 160))}${String(c.notes).length > 160 ? "…" : ""}</div>` : ""}</td>
-          <td>${esc(c.market)}</td><td class="r metric">${money(c.price, c.currency)}</td><td class="r metric">${pct(c.margin, 0)}</td><td class="hide-sm xs muted">${esc(c.researchDate || "")}</td>
-          <td class="r">${pid ? `<a class="btn sm" href="#/p/${attr(pid)}">Open profile</a>` : st === "running" ? '<span class="thinking"><i></i><i></i><i></i></span>' : st && st !== "done" ? `<span class="xs" style="color:var(--bad)">${esc(st)}</span>` : store.sampleState === "ready" && ["UK", "SE"].includes(c.market) ? `<button class="btn sm" data-profile="${attr(c.id)}">${icon("spark", 13)}Analyse</button>` : '<span class="xs muted">—</span>'}</td></tr>`;
-      }).join("")}</tbody></table></div>
-      <div class="panel-b xs muted" style="border-top:1px solid var(--border)">${list.length} ideas${list.length > 200 ? ", first 200 shown" : ""}. US ideas can be read but not analysed: the tool covers the UK and Sweden.</div>
-    </section>`;
-}
-
 function connectors() {
   const list = store.dataset.connectors;
   return `<section class="panel"><div class="list">${list.map((c) => `<div class="li" style="align-items:flex-start">
@@ -163,7 +135,7 @@ function edits() {
       return `<div class="li"><span class="body"><b>${field === "*" ? `AI ${esc(MARKETS[scope]?.name || scope)} analysis` : `${esc(FIELD[field]?.label || field)}`} · <a href="#/p/${attr(pid)}" style="color:inherit">${esc(name.split(/:\s/)[0])}</a></b><small>${esc(scope)}${x.note ? ` · ${esc(x.note)}` : ""}${x.at ? ` · ${dateLabel(x.at)}` : ""}</small></span>${statusPill(x.s, true)}<button class="btn sm ghost" data-unoverlay="${attr(k)}">Undo</button></div>`;
     }).join("") || '<div class="empty">No edits yet. Open a product and use the calculator or “Correct or verify a value”.</div>'}</div></section>
     <section class="panel"><div class="panel-h"><h3>Products added by agents or you</h3><span class="sub">${agentProducts.length}</span></div>
-    <div class="list">${agentProducts.map((p) => `<div class="li"><span class="body"><b><a href="#/p/${attr(p.id)}" style="color:inherit">${esc(p.core?.name?.v || p.id)}</a></b><small>${esc(p.source)} · ${esc(Object.keys(p.markets || {}).join(", "))}${p.createdAt ? ` · ${dateLabel(p.createdAt)}` : ""}</small></span><button class="btn sm ghost" data-archive="${attr(p.id)}">Archive</button></div>`).join("") || '<div class="empty">None yet. Analyse an idea in the research inbox to add one.</div>'}</div></section>`;
+    <div class="list">${agentProducts.map((p) => `<div class="li"><span class="body"><b><a href="#/p/${attr(p.id)}" style="color:inherit">${esc(p.core?.name?.v || p.id)}</a></b><small>${esc(p.source)} · ${esc(Object.keys(p.markets || {}).join(", "))}${p.createdAt ? ` · ${dateLabel(p.createdAt)}` : ""}</small></span><button class="btn sm ghost" data-archive="${attr(p.id)}">Archive</button></div>`).join("") || '<div class="empty">None yet. Analyse an idea under <a href="#/research">New research</a> to add one.</div>'}</div></section>`;
 }
 
 const SETTING_FIELDS = [
@@ -216,7 +188,7 @@ async function exportFile(kind) {
 export function mount(root, { rerender }) {
   root.addEventListener("input", (e) => {
     const id = e.target.id;
-    if (id === "evQ" || id === "inboxQ") {
+    if (id === "evQ") {
       ui[id] = e.target.value;
       clearTimeout(ui._t);
       ui._t = setTimeout(() => { const pos = e.target.selectionStart; rerender(); const el = root.querySelector("#" + id); if (el) { el.focus(); try { el.setSelectionRange(pos, pos); } catch { /* search inputs */ } } }, 250);
@@ -224,7 +196,7 @@ export function mount(root, { rerender }) {
   });
   root.addEventListener("change", (e) => {
     const id = e.target.id;
-    if (["evLevel", "evKind", "evMarket", "inboxMarket"].includes(id)) { ui[id] = e.target.value; rerender(); }
+    if (["evLevel", "evKind", "evMarket"].includes(id)) { ui[id] = e.target.value; rerender(); }
   });
   root.addEventListener("submit", async (e) => {
     const code = e.target.dataset.settings;
@@ -250,24 +222,5 @@ export function mount(root, { rerender }) {
     if (un) { const r = await setOverlay(un.dataset.unoverlay, null); window.__toast?.(r.ok ? "Removed; the analysis value is back." : r.reason); rerender(); return; }
     const ar = t.closest("[data-archive]");
     if (ar) { const r = await archiveUserProduct(ar.dataset.archive); window.__toast?.(r.ok ? "Archived. It stays in the database history." : r.reason); rerender(); return; }
-    if (t.closest("[data-act=inbox-live]")) {
-      ui.inboxState = "loading"; rerender();
-      try { await loadCandidates(); ui.inboxState = "idle"; } catch (err) { ui.inboxState = "idle"; window.__toast?.(err?.message || "The inbox could not be loaded."); }
-      rerender(); return;
-    }
-    const pf = t.closest("[data-profile]");
-    if (pf) {
-      const id = pf.dataset.profile;
-      const cand = (store.candidates || store.dataset.candidates).find((c) => c.id === id);
-      if (!cand) return;
-      ui.profiling[id] = "running"; rerender();
-      try {
-        const res = await runProfiler(cand);
-        ui.profiling[id] = "done";
-        window.__toast?.(res.saved ? "AI profile saved to the database." : "AI profile added for this visit; it could not be saved.");
-        changed("products");
-      } catch (err) { ui.profiling[id] = errCopy(err); }
-      rerender();
-    }
   });
 }

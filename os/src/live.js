@@ -37,30 +37,46 @@ async function tool(name, input, retry) {
   }
 }
 
+export const mcpReady = () => !!mcpRef;
+
+const RUNNING = ["running", "new", "waiting"];
+
+// Start a published workflow through the viewer's n8n connector and wait
+// for it. Resolves with {executionId, runData} for the nodes named; rejects
+// with {code, message}, or {code: "still_running", executionId} when the
+// deadline passes first (pass executionId back in to keep waiting).
+export async function runWorkflow({ workflowId, trigger, body, nodes, onWait, deadlineMs = 90000, executionId }) {
+  if (!mcpRef) throw { code: "not_connected", message: "The n8n connector is not available in this view." };
+  let id = executionId;
+  if (!id) {
+    const started = await tool("execute_workflow", {
+      workflowId,
+      executionMode: "production",
+      triggerNodeName: trigger,
+      inputs: { webhookData: { method: "POST", body } },
+    }, false);
+    id = started?.payload?.executionId;
+    if (!id) throw { code: "tool_error", message: "n8n did not return an execution id." };
+  }
+  let status = "running";
+  const t0 = Date.now();
+  for (let i = 0; Date.now() - t0 < deadlineMs; i++) {
+    await sleep(i < 3 ? 700 : i < 8 ? 1200 : 2500);
+    const st = await tool("get_workflow_execution", { workflowId, executionId: String(id), includeData: false }, true);
+    status = String(st?.payload?.execution?.status || "running");
+    if (!RUNNING.includes(status)) break;
+    onWait?.(Math.round((Date.now() - t0) / 1000), id);
+  }
+  if (RUNNING.includes(status)) throw { code: "still_running", executionId: id, message: "n8n is still working on it." };
+  if (status !== "success") throw { code: "tool_error", executionId: id, message: `The workflow ended as “${status}”.` };
+  const full = await tool("get_workflow_execution", { workflowId, executionId: String(id), includeData: true, nodeNames: nodes }, true);
+  return { executionId: id, runData: full?.payload?.data?.resultData?.runData || {} };
+}
+
 // One call to the Intelligence-DB workflow. Resolves with the SQL function's
 // result or rejects with {code, message}.
 export async function liveCall(body, { onWait } = {}) {
-  if (!mcpRef) throw { code: "not_connected", message: "The n8n connector is not available in this view." };
-  const started = await tool("execute_workflow", {
-    workflowId: LIVE.workflowId,
-    executionMode: "production",
-    triggerNodeName: LIVE.trigger,
-    inputs: { webhookData: { method: "POST", body } },
-  }, false);
-  const id = started?.payload?.executionId;
-  if (!id) throw { code: "tool_error", message: "n8n did not return an execution id." };
-  let status = "running";
-  const t0 = Date.now();
-  for (let i = 0; i < 40; i++) {
-    await sleep(i < 3 ? 700 : i < 8 ? 1200 : 2500);
-    const st = await tool("get_workflow_execution", { workflowId: LIVE.workflowId, executionId: String(id), includeData: false }, true);
-    status = String(st?.payload?.execution?.status || "running");
-    if (!["running", "new", "waiting"].includes(status)) break;
-    onWait?.(Math.round((Date.now() - t0) / 1000));
-  }
-  if (status !== "success") throw { code: "tool_error", message: `The database call ended as “${status}”.` };
-  const full = await tool("get_workflow_execution", { workflowId: LIVE.workflowId, executionId: String(id), includeData: true, nodeNames: LIVE.nodes }, true);
-  const runData = full?.payload?.data?.resultData?.runData || {};
+  const { runData } = await runWorkflow({ workflowId: LIVE.workflowId, trigger: LIVE.trigger, body, nodes: LIVE.nodes, onWait });
   const run = (runData.Svar || runData.Fel || [])[0];
   const item = run?.data?.main?.[0]?.[0]?.json;
   if (!item) throw { code: "tool_error", message: "The database call returned nothing." };
@@ -72,6 +88,7 @@ export const liveRead = (params) => liveCall({ op: "read", params });
 export const liveWrite = (action, payload) => liveCall({ op: "write", action, payload });
 
 export const MCP_FIX = {
+  not_connected: "Open the page on claude.ai and allow the n8n connector when it asks.",
   server_not_connected: "Connect n8n under claude.ai → Settings → Connectors to use the live database.",
   needs_reauth: "Reconnect n8n under claude.ai → Settings → Connectors.",
   not_in_manifest: "Allow the n8n connector when the page asks.",
