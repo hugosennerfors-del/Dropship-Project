@@ -30,6 +30,9 @@ export const store = {
   candidates: null,       // live inbox, loaded on demand
   inboxTotal: 0,          // ideas in public.product_candidates
   research: { state: "idle" }, // the research run started from a search field (research.js)
+  // Brand Builder and Shopify (shopify/brands.js): saved brands, store
+  // connections (never tokens), publish jobs and today's AI generations.
+  shopify: { state: "idle", error: "", connections: [], brands: [], jobs: [], generations: null, jobDetail: {}, at: null },
   runs: [],
   watch: [],
   compare: [],

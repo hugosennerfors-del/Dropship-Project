@@ -15,7 +15,7 @@ const shots = process.argv.includes("--shots");
 const outDir = process.env.SHOTS || "/tmp";
 
 const browser = await chromium.launch();
-const routes = ["#/radar", "#/discover", "#/research", "#/research?q=padel", "#/p/changing-robe", "#/p/posture-corrector", "#/trends", "#/niches", "#/compare", "#/chat", "#/data", "#/data?tab=evidence", "#/data?tab=inbox", "#/data?tab=connectors", "#/data?tab=edits", "#/data?tab=settings", "#/store/", "#/store/kassa", "#/store/risk", "#/store/products"];
+const routes = ["#/radar", "#/discover", "#/research", "#/research?q=padel", "#/p/changing-robe", "#/p/posture-corrector", "#/trends", "#/niches", "#/compare", "#/chat", "#/data", "#/data?tab=evidence", "#/data?tab=inbox", "#/data?tab=connectors", "#/data?tab=edits", "#/data?tab=settings", "#/data?tab=shopify", "#/brands", "#/brands?product=changing-robe", "#/store/", "#/store/kassa", "#/store/risk", "#/store/products"];
 let failures = 0;
 for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, height: 844, name: "phone" }]) {
   const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, reducedMotion: "reduce" });
@@ -35,7 +35,7 @@ for (const vp of [{ width: 1360, height: 900, name: "desktop" }, { width: 390, h
     const bad = !info.text || info.overflow > 2;
     if (bad) failures++;
     console.log(`${vp.name.padEnd(7)} ${r.padEnd(24)} ${bad ? "FAIL" : "ok  "} overflow=${info.overflow} ${info.text}`);
-    if (shots && ["#/radar", "#/p/changing-robe", "#/chat", "#/discover", "#/research?q=padel", "#/store/kassa", "#/data"].includes(r)) {
+    if (shots && ["#/radar", "#/p/changing-robe", "#/chat", "#/discover", "#/research?q=padel", "#/store/kassa", "#/data", "#/brands", "#/data?tab=shopify"].includes(r)) {
       await page.screenshot({ path: `${outDir}/${vp.name}-${r.replace(/[#/?=]/g, "_")}.png`, fullPage: false });
     }
   }

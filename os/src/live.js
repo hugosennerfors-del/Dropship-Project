@@ -73,6 +73,21 @@ export async function runWorkflow({ workflowId, trigger, body, nodes, onWait, de
   return { executionId: id, runData: full?.payload?.data?.resultData?.runData || {} };
 }
 
+// Start a workflow and return at once, without reading its result. For the
+// Shopify intake workflow, which saves no executions (so there is nothing
+// to read back): the page watches the connection appear instead.
+export async function startWorkflow({ workflowId, trigger, body }) {
+  if (!mcpRef) throw { code: "not_connected", message: "The n8n connector is not available in this view." };
+  const started = await tool("execute_workflow", { workflowId, executionMode: "production", triggerNodeName: trigger, inputs: { webhookData: { method: "POST", body } } }, false);
+  const id = started?.payload?.executionId;
+  if (!id) throw { code: "tool_error", message: "n8n did not start the workflow." };
+  return id;
+}
+
+// "Plan-vy · Shopify-anslutning": takes an Admin API token or a Dev
+// Dashboard app's Client ID and secret and stores them in Supabase Vault.
+export const SHOPIFY_INTAKE = { workflowId: "89WVWxRHegBLsz3X", trigger: "API: shopify-anslutning" };
+
 // One call to the Intelligence-DB workflow. Resolves with the SQL function's
 // result or rejects with {code, message}.
 export async function liveCall(body, { onWait } = {}) {

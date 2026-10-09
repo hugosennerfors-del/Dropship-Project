@@ -1,7 +1,7 @@
 // Plan-vy Intelligence — the page.
 //
 // Hash routes:  #/radar  #/discover  #/research?q=…  #/p/<id>  #/trends
-//               #/niches  #/compare  #/chat  #/data?tab=…  #/store/…
+//               #/niches  #/compare  #/chat  #/brands  #/data?tab=…  #/store/…
 
 import { init, connect, store, onChange, rows, setMarket, dataSourceLabel } from "./state.js";
 import { esc, attr, icon, scoreChip } from "./ui/dom.js";
@@ -17,12 +17,14 @@ import * as nichesView from "./views/niches.js";
 import * as compare from "./views/compare.js";
 import * as chat from "./views/chat.js";
 import * as data from "./views/data.js";
+import * as brands from "./views/brands.js";
 
 const NAV = [
   { group: "Research", items: [
     ["#/radar", "Radar", "radar"], ["#/discover", "Discover", "search"], ["#/research", "New research", "spark"],
     ["#/trends", "Early trends", "trend"], ["#/niches", "Niches", "niche"], ["#/compare", "Compare", "compare"], ["#/chat", "Ask the database", "chat"],
   ] },
+  { group: "Shopify", items: [["#/brands", "Brand Builder", "wand"], ["#/data?tab=shopify", "Shopify stores", "store"]] },
   { group: "Data", items: [["#/data", "Data and sources", "data"]] },
   { group: "Store (Sweden)", items: [
     ["#/store/", "Overview", "store"], ["#/store/products", "Products", "box"], ["#/store/kassa", "Kassa", "cash"],
@@ -32,7 +34,7 @@ const NAV = [
 ];
 
 const ROUTES = {
-  radar: radar, discover: discover, research: research, trends: trends, niches: nichesView, compare: compare, chat: chat, data: data,
+  radar: radar, discover: discover, research: research, trends: trends, niches: nichesView, compare: compare, chat: chat, data: data, brands: brands,
 };
 
 function parse() {
@@ -102,7 +104,7 @@ function renderRail(path, params) {
   const full = path + (params.toString() ? "?" + params.toString() : "");
   const isActive = (href) => {
     const h = href.slice(1);
-    if (h === "/data") return path === "/data" && params.get("tab") !== "inbox";
+    if (h === "/data") return path === "/data" && !["inbox", "shopify"].includes(params.get("tab"));
     if (h.includes("?")) return full === h;
     if (h === "/store/") return path === "/store" || path === "/store/";
     if (h === "/discover") return path.startsWith("/discover") || path.startsWith("/p/");
@@ -143,7 +145,7 @@ function openPalette() {
   document.body.appendChild(ov);
   const q = ov.querySelector("#pal-q"), list = ov.querySelector("#pal-list");
   let sel = 0, items = [];
-  const pages = [["Radar", "#/radar"], ["Discover", "#/discover"], ["New research", "#/research"], ["Early trends", "#/trends"], ["Niches", "#/niches"], ["Compare", "#/compare"], ["Ask the database", "#/chat"], ["Data and sources", "#/data"], ["Store: Kassa", "#/store/kassa"], ["Store: Risk", "#/store/risk"]];
+  const pages = [["Radar", "#/radar"], ["Discover", "#/discover"], ["New research", "#/research"], ["Brand Builder", "#/brands"], ["Shopify stores", "#/data?tab=shopify"], ["Early trends", "#/trends"], ["Niches", "#/niches"], ["Compare", "#/compare"], ["Ask the database", "#/chat"], ["Data and sources", "#/data"], ["Store: Kassa", "#/store/kassa"], ["Store: Risk", "#/store/risk"]];
   const where = store.market === "UK" ? "the UK" : MARKETS[store.market].name;
   const paint = () => {
     const raw = q.value.trim(), t = raw.toLowerCase();
@@ -266,7 +268,7 @@ function boot() {
       // Live data and edits re-render the current view in place.
       if (!document.getElementById("legacyRoot").hidden) { renderRail(parse().path, parse().params); return; }
       if (what === "market") { render(true); return; }
-      else if (["connect", "live", "overlay", "products", "runs", "settings", "pagestore", "candidates", "watch", "compare", "research"].includes(what)) {
+      else if (["connect", "live", "overlay", "products", "runs", "settings", "pagestore", "candidates", "watch", "compare", "research", "shopify"].includes(what)) {
         const busy = document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName) && current.root?.contains(document.activeElement);
         if (!busy) render();
         else renderRail(parse().path, parse().params);

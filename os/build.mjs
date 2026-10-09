@@ -27,6 +27,7 @@ const bundle = await build({
 const js = bundle.outputFiles[0].text;
 const css = await readFile(join(root, "src/styles/app.css"), "utf8");
 const fxCss = await readFile(join(root, "src/styles/fx.css"), "utf8");
+const brandsCss = await readFile(join(root, "src/styles/brands.css"), "utf8");
 const dataset = await readFile(join(root, "db/build/dataset.json"), "utf8");
 
 // ── Legacy store workspace ─────────────────────────────────────────────
@@ -78,6 +79,7 @@ const html = `<title>Plan-vy Intelligence</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <style>
 ${css}
+${brandsCss}
 ${fxCss}
 ${legacyCss}
 </style>

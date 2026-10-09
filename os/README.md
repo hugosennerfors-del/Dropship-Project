@@ -48,6 +48,21 @@ without a click.
 The page reads Supabase through the viewer's n8n connector and falls back to
 the snapshot embedded at build time, so it always works.
 
+## Brand Builder and Shopify
+
+**Brand Builder** (`#/brands`) turns a niche into complete brand concepts with
+Claude: name, positioning, palette, fonts, products with variants and prices,
+page plan and copy. Every concept passes a strict schema before it is saved
+as a version. Edit it, preview the page (desktop or mobile), and publish it
+to a connected Shopify store with **Publish brand to Shopify**. The brand
+becomes products (drafts by default), a smart collection, a brand metaobject,
+a hidden page and optionally a menu item and Online Store listing. A publish
+is a background job with a dry run, step-by-step status, retry and undo.
+Stores are connected under *Data > Shopify stores*; tokens and app secrets
+go straight into Supabase Vault and never reach the page. Architecture,
+scopes, setup and what is not built yet:
+[docs/shopify-integration.md](docs/shopify-integration.md).
+
 ## Look
 
 Chroma Glass, the earlier Plan-vy palette: a cool light ground with slow
@@ -82,7 +97,9 @@ count as self-reported (E) until real orders sync.
 npm install
 npm run pipeline     # raw → processed → scores → profiles, SQLite, Supabase sync file
 npm run build        # dist/index.html (single file, embeds the snapshot)
-npm test             # unit tests, every route in a browser, chat and live-data tests
+npm test             # unit, Shopify, build, smoke and browser tests
+npm run shopify:schema   # contract check of the pinned Shopify API (see docs)
+npm run edge:sync    # copy src/shopify into the edge function before deploying it
 ```
 
 After `npm run pipeline`, commit and push: the Intelligence-sync workflow loads
@@ -98,11 +115,15 @@ src/chat/         engine (Claude with page tools, or local answers), compose
 src/agents/       brand builder, improvement engine, review analyst,
                   market adapter, scenario commentary, comparison judge,
                   niche scout, weekly brief, inbox profiler
-src/views/        radar, discover, research, product, trends, niches, compare, chat, data
+src/views/        radar, discover, research, product, trends, niches, compare, chat, data,
+                  brands (Brand Builder), shopify-ui (preview, editor, publish, status, undo)
+src/shopify/      Shopify client, auth, schema check, mapping, pipeline, edge function,
+                  simulated store, brand concepts (shared by page, edge function and tests)
+supabase/         edge function intel-shopify and the SQL migrations
 src/live.js       Supabase through n8n (any published workflow, polled to completion)
 src/research.js   new research from the search fields
 src/fx.js         effects: entrances, count-ups, glow, sparks, confetti
-src/styles/       app.css (Chroma Glass palette and components), fx.css (effects)
+src/styles/       app.css (Chroma Glass palette and components), brands.css, fx.css (effects)
 src/state.js      the page's data layer
 pipeline/         run.mjs and its stages
 ```

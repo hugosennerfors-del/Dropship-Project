@@ -10,9 +10,13 @@ import { CONNECTOR_STATUS } from "../core/connectors.js";
 import { EVIDENCE_LEVELS } from "../core/provenance.js";
 import { LIVE } from "../live.js";
 import { provenanceLegend } from "./shared.js";
+import { SCOPES, SCOPES_FOR } from "../shopify/documents.js";
+import { SHOPIFY_API_VERSION } from "../shopify/version.js";
+import { loadShopify, connectStore, testConnection, disconnectStore, saveGenerationLimit, simulatedStoreForm, storeBadge } from "../shopify/brands.js";
+import { openJobDrawer } from "./shopify-ui.js";
 
-const TABS = [["overview", "Overview"], ["evidence", "Evidence"], ["connectors", "Connectors"], ["edits", "Your edits"], ["settings", "Settings"]];
-let ui = { evLevel: "", evKind: "", evMarket: "", evQ: "", exportMsg: "" };
+const TABS = [["overview", "Overview"], ["evidence", "Evidence"], ["connectors", "Connectors"], ["shopify", "Shopify stores"], ["edits", "Your edits"], ["settings", "Settings"]];
+let ui = { evLevel: "", evKind: "", evMarket: "", evQ: "", exportMsg: "", shop: { kind: "app", shop: "", label: "", isTest: null, busy: false, msg: "", ok: null }, armDisc: null };
 
 export function render(params) {
   const tab = params?.get?.("tab") || "overview";
@@ -25,7 +29,7 @@ export function render(params) {
         <p>Every value carries a status, and every estimate cites its evidence. This is where the data comes from, how it moves through the pipeline and what you have changed.</p>
       </div>${provenanceLegend()}</header>
       <nav class="tabs" role="tablist">${TABS.map(([k, l]) => `<a href="#/data?tab=${k}" role="tab" aria-selected="${tab === k}">${l}</a>`).join("")}</nav>
-      ${({ overview, evidence, connectors, edits, settings })[tab]?.() || overview()}
+      ${({ overview, evidence, connectors, shopify: shopifyTab, edits, settings })[tab]?.() || overview()}
     </div>`,
   };
 }
@@ -125,6 +129,92 @@ function connectors() {
     <div class="callout">${icon("info", 16)}<span>A connector writes raw records into Supabase; analysis and scores are rebuilt from them, so connecting a source never overwrites an analysis. Amazon, eBay, Etsy, TikTok Shop and Google data need API access before they can be added.</span></div>`;
 }
 
+// -- Shopify stores -----------------------------------------------------
+// Connections are listed without any secret: the page only ever sees
+// whether a token exists. Credentials go once to the n8n intake workflow,
+// which saves no executions, and from there into Supabase Vault.
+const REQUIRED_SCOPES = ["write_products", "write_content", "write_metaobject_definitions", "write_metaobjects"];
+const OPTIONAL_SCOPES = ["write_online_store_navigation", "write_publications"];
+function shopifyTab() {
+  const sh = store.shopify;
+  const live = store.live.state === "ready";
+  const f = ui.shop;
+  const gens = sh.generations;
+  const list = sh.connections;
+  return `
+    ${!live ? `<div class="callout warn">${icon("warn", 16)}<span>${esc(store.live.error || "Connecting to the live database…")} Store connections need it.</span></div>` : ""}
+    <section class="panel"><div class="panel-h"><h2>Connected stores</h2><span class="sub">${list.filter((c) => c.status === "connected").length} connected · Admin GraphQL API ${esc(SHOPIFY_API_VERSION)}</span></div>
+      <div class="list">${list.map((c) => connRow(c)).join("") || `<div class="empty">${sh.state === "loading" || sh.state === "waiting" ? '<span class="thinking"><i></i><i></i><i></i></span>Loading…' : "No store connected yet. Add one below, or try the whole flow with a simulated store first."}</div>`}</div>
+      <div class="panel-b row" style="border-top:1px solid var(--border)"><button class="btn sm" data-shop="sim"${live ? "" : " disabled"}>${icon("flask", 13)}Add a simulated store (no Shopify)</button><button class="btn sm ghost" data-shop="reload">Read again</button><button class="btn sm ghost" data-shop="history">Publish history</button></div>
+    </section>
+
+    <div class="grid g2">
+      <section class="panel"><div class="panel-h"><h3>Add a store</h3><span class="sub">a brand is published into an existing store</span></div>
+        <form class="panel-b stack" data-shop-form autocomplete="off">
+          <div class="seg" role="group" aria-label="How the store connects">
+            <button type="button" data-shop-kind="app" aria-pressed="${f.kind === "app"}">Dev Dashboard app</button>
+            <button type="button" data-shop-kind="token" aria-pressed="${f.kind === "token"}">Admin API token</button>
+          </div>
+          <p class="xs muted">${f.kind === "app"
+            ? "For new connections: an app made in Shopify's Dev Dashboard, in the same organisation as the store. Its Client ID and secret are exchanged for a token that lasts about 24 hours and is renewed automatically."
+            : "For a custom app made in the store admin before 1 January 2026 (Shopify no longer allows new ones there). The token starts with shpat_."}</p>
+          <label class="field"><span>Store address</span><input type="text" name="shop" value="${attr(f.shop)}" placeholder="your-store.myshopify.com" spellcheck="false"></label>
+          ${f.kind === "app" ? `<label class="field"><span>Client ID</span><input type="text" name="clientId" class="mono" spellcheck="false" autocomplete="off"></label>
+            <label class="field"><span>Client secret</span><input type="password" name="clientSecret" class="mono" autocomplete="new-password"></label>`
+            : `<label class="field"><span>Admin API access token</span><input type="password" name="token" class="mono" autocomplete="new-password" placeholder="shpat_…"></label>`}
+          <label class="field"><span>Name in Plan-vy <small class="xs muted">optional</small></span><input type="text" name="label" value="${attr(f.label)}" maxlength="80"></label>
+          <fieldset class="bb-fs"><legend class="small">Which kind of store is it?</legend>
+            <label class="bb-check"><input type="radio" name="isTest" value="test"${f.isTest === true ? " checked" : ""}> Development or test store</label>
+            <label class="bb-check"><input type="radio" name="isTest" value="live"${f.isTest === false ? " checked" : ""}> Live store with real customers <small>(every publish asks you to type its address)</small></label>
+          </fieldset>
+          <div class="row"><button class="btn primary" type="submit"${live && !f.busy ? "" : " disabled"}>${f.busy ? "Connecting…" : "Connect and test"}</button>${f.msg ? `<span class="small" style="color:${f.ok === false ? "var(--bad)" : f.ok ? "var(--good)" : "var(--fg-3)"}">${esc(f.msg)}</span>` : ""}</div>
+          <p class="xs muted">The secret goes once from this form to the n8n workflow “Plan-vy · Shopify-anslutning”, which keeps no execution data, and into Supabase Vault. It is never shown again, never stored in the page and never logged. Disconnecting deletes it.</p>
+        </form></section>
+
+      <section class="panel"><div class="panel-h"><h3>Setting up a store</h3></div>
+        <div class="panel-b stack small">
+          <ol class="bullets">
+            <li><b>A development store</b> (free): Shopify Dev Dashboard > Stores > Create a development store. Use it for every first publish.</li>
+            <li><b>An app</b>: Dev Dashboard > Apps > Create app. Under Versions, choose the Admin API scopes below, release the version and install the app on the store. Copy the Client ID and secret from Settings.</li>
+            <li><b>Connect</b> it here. “Connect and test” checks the token, the scopes and every API field this integration uses.</li>
+          </ol>
+          <div><b>Scopes to request</b> (write includes read):<ul class="bullets xs">${REQUIRED_SCOPES.map((s) => `<li><code>${s}</code>: ${esc(SCOPES[s])}</li>`).join("")}${OPTIONAL_SCOPES.map((s) => `<li><code>${s}</code> (optional): ${esc(SCOPES[s])}</li>`).join("")}</ul></div>
+          <p class="xs muted">Not requested: themes, files, translations, inventory and orders. Theme templates, image uploads and other languages are not built yet, so the app does not ask for them.</p>
+        </div></section>
+    </div>
+
+    <section class="panel"><div class="panel-h"><h3>AI generation limit</h3><span class="sub">${gens ? `${gens.today} of ${gens.limit} brand generations today` : "—"}</span></div>
+      <form class="panel-b row" data-shop-limit><label class="field"><span>Brand generations per day</span><input type="number" name="limit" min="0" max="500" value="${attr(gens?.limit ?? 20)}"></label>
+        <button class="btn sm" type="submit"${live ? "" : " disabled"}>Save limit</button>
+        <span class="xs muted">Counts every generation for this database, including regenerations. Claude usage is paid by the viewer's own Claude plan, so there is no per-call price to log; tokens are estimated from the text length.</span></form></section>
+
+    <div class="callout">${icon("info", 16)}<span>Shopify has no public API for creating a new store, so a brand is published <b>into</b> a store you connect: a collection, a page, a brand entry (metaobject) and products tagged <code>brand:&lt;handle&gt;</code>. Several stores can be connected; one store per brand is then a choice of target, not a different build.</span></div>`;
+}
+
+function connRow(c) {
+  const badge = storeBadge(c);
+  const needs = [...new Set([...SCOPES_FOR.product, ...SCOPES_FOR.collection, ...SCOPES_FOR.metaobject, ...SCOPES_FOR.page])];
+  const missing = (c.missingScopes || []).filter((s) => needs.includes(s));
+  const optional = c.schema?.optionalScopesMissing || [];
+  const armed = ui.armDisc === c.id;
+  const mismatch = c.isTestStore && c.schema?.partnerDevelopment === false && !c.simulated;
+  return `<div class="li bb-conn" style="align-items:flex-start">
+    <span class="bb-badge ${badge.toLowerCase()}">${badge}</span>
+    <span class="body"><b>${esc(c.shopName || c.label || c.shopDomain)}</b>
+      <small>${esc(c.shopDomain)} · ${esc(c.plan || "plan unknown")} · ${esc(c.currency || "currency unknown")} · ${c.auth === "client_credentials" ? `Dev Dashboard app ${esc(c.clientId || "")}${c.tokenExpiresAt ? `, token renews before ${new Date(c.tokenExpiresAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}` : "Admin API token"}</small>
+      <small>${c.status === "connected" ? `Checked ${c.lastVerifiedAt ? dateLabel(c.lastVerifiedAt) + " " + new Date(c.lastVerifiedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}${c.schema ? ` · ${c.schema.checked} API fields checked${c.schema.deprecated?.length ? `, ${c.schema.deprecated.length} deprecated` : ""}` : ""}` : esc(c.status)}</small>
+      ${c.scopes?.length ? `<span class="bb-scopes">${c.scopes.map((s) => `<code>${esc(s)}</code>`).join("")}</span>` : ""}
+      ${missing.length ? `<span class="small" style="color:var(--bad);white-space:normal;display:block">Missing: ${missing.map((s) => `<code>${esc(s)}</code> (${esc(SCOPES[s] || "needed")})`).join("; ")}. Add them to the app, release a new version and reinstall it.</span>` : ""}
+      ${optional.length ? `<small style="white-space:normal">Optional, not granted: ${optional.map((s) => `${esc(s)} (${esc(SCOPES[s] || "")})`).join("; ")}</small>` : ""}
+      ${mismatch ? `<span class="small" style="color:var(--warn);white-space:normal;display:block">Added as a test store, but Shopify does not report it as a development store: it is treated as live.</span>` : ""}
+      ${c.lastError ? `<span class="small" style="color:${c.status === "connected" ? "var(--warn)" : "var(--bad)"};white-space:normal;display:block">${esc(c.lastError)}</span>` : ""}
+    </span>
+    <span class="side"><span class="conn ${c.status === "connected" ? "on" : c.status === "pending" ? "" : "warn"}"><i></i>${esc(c.status)}</span>
+      <button class="btn sm" data-shop-test="${attr(c.id)}"${c.hasToken || c.auth === "client_credentials" ? "" : " disabled"}>Test</button>
+      <button class="btn sm ${armed ? "bb-btn-danger" : "ghost"}" data-shop-disc="${attr(c.id)}">${armed ? "Disconnect?" : "Disconnect"}</button></span>
+  </div>`;
+}
+
 function edits() {
   const ov = Object.entries(store.overlays).filter(([, x]) => x);
   const agentProducts = store.userProducts;
@@ -185,7 +275,33 @@ async function exportFile(kind) {
   catch (e) { return e?.code === "cancelled" || e?.code === "declined" ? "Download cancelled." : "The download could not be started."; }
 }
 
-export function mount(root, { rerender }) {
+export function mount(root, { rerender, params }) {
+  const onShopify = () => params?.get?.("tab") === "shopify";
+  if (onShopify() && store.shopify.state !== "ready") loadShopify();
+  root.addEventListener("submit", async (e) => {
+    const form = e.target;
+    if (form.matches("[data-shop-form]")) {
+      e.preventDefault();
+      const fd = new FormData(form);
+      const isTest = fd.get("isTest") === "test" ? true : fd.get("isTest") === "live" ? false : null;
+      Object.assign(ui.shop, { shop: String(fd.get("shop") || ""), label: String(fd.get("label") || ""), isTest });
+      const creds = { kind: ui.shop.kind, shop: ui.shop.shop, label: ui.shop.label, isTest, token: fd.get("token"), clientId: fd.get("clientId"), clientSecret: fd.get("clientSecret") };
+      // The secret fields are cleared at once; the value lives only in this call.
+      for (const n of ["token", "clientSecret"]) { const el = form.querySelector(`[name=${n}]`); if (el) el.value = ""; }
+      ui.shop.busy = true; ui.shop.ok = null; ui.shop.msg = "Sending to the intake workflow…"; rerender();
+      const r = await connectStore(creds, { onStatus: (m) => { ui.shop.msg = m; rerender(); } });
+      ui.shop.busy = false; ui.shop.ok = r.ok; ui.shop.msg = r.ok ? `Connected: ${r.connection.shopName || r.connection.shopDomain}.` : r.reason;
+      if (r.ok) Object.assign(ui.shop, { shop: "", label: "", isTest: null });
+      rerender();
+      return;
+    }
+    if (form.matches("[data-shop-limit]")) {
+      e.preventDefault();
+      const r = await saveGenerationLimit(new FormData(form).get("limit"));
+      window.__toast?.(r.ok ? `Limit saved: ${r.limit} per day.` : r.reason);
+      rerender();
+    }
+  });
   root.addEventListener("input", (e) => {
     const id = e.target.id;
     if (id === "evQ") {
@@ -222,5 +338,30 @@ export function mount(root, { rerender }) {
     if (un) { const r = await setOverlay(un.dataset.unoverlay, null); window.__toast?.(r.ok ? "Removed; the analysis value is back." : r.reason); rerender(); return; }
     const ar = t.closest("[data-archive]");
     if (ar) { const r = await archiveUserProduct(ar.dataset.archive); window.__toast?.(r.ok ? "Archived. It stays in the database history." : r.reason); rerender(); return; }
+    // Shopify stores
+    const kind = t.closest("[data-shop-kind]");
+    if (kind) { const form = root.querySelector("[data-shop-form]"); if (form) { const fd = new FormData(form); ui.shop.shop = String(fd.get("shop") || ""); ui.shop.label = String(fd.get("label") || ""); } ui.shop.kind = kind.dataset.shopKind; ui.shop.msg = ""; rerender(); return; }
+    const sa = t.closest("[data-shop]")?.dataset.shop;
+    if (sa === "reload") { await loadShopify(); rerender(); return; }
+    if (sa === "history") { openJobDrawer(null, { tab: "history" }); return; }
+    if (sa === "sim") {
+      ui.shop.busy = true; ui.shop.ok = null; ui.shop.msg = "Creating a simulated store…"; rerender();
+      const r = await connectStore(simulatedStoreForm(), { onStatus: (m) => { ui.shop.msg = m; rerender(); } });
+      ui.shop.busy = false; ui.shop.ok = r.ok; ui.shop.msg = r.ok ? "Simulated store ready. Publishing to it runs the real pipeline against a store kept in the database." : r.reason;
+      rerender();
+      return;
+    }
+    const st = t.closest("[data-shop-test]");
+    if (st) { st.disabled = true; const r = await testConnection(st.dataset.shopTest); window.__toast?.(r.ok ? "Testing the connection…" : r.reason); setTimeout(() => loadShopify({ quiet: true }), 3500); return; }
+    const dc = t.closest("[data-shop-disc]");
+    if (dc) {
+      const id = dc.dataset.shopDisc;
+      if (ui.armDisc !== id) { ui.armDisc = id; rerender(); clearTimeout(ui._arm); ui._arm = setTimeout(() => { ui.armDisc = null; rerender(); }, 5000); return; }
+      ui.armDisc = null;
+      const r = await disconnectStore(id);
+      window.__toast?.(r.ok ? "Disconnected. The token or secret is deleted from Vault; the publish history is kept." : r.reason);
+      rerender();
+    }
   });
+  return { refresh: () => { if (onShopify() && store.live.state === "ready" && store.shopify.state !== "ready" && store.shopify.state !== "loading" && !store.shopify._dataTried) { store.shopify._dataTried = true; loadShopify(); } } };
 }

@@ -1,0 +1,73 @@
+{
+  "name": "Tidewarm",
+  "tagline": "Warm in two minutes after any swim",
+  "positioning": "Changing robes and recovery layers for people who swim outdoors all year. Built for the five minutes after the swim, priced below the category leader and sized for smaller swimmers too.",
+  "market": "UK",
+  "targetAudience": {
+    "summary": "UK open-water swimmers aged 28–55 who dip through the winter, often in clubs.",
+    "personas": [
+      { "name": "Club dipper", "description": "Swims with a group every weekend from October to March and changes in a car park." },
+      { "name": "Gift buyer", "description": "Buys a robe for a partner who has started cold-water swimming." }
+    ]
+  },
+  "toneOfVoice": { "adjectives": ["warm", "practical", "nordic"], "doList": ["Talk about the minutes after the swim"], "dontList": ["Mention other brands' trade marks"] },
+  "identity": {
+    "palette": [
+      { "role": "primary", "hex": "#1E4E79", "name": "Deep water" },
+      { "role": "secondary", "hex": "#F2A65A", "name": "Sunrise" },
+      { "role": "accent", "hex": "#E0F2F1", "name": "Sea foam" },
+      { "role": "bg", "hex": "#FAFAF7", "name": "Shell" },
+      { "role": "fg", "hex": "#1B1F23", "name": "Slate" }
+    ],
+    "typography": { "headingFont": "Fraunces", "bodyFont": "Inter", "rationale": "A warm serif for headings, a plain sans for reading." },
+    "logoBrief": "A simple wave inside a circle, one colour, works at favicon size.",
+    "imageryDirection": "Early-morning beaches, steam rising off swimmers, real people in robes."
+  },
+  "story": {
+    "about": "We started swimming in the sea through a Scottish winter and could never get warm fast enough.\n\nTidewarm is the robe we wanted.",
+    "mission": "Make the minutes after a cold swim the best part of it.",
+    "usps": ["Warm inside two minutes", "Three lining weights", "Sized for smaller swimmers"]
+  },
+  "products": [
+    {
+      "title": "Tidewarm Changing Robe",
+      "description": "A waterproof, fleece-lined robe you can change under on any beach.\n\nThe shell keeps wind and rain out; the lining dries fast.",
+      "bulletPoints": ["Waterproof shell, taped seams", "Fleece lining", "Two-way zip"],
+      "productType": "Changing robe",
+      "tags": ["robe", "cold water"],
+      "options": [{ "name": "Size", "values": ["S", "M", "L"] }],
+      "variants": [
+        { "optionValues": ["S"], "price": "109.00", "sku": "TW-ROBE-S", "weightGrams": 1600 },
+        { "optionValues": ["M"], "price": "109.00", "sku": "TW-ROBE-M", "weightGrams": 1750 },
+        { "optionValues": ["L"], "price": "109.00", "compareAtPrice": "129.00", "sku": "TW-ROBE-L", "weightGrams": 1900 }
+      ],
+      "costEstimate": "31.00",
+      "suggestedMarginPct": 58,
+      "imagePrompts": ["A swimmer in a navy robe on a misty beach at dawn"],
+      "seo": { "title": "Changing robe for cold-water swimming | Tidewarm", "description": "Waterproof, fleece-lined changing robe for year-round open-water swimmers." }
+    },
+    {
+      "title": "Tidewarm Dry Bag 20 L",
+      "description": "Keeps your phone, keys and dry clothes dry on the beach.",
+      "bulletPoints": ["Roll-top closure", "20 litres"],
+      "productType": "Dry bag",
+      "tags": ["accessory"],
+      "options": [],
+      "variants": [{ "optionValues": [], "price": "24.00", "sku": "TW-BAG-20" }],
+      "costEstimate": "6.00",
+      "imagePrompts": [],
+      "seo": { "title": "20 L dry bag | Tidewarm", "description": "Roll-top dry bag for swimmers." }
+    }
+  ],
+  "pagePlan": {
+    "sections": [
+      { "type": "hero", "headline": "Warm in two minutes", "body": "Robes built for the minutes after the swim." },
+      { "type": "featured-collection", "headline": "The range" },
+      { "type": "usp-columns", "headline": "Why Tidewarm", "items": [{ "title": "Warm fast", "body": "Fleece lining that dries quickly." }] },
+      { "type": "faq", "headline": "Questions", "items": [{ "title": "Which size?", "body": "Take your usual jacket size." }] },
+      { "type": "testimonials", "headline": "Swimmers say" }
+    ]
+  },
+  "seo": { "title": "Tidewarm changing robes for cold-water swimmers", "description": "Changing robes and recovery layers for year-round open-water swimmers in the UK.", "keywords": ["changing robe", "cold water swimming"] },
+  "legalFlags": ["Check UKIPO for marks similar to Tidewarm."]
+}
