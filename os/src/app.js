@@ -268,7 +268,7 @@ function boot() {
       // Live data and edits re-render the current view in place.
       if (!document.getElementById("legacyRoot").hidden) { renderRail(parse().path, parse().params); return; }
       if (what === "market") { render(true); return; }
-      else if (["connect", "live", "overlay", "products", "runs", "settings", "pagestore", "candidates", "watch", "compare", "research", "shopify"].includes(what)) {
+      else if (["connect", "live", "overlay", "products", "runs", "settings", "pagestore", "candidates", "watch", "compare", "research", "shopify", "ads"].includes(what)) {
         const busy = document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName) && current.root?.contains(document.activeElement);
         if (!busy) render();
         else renderRail(parse().path, parse().params);

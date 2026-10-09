@@ -8,6 +8,7 @@ import { esc, attr, icon, money, pct, glyph, scoreChip, stageChip } from "../ui/
 import { MARKETS } from "../core/markets.js";
 import { fold } from "../core/nlq.js";
 import { researchRuns } from "../core/candidates.js";
+import { adLibraryLinks } from "../core/ads.js";
 import { startResearch, checkAgain, clearResearch, researchAvailable } from "../research.js";
 import { runProfiler } from "../agents/index.js";
 import { aiUnavailableNote, shortName } from "./shared.js";
@@ -97,7 +98,7 @@ function card(c, i = 0) {
       <div><dt>Profit/order</dt><dd class="${c.profit > 0 ? "pos-n" : c.profit < 0 ? "neg-n" : ""}">${money(c.profit, c.currency)}</dd></div>
     </dl>
     ${plan.hook ? `<div class="r-hook"><span class="xs muted">Ad hook${plan.format ? ` · ${esc(plan.format)}` : ""}</span><q>${esc(plan.hook)}</q>${plan.angle ? `<span class="xs muted">${esc(plan.angle)}</span>` : ""}</div>` : ""}
-    <div class="r-card-f">${action(c)}${plan.adLibraryQuery ? `<span class="xs muted" title="Search this in Meta's Ad Library to see competing ads">Ad Library: “${esc(plan.adLibraryQuery)}”</span>` : ""}</div>
+    <div class="r-card-f">${action(c)}${plan.adLibraryQuery ? `<a class="xs linkish" href="${attr(adLibraryLinks(plan.adLibraryQuery, c.market)[0].url)}" target="_blank" rel="noopener noreferrer" title="Competing ads in Meta's Ad Library">See ads: “${esc(plan.adLibraryQuery)}” ${icon("ext", 11)}</a>` : ""}</div>
   </article>`;
 }
 

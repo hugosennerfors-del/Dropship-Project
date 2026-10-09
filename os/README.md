@@ -48,6 +48,19 @@ without a click.
 The page reads Supabase through the viewer's n8n connector and falls back to
 the snapshot embedded at build time, so it always works.
 
+## Competitors' ads
+
+Each product page has an **Ads** section for the selected market. It links to
+Meta's Ad Library with the market (the UK is `GB`) and the search words
+filled in, to TikTok search the same way, and to TikTok's Ad Library and Top
+Ads, which do not take the search from the address (copy it with one click).
+Meta and TikTok do not let other pages show their ads, so they open in a new
+tab. Ads you find are saved on the product (link, advertiser, when it started
+running, angle, note) in `intel.product_ads` through the `ads.save` and
+`ads.remove` actions. Still-running ads 30 days or older count as
+long-running, which the section reads as a sign that someone sells the
+product at a profit. Removing an ad keeps the row, marked removed.
+
 ## Brand Builder and Shopify
 
 **Brand Builder** (`#/brands`) turns a niche into complete brand concepts with
@@ -110,12 +123,12 @@ the new build into Supabase the next morning, or run it by hand in n8n.
 ```
 src/core/         fields (the vocabulary), markets, provenance, economics,
                   scoring, inherit (UK → SE), ownsales, profile, query, nlq, insights,
-                  candidates (research-inbox ideas)
+                  candidates (research-inbox ideas), ads (ad-library links, saved ads)
 src/chat/         engine (Claude with page tools, or local answers), compose
 src/agents/       brand builder, improvement engine, review analyst,
                   market adapter, scenario commentary, comparison judge,
                   niche scout, weekly brief, inbox profiler
-src/views/        radar, discover, research, product, trends, niches, compare, chat, data,
+src/views/        radar, discover, research, product (+ ads), trends, niches, compare, chat, data,
                   brands (Brand Builder), shopify-ui (preview, editor, publish, status, undo)
 src/shopify/      Shopify client, auth, schema check, mapping, pipeline, edge function,
                   simulated store, brand concepts (shared by page, edge function and tests)

@@ -124,5 +124,37 @@ const near = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
   ok(budget.rows.every((r) => r.startupCost + 300 <= 2500), "budget filter includes the ad test");
 }
 
+// Competitor ads: library links, checks and what the saved ads say.
+{
+  const A = await import("../src/core/ads.js");
+  const today = new Date("2026-10-09T12:00:00Z");
+  ok(A.defaultAdQuery("Posture corrector: adjustable (unisex)") === "posture corrector", "ad search drops the subtitle and brackets", A.defaultAdQuery("Posture corrector: adjustable (unisex)"));
+  const [meta, lib, top, search] = A.adLibraryLinks("robe & towel", "UK");
+  ok(meta.url === "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=GB&q=robe%20%26%20towel&search_type=keyword_unordered&media_type=all", "Meta Ad Library link: UK is GB, the search is encoded", meta.url);
+  ok(A.adLibraryLinks("x", "SE")[0].url.includes("country=SE"), "Meta Ad Library link for Sweden");
+  ok(!lib.prefilled && !top.prefilled && search.prefilled && search.url === "https://www.tiktok.com/search?q=robe%20%26%20towel", "TikTok links: only search takes the words from the address");
+  ok(A.platformOf("https://www.facebook.com/ads/library/?id=1") === "meta" && A.platformOf("https://www.instagram.com/p/x") === "meta"
+    && A.platformOf("https://vm.tiktok.com/abc") === "tiktok" && A.platformOf("https://www.pinterest.co.uk/pin/1") === "pinterest"
+    && A.platformOf("https://notfacebook.com/x") === "other" && A.platformOf("nope") === null, "platform from the link's host");
+  const good = A.normaliseAd({ url: "www.facebook.com/ads/library/?id=5", advertiser: "  Robe Co ", startedOn: "2026-08-01" }, { productId: "changing-robe", market: "UK", today });
+  ok(good.ad && good.ad.url === "https://www.facebook.com/ads/library/?id=5" && good.ad.platform === "meta" && good.ad.advertiser === "Robe Co" && good.ad.stillRunning === true && /^[0-9a-f]{8}-[0-9a-f]{4}-4/.test(good.ad.id), "a pasted link without https:// is completed", JSON.stringify(good));
+  ok(A.normaliseAd({ url: "http://www.tiktok.com/@shop/video/1" }, { productId: "changing-robe", market: "UK", today }).ad?.url.startsWith("https://"), "http links are upgraded");
+  ok(A.normaliseAd({ url: "javascript:alert(1)" }, { productId: "changing-robe", market: "UK", today }).field === "url", "only https links are saved");
+  ok(A.normaliseAd({ url: "https://x.test/a", startedOn: "2026-10-20" }, { productId: "changing-robe", market: "UK", today }).field === "startedOn", "a start date in the future is refused");
+  ok(A.normaliseAd({ url: "https://x.test/a" }, { productId: "Bad Id", market: "UK", today }).error, "product ids are checked like the database does");
+  const ads = [
+    { advertiser: "A", startedOn: "2026-08-01", createdAt: "1" },
+    { advertiser: "B", startedOn: "2026-10-01", createdAt: "2" },
+    { advertiser: "C", startedOn: "2026-01-01", stillRunning: false, createdAt: "3" },
+  ];
+  ok(A.runningDays(ads[0], today) === 69 && A.runningDays(ads[2], today) === null, "days running counts only ads still running");
+  ok(A.sortAds(ads, today).map((a) => a.advertiser).join("") === "ABC", "longest-running ads first");
+  const sig = A.adSignal(ads, today);
+  ok(sig.tone === "good" && sig.long === 1 && sig.active === 2 && sig.advertisers === 3, "one ad past 30 days reads as a profit sign", JSON.stringify(sig));
+  ok(A.adSignal([{ startedOn: "2026-10-01" }], today).tone === "" && /early tests/.test(A.adSignal([{ startedOn: "2026-10-01" }], today).text), "only young ads: early tests");
+  ok(A.adSignal([{ stillRunning: false }], today).tone === "warn", "every ad stopped: a warning");
+  ok(/No ads saved/.test(A.adSignal([], today).text), "no ads: says how to find them");
+}
+
 console.log(fail ? `✗ ${fail} failed, ${pass} passed` : `✓ ${pass} unit tests passed`);
 process.exit(fail ? 1 : 0);

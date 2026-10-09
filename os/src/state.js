@@ -33,6 +33,7 @@ export const store = {
   // Brand Builder and Shopify (shopify/brands.js): saved brands, store
   // connections (never tokens), publish jobs and today's AI generations.
   shopify: { state: "idle", error: "", connections: [], brands: [], jobs: [], generations: null, jobDetail: {}, at: null },
+  ads: [],                // competitor ads saved on product pages (core/ads.js)
   runs: [],
   watch: [],
   compare: [],
@@ -92,7 +93,7 @@ function rebuild() {
 
 // ── Preferences (this browser only) ───────────────────────────────────
 const PREF_KEY = "planvy-intel-pref";
-function loadPref() {
+export function loadPref() {
   try { return JSON.parse(localStorage.getItem(PREF_KEY) || "{}"); } catch { return {}; }
 }
 export function savePref(patch) {
@@ -167,6 +168,7 @@ function applyLive(r) {
   store.userProducts = userProducts;
   store.overlays = { ...(store.dataset.overlays || {}), ...(r.overlays || {}) };
   store.runs = r.runs || [];
+  if (Array.isArray(r.ads)) store.ads = r.ads;
   store.settings = { markets: r.settings?.markets || {} };
   store.watch = r.settings?.watch || [];
   if (Array.isArray(r.ownSales) && r.ownSales.length) store.ownSalesRows = r.ownSales.map((x) => ({ ...x, period: String(x.period).slice(0, 10) }));
@@ -202,14 +204,16 @@ export const allCandidates = () => store.candidates || store.dataset.candidates;
 // ── Page storage fallback ──────────────────────────────────────────────
 async function loadPageStore(db) {
   try {
-    const [ov, up, runs] = await Promise.all([
+    const [ov, up, runs, ads] = await Promise.all([
       db.collection(`${DB_PREFIX}_overlays`).limit(1000).get(),
       db.collection(`${DB_PREFIX}_products`).limit(500).get(),
       db.collection(`${DB_PREFIX}_runs`).orderBy("createdAt", "desc").limit(200).get(),
+      db.collection(`${DB_PREFIX}_ads`).limit(1000).get(),
     ]);
     for (const d of ov.docs) { const x = d.data(); if (x?.key && x.value) store.overlays[x.key] = x.value; }
     for (const d of up.docs) { const p = d.data(); if (p?.id && p.core && !store.userProducts.some((u) => u.id === p.id)) store.userProducts.push(p); }
     for (const d of runs.docs) { const r = { id: d.id, ...d.data() }; if (!store.runs.some((x) => x.id === r.id)) store.runs.push(r); }
+    for (const d of ads.docs) { const a = d.data(); if (a?.id && a.productId && !store.ads.some((x) => x.id === a.id)) store.ads.push(a); }
     changed("pagestore");
   } catch { store.dbState = "offline"; }
 }
@@ -226,7 +230,36 @@ async function write(action, payload, fallback) {
     try { await fallback(store.db); return { ok: true, where: "page", note: "Saved in the page; it reaches Supabase only when n8n is connected." }; }
     catch (e) { return { ok: false, reason: dbMessage(e) }; }
   }
-  return { ok: false, reason: "Saved for this visit only: neither the live database nor the page storage is available here." };
+  return { ok: false, kept: true, reason: "Saved for this visit only: neither the live database nor the page storage is available here." };
+}
+
+// ── Competitor ads ─────────────────────────────────────────────────────
+// Shown at once; put back if the database refuses the change.
+export const adsFor = (productId) => store.ads.filter((a) => a.productId === productId);
+
+export async function saveAd(ad) {
+  const i = store.ads.findIndex((x) => x.id === ad.id);
+  const prev = i >= 0 ? store.ads[i] : null;
+  const now = new Date().toISOString();
+  const row = { ...prev, ...ad, createdAt: prev?.createdAt || now, updatedAt: now };
+  if (i >= 0) store.ads[i] = row; else store.ads.unshift(row);
+  changed("ads");
+  const res = await write("ads.save", ad, (db) => db.collection(`${DB_PREFIX}_ads`).doc(ad.id).set(row));
+  if (!res.ok && !res.kept) {
+    store.ads = prev ? store.ads.map((x) => (x.id === ad.id ? prev : x)) : store.ads.filter((x) => x.id !== ad.id);
+    changed("ads");
+  }
+  return res;
+}
+
+export async function removeAd(id) {
+  const prev = store.ads.find((x) => x.id === id);
+  if (!prev) return { ok: true };
+  store.ads = store.ads.filter((x) => x.id !== id);
+  changed("ads");
+  const res = await write("ads.remove", { id }, (db) => db.collection(`${DB_PREFIX}_ads`).doc(id).delete());
+  if (!res.ok && !res.kept) { store.ads = [prev, ...store.ads]; changed("ads"); }
+  return res;
 }
 
 export async function setOverlay(key, value) {

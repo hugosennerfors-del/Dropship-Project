@@ -84,6 +84,10 @@ const browser = await chromium.launch();
   await ctx.addInitScript((fixture) => {
     window.__calls = [];
     const live = JSON.parse(fixture);
+    // One competitor ad already saved in Supabase, running since January.
+    live.ads = [{ id: "0c3f1d2e-1111-4111-8111-000000000001", productId: "changing-robe", market: "UK", platform: "meta",
+      url: "https://www.facebook.com/ads/library/?id=111", advertiser: "Robe Co", startedOn: "2026-01-15", stillRunning: true,
+      angle: "Warm in two minutes", createdAt: "2026-02-01T00:00:00Z", updatedAt: "2026-02-01T00:00:00Z" }];
     const mcp = {
       async callTool(server, tool, input) {
         window.__calls.push({ server, tool, input });
@@ -140,6 +144,63 @@ const browser = await chromium.launch();
   await page.waitForFunction(() => window.__calls.some((c) => c.tool === "execute_workflow" && c.input.inputs.webhookData.body.op === "write"), null, { timeout: 8000 });
   const w = await page.evaluate(() => window.__calls.filter((c) => c.tool === "execute_workflow").map((c) => c.input.inputs.webhookData.body).find((b) => b.op === "write"));
   ok(w.action === "overlay.set" && w.payload.key === "posture-corrector|UK|competition" && w.payload.value.v === 70 && w.payload.value.s === "V", "verified value is written to Supabase via n8n", JSON.stringify(w));
+  // Competitor ads on the product page.
+  {
+    const writes = () => page.evaluate(() => window.__calls.filter((c) => c.tool === "execute_workflow").map((c) => c.input.inputs.webhookData.body).filter((b) => b.op === "write" && /^ads\./.test(b.action)));
+    await page.goto(url + "#/p/changing-robe");
+    await page.waitForSelector("#sec-ads");
+    ok(await page.locator('.toc [data-toc="ads"]').count() === 1, "ads: the section is in the table of contents");
+    const row = page.locator("#sec-ads .ads-row").first();
+    ok(/Robe Co/.test(await row.innerText()) && await row.locator(".tag.ads-long").count() === 1, "ads: a saved ad from Supabase shows as long-running", await row.innerText());
+    ok(/running for 30\+ days/.test(await page.locator("[data-ads-signal]").innerText()), "ads: the summary reads the long-running ad as a profit sign");
+    const meta = () => page.locator('[data-ads-link="meta"]').getAttribute("href");
+    let href = await meta();
+    ok(/country=GB/.test(href) && /q=waterproof%20changing%20robe/.test(href) && /search_type=keyword_unordered/.test(href), "ads: Meta Ad Library link carries the UK and the product's name", href);
+    ok(await page.locator('[data-ads-link="meta"]').getAttribute("target") === "_blank", "ads: libraries open in a new tab");
+    await page.fill("#ads-q", "dryrobe alternative");
+    href = await meta();
+    ok(/q=dryrobe%20alternative/.test(href), "ads: editing the search words updates the links", href);
+    // An address that is not a link is explained, not sent.
+    await page.click("[data-ads-new]");
+    await page.fill("#adsForm [name=url]", "not a link");
+    await page.click("#adsForm button[type=submit]");
+    ok(/not a web address/i.test(await page.locator(".ads-err").innerText()) && (await writes()).length === 0, "ads: a bad link is explained next to the field and not saved");
+    // Save a new ad: the platform is read from the address.
+    await page.fill("#adsForm [name=url]", "facebook.com/ads/library/?id=222");
+    ok(await page.locator("#adsForm [name=platform]").inputValue() === "meta", "ads: the platform is detected from the link");
+    await page.fill("#adsForm [name=advertiser]", "Swim Shop");
+    await page.fill("#adsForm [name=startedOn]", "2026-09-30");
+    await page.fill("#adsForm [name=angle]", "Change on any beach");
+    await page.click("#adsForm button[type=submit]");
+    await page.waitForFunction(() => window.__calls.some((c) => c.tool === "execute_workflow" && c.input.inputs.webhookData.body.action === "ads.save"), null, { timeout: 8000 });
+    const save = (await writes()).find((b) => b.action === "ads.save");
+    ok(save && save.payload.productId === "changing-robe" && save.payload.market === "UK" && save.payload.platform === "meta"
+      && save.payload.url === "https://facebook.com/ads/library/?id=222" && save.payload.startedOn === "2026-09-30" && /^[0-9a-f-]{36}$/.test(save.payload.id),
+    "ads: a saved ad is written to Supabase via n8n", JSON.stringify(save));
+    await page.waitForTimeout(200);
+    ok(await page.locator("#sec-ads .ads-row").count() === 2 && /Swim Shop/.test(await page.locator("#sec-ads .list").innerText()), "ads: the new ad is listed");
+    // The same link twice on one product is refused on the page.
+    await page.click("[data-ads-new]");
+    await page.fill("#adsForm [name=url]", "https://facebook.com/ads/library/?id=222");
+    await page.click("#adsForm button[type=submit]");
+    ok(/already saved/i.test(await page.locator(".ads-err").innerText()), "ads: a duplicate link is refused");
+    await page.click("[data-ads-cancel]");
+    // Remove takes two clicks.
+    const rm = page.locator(`#sec-ads [data-ads-rm="${save.payload.id}"]`);
+    await rm.click();
+    ok(/Remove\?/.test(await page.locator(`#sec-ads [data-ads-rm="${save.payload.id}"]`).innerText()) && !(await writes()).some((b) => b.action === "ads.remove"), "ads: the first click on Remove only asks");
+    await page.locator(`#sec-ads [data-ads-rm="${save.payload.id}"]`).click();
+    await page.waitForFunction(() => window.__calls.some((c) => c.tool === "execute_workflow" && c.input.inputs.webhookData.body.action === "ads.remove"), null, { timeout: 8000 });
+    const rmw = (await writes()).find((b) => b.action === "ads.remove");
+    ok(rmw?.payload?.id === save.payload.id, "ads: the second click removes it through n8n", JSON.stringify(rmw));
+    await page.waitForTimeout(200);
+    ok(await page.locator("#sec-ads .ads-row").count() === 1, "ads: the removed ad leaves the list");
+    // Sweden: Swedish ads, the UK ones counted separately.
+    await page.click('[data-market="SE"]');
+    await page.waitForSelector("#sec-ads");
+    ok(/country=SE/.test(await meta()) && /1 more saved for United Kingdom/.test(await page.locator("#sec-ads").innerText()), "ads: Sweden searches Swedish ads and points to the UK ones");
+    await page.click('[data-market="UK"]');
+  }
   // Chat with Claude and page tools.
   await page.goto(url + "#/chat");
   await page.fill("#q", "Which products have a margin of at least 55%?");
