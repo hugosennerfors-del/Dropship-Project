@@ -61,6 +61,29 @@ running, angle, note) in `intel.product_ads` through the `ads.save` and
 long-running, which the section reads as a sign that someone sells the
 product at a profit. Removing an ad keeps the row, marked removed.
 
+## Stores and suppliers
+
+Next to Ads, **Stores & suppliers** answers who sells the product and who
+makes it. One set of search words drives every link:
+
+- **Stores in the selected market:** Google Shopping, Amazon UK or Amazon.se,
+  eBay UK (UK only) and Etsy. The brands the research names as market leaders
+  are searched together with the product.
+- **Suppliers in China:** AliExpress (single units, samples) and Alibaba
+  (factories, minimum orders) take the search from the link. 1688 needs
+  Chinese words, so it opens on its home page. The research's supply notes
+  (minimum orders, price ranges) are shown beside them.
+
+The sites do not let other pages read their results, so these are searches
+that open in a new tab, not lists filled in automatically. The stores and
+supplier listings you save (link, name, price, currency, and the minimum
+order for suppliers) go to `intel.product_links` through `links.save` and
+`links.remove`. The section compares saved store prices with yours and the
+cheapest USD quote with the analysis' supplier price. **Use price** saves a
+quote as your verified supplier price, so the calculator and scores use it.
+Each research idea links to the same searches (ads, stores, AliExpress,
+Alibaba).
+
 ## Brand Builder and Shopify
 
 **Brand Builder** (`#/brands`) turns a niche into complete brand concepts with
@@ -123,12 +146,13 @@ the new build into Supabase the next morning, or run it by hand in n8n.
 ```
 src/core/         fields (the vocabulary), markets, provenance, economics,
                   scoring, inherit (UK → SE), ownsales, profile, query, nlq, insights,
-                  candidates (research-inbox ideas), ads (ad-library links, saved ads)
+                  candidates (research-inbox ideas), ads (ad-library links, saved ads),
+                  sourcing (store and supplier searches, saved links), weblinks
 src/chat/         engine (Claude with page tools, or local answers), compose
 src/agents/       brand builder, improvement engine, review analyst,
                   market adapter, scenario commentary, comparison judge,
                   niche scout, weekly brief, inbox profiler
-src/views/        radar, discover, research, product (+ ads), trends, niches, compare, chat, data,
+src/views/        radar, discover, research, product (+ ads, sourcing), trends, niches, compare, chat, data,
                   brands (Brand Builder), shopify-ui (preview, editor, publish, status, undo)
 src/shopify/      Shopify client, auth, schema check, mapping, pipeline, edge function,
                   simulated store, brand concepts (shared by page, edge function and tests)

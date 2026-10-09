@@ -88,6 +88,9 @@ const browser = await chromium.launch();
     live.ads = [{ id: "0c3f1d2e-1111-4111-8111-000000000001", productId: "changing-robe", market: "UK", platform: "meta",
       url: "https://www.facebook.com/ads/library/?id=111", advertiser: "Robe Co", startedOn: "2026-01-15", stillRunning: true,
       angle: "Warm in two minutes", createdAt: "2026-02-01T00:00:00Z", updatedAt: "2026-02-01T00:00:00Z" }];
+    // A store selling the robe in the UK, as Supabase returns it (price as text).
+    live.links = [{ id: "0c3f1d2e-2222-4222-8222-000000000001", productId: "changing-robe", kind: "store", market: "UK",
+      url: "https://www.dryrobe.com/products/advance", name: "dryrobe", price: "175.00", currency: "GBP", createdAt: "2026-02-01T00:00:00Z" }];
     const mcp = {
       async callTool(server, tool, input) {
         window.__calls.push({ server, tool, input });
@@ -200,6 +203,59 @@ const browser = await chromium.launch();
     await page.waitForSelector("#sec-ads");
     ok(/country=SE/.test(await meta()) && /1 more saved for United Kingdom/.test(await page.locator("#sec-ads").innerText()), "ads: Sweden searches Swedish ads and points to the UK ones");
     await page.click('[data-market="UK"]');
+  }
+  // Stores selling it and Chinese suppliers.
+  {
+    const writes = () => page.evaluate(() => window.__calls.filter((c) => c.tool === "execute_workflow").map((c) => c.input.inputs.webhookData.body).filter((b) => b.op === "write"));
+    await page.goto(url + "#/p/changing-robe");
+    await page.waitForSelector("#sec-sourcing");
+    const sec = page.locator("#sec-sourcing");
+    ok(await page.locator('.toc [data-toc="sourcing"]').count() === 1, "sourcing: the section is in the table of contents");
+    const href = (id) => page.locator(`[data-src-link="${id}"]`).getAttribute("href");
+    ok(/udm=28&gl=uk/.test(await href("google-shopping")) && /^https:\/\/www\.amazon\.co\.uk\/s\?k=waterproof%20changing%20robe$/.test(await href("amazon")), "sourcing: store searches for the UK with the product's name", await href("amazon"));
+    ok(await href("aliexpress") === "https://www.aliexpress.com/w/wholesale-waterproof-changing-robe.html" && /SearchText=waterproof%20changing%20robe/.test(await href("alibaba")), "sourcing: AliExpress and Alibaba searches", await href("aliexpress"));
+    ok(await sec.locator("[data-src-named]").filter({ hasText: "Dryrobe" }).count() === 1, "sourcing: market leaders from the research are searchable");
+    ok(/OEM suppliers offer changing robes/.test(await sec.innerText()), "sourcing: supply evidence from the research is shown");
+    ok(/£175/.test(await sec.locator('[data-src-list="store"]').innerText()) && /Saved stores charge £175/.test(await sec.locator('[data-src-summary="store"]').innerText()), "sourcing: a saved store from Supabase with its price");
+    await page.fill("#src-q", "dryrobe alternative");
+    ok(await href("aliexpress") === "https://www.aliexpress.com/w/wholesale-dryrobe-alternative.html", "sourcing: editing the search words updates every link");
+    // Save a supplier, then use its price in the calculator.
+    await page.click('[data-src-new="supplier"]');
+    await page.fill("#srcForm [name=url]", "alibaba.com/product-detail/robe_1.html");
+    await page.fill("#srcForm [name=name]", "Ningbo Outdoor");
+    await page.fill("#srcForm [name=price]", "11.50");
+    await page.fill("#srcForm [name=moq]", "1.5");
+    await page.click("#srcForm button[type=submit]");
+    ok(/whole number/.test(await page.locator("#srcForm .ads-err").innerText()) && !(await writes()).some((b) => b.action === "links.save"), "sourcing: a fractional minimum order is explained, not sent");
+    await page.fill("#srcForm [name=moq]", "100");
+    await page.click("#srcForm button[type=submit]");
+    await page.waitForFunction(() => window.__calls.some((c) => c.tool === "execute_workflow" && c.input.inputs.webhookData.body.action === "links.save"), null, { timeout: 8000 });
+    const save = (await writes()).find((b) => b.action === "links.save");
+    ok(save && save.payload.kind === "supplier" && save.payload.market === null && save.payload.url === "https://alibaba.com/product-detail/robe_1.html"
+      && save.payload.price === 11.5 && save.payload.currency === "USD" && save.payload.moq === 100, "sourcing: a supplier is written to Supabase via n8n", JSON.stringify(save));
+    await page.waitForTimeout(200);
+    ok(/\$11\.50 per unit at a minimum order of 100 from Ningbo Outdoor/.test(await sec.locator('[data-src-summary="supplier"]').innerText()), "sourcing: the cheapest quote is compared with the analysis");
+    await sec.locator(`[data-src-use="${save.payload.id}"]`).click();
+    await page.waitForFunction(() => window.__calls.some((c) => c.tool === "execute_workflow" && c.input.inputs.webhookData.body.payload?.key === "changing-robe|core|supplierPriceUSD"), null, { timeout: 8000 });
+    const use = (await writes()).find((b) => b.payload?.key === "changing-robe|core|supplierPriceUSD");
+    ok(use.action === "overlay.set" && use.payload.value.v === 11.5 && use.payload.value.s === "V" && use.payload.value.note.includes(save.payload.url), "sourcing: Use price saves a verified supplier price", JSON.stringify(use));
+    await page.waitForTimeout(200);
+    ok(await sec.locator('[data-src-list="supplier"] .tag').filter({ hasText: "in the calculator" }).count() === 1, "sourcing: the supplier shows its price is in the calculator");
+    // Remove takes two clicks.
+    await sec.locator(`[data-src-rm="${save.payload.id}"]`).click();
+    ok(!(await writes()).some((b) => b.action === "links.remove"), "sourcing: the first click on Remove only asks");
+    await sec.locator(`[data-src-rm="${save.payload.id}"]`).click();
+    await page.waitForFunction(() => window.__calls.some((c) => c.tool === "execute_workflow" && c.input.inputs.webhookData.body.action === "links.remove"), null, { timeout: 8000 });
+    ok((await writes()).find((b) => b.action === "links.remove")?.payload?.id === save.payload.id, "sourcing: the second click removes it through n8n");
+    await page.click('[data-market="SE"]');
+    await page.waitForSelector("#sec-sourcing");
+    ok(/gl=se&hl=sv/.test(await href("google-shopping")) && /amazon\.se/.test(await href("amazon")) && await page.locator('[data-src-link="ebay"]').count() === 0, "sourcing: Sweden searches Swedish shops");
+    await page.click('[data-market="UK"]');
+    // Research ideas carry the same searches.
+    await page.goto(url + "#/research");
+    await page.waitForSelector(".r-find");
+    const find = page.locator(".r-find").first();
+    ok(await find.locator("a").count() === 4 && /aliexpress\.com\/w\/wholesale-/.test(await find.locator("a").nth(2).getAttribute("href")), "research ideas link to ads, stores, AliExpress and Alibaba");
   }
   // Chat with Claude and page tools.
   await page.goto(url + "#/chat");

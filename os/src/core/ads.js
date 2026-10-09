@@ -3,6 +3,8 @@
 // links to their ad libraries with the search filled in where the library
 // takes it from the address, and keeps the ads you save there.
 
+import { cleanUrl, newId, PRODUCT_ID } from "./weblinks.js";
+
 export const AD_PLATFORMS = {
   meta: "Meta (Facebook, Instagram)",
   tiktok: "TikTok",
@@ -19,7 +21,6 @@ export const LONG_RUNNING_DAYS = 30;
 const COUNTRY = { UK: "GB", SE: "SE" };
 export const countryOf = (market) => COUNTRY[market] || market;
 
-const PRODUCT_ID = /^[a-z0-9][a-z0-9-]{0,119}$/;
 const DAY = 86400000;
 
 // A short search for the ad libraries: the product's name without the part
@@ -72,17 +73,6 @@ export function platformOf(url) {
 
 const isoDay = (d) => new Date(d).toISOString().slice(0, 10);
 
-export function newAdId() {
-  const c = globalThis.crypto;
-  if (c?.randomUUID) return c.randomUUID();
-  const b = new Uint8Array(16);
-  if (c?.getRandomValues) c.getRandomValues(b); else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
-  b[6] = (b[6] & 0x0f) | 0x40;
-  b[8] = (b[8] & 0x3f) | 0x80;
-  const h = [...b].map((x) => x.toString(16).padStart(2, "0")).join("");
-  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
-}
-
 // Check a saved ad the way the database will (intel.api_write_ads), so a
 // mistake is explained next to the field instead of coming back as an error.
 // Returns { ad } or { error, field }.
@@ -90,14 +80,9 @@ export function normaliseAd(input, { productId, market, today = new Date() } = {
   const s = (v) => String(v ?? "").trim();
   if (!PRODUCT_ID.test(productId || "")) return { error: "This product cannot have ads saved.", field: "url" };
   if (!/^[A-Z]{2}$/.test(market || "")) return { error: "Pick a market first.", field: "url" };
-  let url = s(input.url);
-  if (!url) return { error: "Paste the link to the ad.", field: "url" };
-  if (/^www\.|^[a-z0-9-]+\.[a-z]{2,}\//i.test(url)) url = "https://" + url;
-  if (/^http:\/\//i.test(url)) url = "https://" + url.slice(7);
-  let parsed;
-  try { parsed = new URL(url); } catch { return { error: "That is not a web address. Copy the ad's link from the library.", field: "url" }; }
-  if (parsed.protocol !== "https:" || /\s/.test(url)) return { error: "Use the ad's https:// link.", field: "url" };
-  if (url.length > 2000) return { error: "That link is too long.", field: "url" };
+  const u = cleanUrl(input.url);
+  if (u.error) return { error: s(input.url) ? u.error : "Paste the link to the ad.", field: "url" };
+  const url = u.url;
   const platform = input.platform && AD_PLATFORMS[input.platform] ? input.platform : platformOf(url) || "other";
   const advertiser = s(input.advertiser);
   if (advertiser.length > 200) return { error: "Keep the advertiser under 200 characters.", field: "advertiser" };
@@ -113,7 +98,7 @@ export function normaliseAd(input, { productId, market, today = new Date() } = {
   const note = s(input.note);
   if (note.length > 1000) return { error: "Keep the note under 1,000 characters.", field: "note" };
   return { ad: {
-    id: input.id || newAdId(), productId, market, platform, url,
+    id: input.id || newId(), productId, market, platform, url,
     advertiser: advertiser || null, startedOn, stillRunning: input.stillRunning !== false,
     angle: angle || null, note: note || null,
   } };

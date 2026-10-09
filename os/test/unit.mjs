@@ -156,5 +156,39 @@ const near = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
   ok(/No ads saved/.test(A.adSignal([], today).text), "no ads: says how to find them");
 }
 
+// Stores selling a product and its suppliers.
+{
+  const S = await import("../src/core/sourcing.js");
+  const W = await import("../src/core/weblinks.js");
+  const uk = S.storeSearchLinks("robe & towel", "UK");
+  ok(uk.map((l) => l.id).join() === "google-shopping,amazon,ebay,etsy", "UK store searches: Google Shopping, Amazon, eBay, Etsy");
+  ok(uk[0].url === "https://www.google.com/search?q=robe%20%26%20towel&udm=28&gl=uk&hl=en-GB" && uk[1].url === "https://www.amazon.co.uk/s?k=robe%20%26%20towel"
+    && uk[2].url === "https://www.ebay.co.uk/sch/i.html?_nkw=robe%20%26%20towel", "store search links carry the encoded words and the UK", uk.map((l) => l.url).join(" "));
+  const se = S.storeSearchLinks("hundtäcke", "SE");
+  ok(se.map((l) => l.id).join() === "google-shopping,amazon,etsy" && se[0].url.includes("gl=se&hl=sv") && se[1].url.startsWith("https://www.amazon.se/s?k=hundt%C3%A4cke"), "Swedish store searches: Amazon.se, no eBay UK");
+  const [ali, alibaba, cn] = S.supplierSearchLinks("Changing Robe");
+  ok(ali.url === "https://www.aliexpress.com/w/wholesale-changing-robe.html" && alibaba.url === "https://www.alibaba.com/trade/search?SearchText=Changing%20Robe" && !cn.prefilled,
+    "supplier searches: AliExpress path, Alibaba query, 1688 home page", `${ali.url} ${alibaba.url}`);
+  ok(S.supplierSearchLinks("")[0].url === "https://www.aliexpress.com/", "no search words: AliExpress home page");
+  const named = S.namedSellers(["Dryrobe", "Red Original (premium)", "Amazon generics", "Large decor dropshipping stores", "dryrobe"], "changing robe", "UK");
+  ok(named.map((x) => x.name).join() === "Dryrobe,Red Original" && named[0].url === "https://www.google.com/search?q=Dryrobe%20changing%20robe&gl=uk&hl=en-GB", "named sellers: brands searched with the product, generic descriptions left out", JSON.stringify(named));
+  const st = S.normaliseLink({ url: "shop.example/products/robe", name: " Robe Shop ", price: "£89,99", moq: "50" }, { productId: "changing-robe", kind: "store", market: "UK" });
+  ok(st.link && st.link.url === "https://shop.example/products/robe" && st.link.price === 89.99 && st.link.currency === "GBP" && st.link.moq === null && st.link.market === "UK" && st.link.name === "Robe Shop", "a store link: https added, price parsed, market currency, no MOQ", JSON.stringify(st));
+  const sp = S.normaliseLink({ url: "https://www.alibaba.com/product-detail/x.html", price: "11.5", currency: "usd", moq: "1,000" }, { productId: "changing-robe", kind: "supplier", market: "UK" });
+  ok(sp.link && sp.link.market === null && sp.link.currency === "USD" && sp.link.moq === 1000 && sp.link.price === 11.5, "a supplier link: no market, USD, MOQ parsed", JSON.stringify(sp));
+  ok(S.normaliseLink({ url: "https://a.test/x", price: "abc" }, { productId: "changing-robe", kind: "store", market: "UK" }).field === "price", "a price that is not a number is refused");
+  ok(S.normaliseLink({ url: "https://a.test/x", moq: "2.5" }, { productId: "changing-robe", kind: "supplier" }).field === "moq", "a fractional minimum order is refused");
+  ok(S.normaliseLink({ url: "ftp://a.test/x" }, { productId: "changing-robe", kind: "supplier" }).field === "url", "only https links");
+  ok(W.cleanUrl("http://a.test/x").url === "https://a.test/x" && W.cleanUrl("not a link").error, "links are completed to https or explained");
+  const stores = [{ price: 89, currency: "GBP" }, { price: 120, currency: "GBP" }, { price: 175, currency: "GBP" }, { price: 999, currency: "SEK" }];
+  const ss = S.storeSummary(stores, { price: 109, currency: "GBP" });
+  ok(ss.lo === 89 && ss.hi === 175 && ss.med === 120 && /1 of 3 saved stores charge less/.test(ss.text), "store prices: range, median and where your price sits", ss.text);
+  ok(S.storeSummary(stores, { price: 200, currency: "GBP" }).tone === "warn", "dearer than every saved store: a warning");
+  const ps = S.supplierSummary([{ price: 14, currency: "USD", moq: 50 }, { price: 11.5, currency: "USD", moq: 100, name: "Ningbo Co" }, { price: 60, currency: "CNY" }], 24);
+  ok(ps.best.price === 11.5 && /\$11\.50 per unit at a minimum order of 100 from Ningbo Co/.test(ps.text) && /at or below the analysis' \$24\.00/.test(ps.text), "cheapest USD quote against the analysis", ps.text);
+  ok(S.supplierSummary([{ price: 30, currency: "USD" }], 24).tone === "warn", "a quote above the analysis' supplier price is a warning");
+  ok(S.fmtMoney(89.5, "GBP") === "£89.50" && S.fmtMoney(249, "SEK") === "249 kr" && S.fmtMoney(80, "CNY") === "¥80", "money in the link's own currency");
+}
+
 console.log(fail ? `✗ ${fail} failed, ${pass} passed` : `✓ ${pass} unit tests passed`);
 process.exit(fail ? 1 : 0);

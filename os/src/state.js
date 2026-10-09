@@ -34,6 +34,7 @@ export const store = {
   // connections (never tokens), publish jobs and today's AI generations.
   shopify: { state: "idle", error: "", connections: [], brands: [], jobs: [], generations: null, jobDetail: {}, at: null },
   ads: [],                // competitor ads saved on product pages (core/ads.js)
+  links: [],              // stores selling a product and its suppliers (core/sourcing.js)
   runs: [],
   watch: [],
   compare: [],
@@ -169,6 +170,7 @@ function applyLive(r) {
   store.overlays = { ...(store.dataset.overlays || {}), ...(r.overlays || {}) };
   store.runs = r.runs || [];
   if (Array.isArray(r.ads)) store.ads = r.ads;
+  if (Array.isArray(r.links)) store.links = r.links.map((l) => ({ ...l, price: l.price == null ? null : Number(l.price) }));
   store.settings = { markets: r.settings?.markets || {} };
   store.watch = r.settings?.watch || [];
   if (Array.isArray(r.ownSales) && r.ownSales.length) store.ownSalesRows = r.ownSales.map((x) => ({ ...x, period: String(x.period).slice(0, 10) }));
@@ -204,16 +206,18 @@ export const allCandidates = () => store.candidates || store.dataset.candidates;
 // ── Page storage fallback ──────────────────────────────────────────────
 async function loadPageStore(db) {
   try {
-    const [ov, up, runs, ads] = await Promise.all([
+    const [ov, up, runs, ads, links] = await Promise.all([
       db.collection(`${DB_PREFIX}_overlays`).limit(1000).get(),
       db.collection(`${DB_PREFIX}_products`).limit(500).get(),
       db.collection(`${DB_PREFIX}_runs`).orderBy("createdAt", "desc").limit(200).get(),
       db.collection(`${DB_PREFIX}_ads`).limit(1000).get(),
+      db.collection(`${DB_PREFIX}_links`).limit(2000).get(),
     ]);
     for (const d of ov.docs) { const x = d.data(); if (x?.key && x.value) store.overlays[x.key] = x.value; }
     for (const d of up.docs) { const p = d.data(); if (p?.id && p.core && !store.userProducts.some((u) => u.id === p.id)) store.userProducts.push(p); }
     for (const d of runs.docs) { const r = { id: d.id, ...d.data() }; if (!store.runs.some((x) => x.id === r.id)) store.runs.push(r); }
     for (const d of ads.docs) { const a = d.data(); if (a?.id && a.productId && !store.ads.some((x) => x.id === a.id)) store.ads.push(a); }
+    for (const d of links.docs) { const l = d.data(); if (l?.id && l.productId && !store.links.some((x) => x.id === l.id)) store.links.push(l); }
     changed("pagestore");
   } catch { store.dbState = "offline"; }
 }
@@ -233,34 +237,48 @@ async function write(action, payload, fallback) {
   return { ok: false, kept: true, reason: "Saved for this visit only: neither the live database nor the page storage is available here." };
 }
 
-// ── Competitor ads ─────────────────────────────────────────────────────
-// Shown at once; put back if the database refuses the change.
+// ── Saved links: competitor ads, stores and suppliers ─────────────────
+// A list in the store saved through `<name>.save` / `<name>.remove`. A
+// change shows at once and is put back if the database refuses it.
+function savedList(name) {
+  const coll = `${DB_PREFIX}_${name}`;
+  return {
+    async save(item) {
+      const list = store[name];
+      const i = list.findIndex((x) => x.id === item.id);
+      const prev = i >= 0 ? list[i] : null;
+      const now = new Date().toISOString();
+      const row = { ...prev, ...item, createdAt: prev?.createdAt || now, updatedAt: now };
+      store[name] = i >= 0 ? list.map((x) => (x.id === item.id ? row : x)) : [row, ...list];
+      changed(name);
+      const res = await write(`${name}.save`, item, (db) => db.collection(coll).doc(item.id).set(row));
+      if (!res.ok && !res.kept) {
+        store[name] = prev ? store[name].map((x) => (x.id === item.id ? prev : x)) : store[name].filter((x) => x.id !== item.id);
+        changed(name);
+      }
+      return res;
+    },
+    async remove(id) {
+      const prev = store[name].find((x) => x.id === id);
+      if (!prev) return { ok: true };
+      store[name] = store[name].filter((x) => x.id !== id);
+      changed(name);
+      const res = await write(`${name}.remove`, { id }, (db) => db.collection(coll).doc(id).delete());
+      if (!res.ok && !res.kept) { store[name] = [prev, ...store[name]]; changed(name); }
+      return res;
+    },
+  };
+}
+
+const ads = savedList("ads");
 export const adsFor = (productId) => store.ads.filter((a) => a.productId === productId);
+export const saveAd = (ad) => ads.save(ad);
+export const removeAd = (id) => ads.remove(id);
 
-export async function saveAd(ad) {
-  const i = store.ads.findIndex((x) => x.id === ad.id);
-  const prev = i >= 0 ? store.ads[i] : null;
-  const now = new Date().toISOString();
-  const row = { ...prev, ...ad, createdAt: prev?.createdAt || now, updatedAt: now };
-  if (i >= 0) store.ads[i] = row; else store.ads.unshift(row);
-  changed("ads");
-  const res = await write("ads.save", ad, (db) => db.collection(`${DB_PREFIX}_ads`).doc(ad.id).set(row));
-  if (!res.ok && !res.kept) {
-    store.ads = prev ? store.ads.map((x) => (x.id === ad.id ? prev : x)) : store.ads.filter((x) => x.id !== ad.id);
-    changed("ads");
-  }
-  return res;
-}
-
-export async function removeAd(id) {
-  const prev = store.ads.find((x) => x.id === id);
-  if (!prev) return { ok: true };
-  store.ads = store.ads.filter((x) => x.id !== id);
-  changed("ads");
-  const res = await write("ads.remove", { id }, (db) => db.collection(`${DB_PREFIX}_ads`).doc(id).delete());
-  if (!res.ok && !res.kept) { store.ads = [prev, ...store.ads]; changed("ads"); }
-  return res;
-}
+const links = savedList("links");
+export const linksFor = (productId, kind) => store.links.filter((l) => l.productId === productId && (!kind || l.kind === kind));
+export const saveLink = (link) => links.save(link);
+export const removeLink = (id) => links.remove(id);
 
 export async function setOverlay(key, value) {
   if (value == null) delete store.overlays[key]; else store.overlays[key] = value;

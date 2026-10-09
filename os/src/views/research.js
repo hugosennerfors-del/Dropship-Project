@@ -8,7 +8,8 @@ import { esc, attr, icon, money, pct, glyph, scoreChip, stageChip } from "../ui/
 import { MARKETS } from "../core/markets.js";
 import { fold } from "../core/nlq.js";
 import { researchRuns } from "../core/candidates.js";
-import { adLibraryLinks } from "../core/ads.js";
+import { adLibraryLinks, defaultAdQuery } from "../core/ads.js";
+import { storeSearchLinks, supplierSearchLinks } from "../core/sourcing.js";
 import { startResearch, checkAgain, clearResearch, researchAvailable } from "../research.js";
 import { runProfiler } from "../agents/index.js";
 import { aiUnavailableNote, shortName } from "./shared.js";
@@ -98,8 +99,26 @@ function card(c, i = 0) {
       <div><dt>Profit/order</dt><dd class="${c.profit > 0 ? "pos-n" : c.profit < 0 ? "neg-n" : ""}">${money(c.profit, c.currency)}</dd></div>
     </dl>
     ${plan.hook ? `<div class="r-hook"><span class="xs muted">Ad hook${plan.format ? ` · ${esc(plan.format)}` : ""}</span><q>${esc(plan.hook)}</q>${plan.angle ? `<span class="xs muted">${esc(plan.angle)}</span>` : ""}</div>` : ""}
-    <div class="r-card-f">${action(c)}${plan.adLibraryQuery ? `<a class="xs linkish" href="${attr(adLibraryLinks(plan.adLibraryQuery, c.market)[0].url)}" target="_blank" rel="noopener noreferrer" title="Competing ads in Meta's Ad Library">See ads: “${esc(plan.adLibraryQuery)}” ${icon("ext", 11)}</a>` : ""}</div>
+    ${findLinks(c)}
+    <div class="r-card-f">${action(c)}</div>
   </article>`;
+}
+
+// One-click searches for an idea: competitors' ads, shops selling it in its
+// market, and Chinese suppliers. Searches, not results: the sites block
+// other pages from reading them.
+function findLinks(c) {
+  const q = c.adPlan?.adLibraryQuery || defaultAdQuery(c.name);
+  if (!q) return "";
+  const market = ["UK", "SE"].includes(c.market) ? c.market : "UK";
+  const a = (url, label, title) => `<a class="linkish" href="${attr(url)}" target="_blank" rel="noopener noreferrer" title="${attr(title)}">${esc(label)}</a>`;
+  const [shopping] = storeSearchLinks(q, market);
+  const [ali, alibaba] = supplierSearchLinks(q);
+  return `<div class="r-find xs"><span class="muted">Find “${esc(shortName(q, 34))}”:</span>
+    ${a(adLibraryLinks(q, c.market)[0].url, "Ads", "Competing ads in Meta's Ad Library")}
+    ${a(shopping.url, "Stores", `Shops selling it in ${market === "SE" ? "Sweden" : "the UK"} on Google Shopping`)}
+    ${a(ali.url, "AliExpress", "Suppliers on AliExpress")}
+    ${a(alibaba.url, "Alibaba", "Factories on Alibaba")}</div>`;
 }
 
 const profiledId = (c) => store.userProducts.find((p) => p.fromCandidate === c.id || (c.sourceId && p.candidateId === c.sourceId))?.id || null;
@@ -156,7 +175,7 @@ function ideas() {
         ${store.live.state === "ready" ? `<button class="btn sm" data-act="reload">${ui.listState === "loading" ? "Loading…" : store.candidates ? "Reload from Supabase" : "Load all from Supabase"}</button>` : ""}
       </div></div>
     <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Idea</th><th>Market</th><th class="r">Price</th><th class="r">Margin</th><th class="r hide-sm">Profit/order</th><th class="hide-sm">Researched</th><th class="r"></th></tr></thead><tbody>
-    ${list.slice(0, 200).map((c) => `<tr><td><div class="pname" style="min-width:220px"><b style="font-weight:500">${esc(c.name)}${fresh.has(c.id) ? ' <span class="tag">New</span>' : ""}</b><small>${esc(c.niche || "")}</small></div>${c.notes ? `<div class="xs muted" style="max-width:56ch;margin-top:2px">${esc(String(c.notes).slice(0, 160))}${String(c.notes).length > 160 ? "…" : ""}</div>` : ""}</td>
+    ${list.slice(0, 200).map((c) => `<tr><td><div class="pname" style="min-width:220px"><b style="font-weight:500">${esc(c.name)}${fresh.has(c.id) ? ' <span class="tag">New</span>' : ""}</b><small>${esc(c.niche || "")}</small></div>${c.notes ? `<div class="xs muted" style="max-width:56ch;margin-top:2px">${esc(String(c.notes).slice(0, 160))}${String(c.notes).length > 160 ? "…" : ""}</div>` : ""}${findLinks(c)}</td>
       <td>${esc(c.market)}</td><td class="r metric">${money(c.price, c.currency)}</td><td class="r metric">${pct(c.margin, 0)}</td><td class="r metric hide-sm ${c.profit > 0 ? "pos-n" : c.profit < 0 ? "neg-n" : ""}">${money(c.profit, c.currency)}</td><td class="hide-sm xs muted">${esc(c.researchDate || "")}</td>
       <td class="r">${action(c)}</td></tr>`).join("") || '<tr><td colspan="7"><div class="empty">No ideas match.</div></td></tr>'}
     </tbody></table></div>

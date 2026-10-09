@@ -582,3 +582,31 @@ button.li { border: 0; border-bottom: 1px solid var(--border); background: none;
   .ads-row { flex-wrap: wrap; }
   .ads-row .side { width: 100%; justify-content: flex-start; }
 }
+
+/* Product page: stores selling it and suppliers (views/sourcing.js). */
+#sec-sourcing > .ads-q { max-width: 640px; }
+.src-named { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.src-named .xs { margin-right: 4px; }
+.src-named .chip { text-decoration: none; }
+.src-list-h { display: flex; gap: 10px; align-items: center; padding: 12px 18px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.src-list-h b { font-weight: 600; font-size: 13px; }
+.src-list-h .btn { margin-left: auto; }
+.src-row .side { flex-wrap: wrap; justify-content: flex-end; }
+.src-price { font-size: 13px; font-weight: 600; }
+.src-price-in { display: flex; gap: 6px; }
+.src-price-in input { flex: 1; min-width: 0; }
+.src-price-in select { width: auto !important; flex: 0 0 auto; }
+@media (max-width: 640px) {
+  .src-row { flex-wrap: wrap; }
+  .src-row .side { width: 100%; justify-content: flex-start; }
+}
+.r-find { display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; margin-top: 4px; }
+.src-ev { display: flex; gap: 6px; align-items: baseline; margin: 0; }
+.src-list-h b { white-space: nowrap; }
+.ads-q > span:first-child { flex-wrap: wrap; }
+.ads-q > span:first-child > small { text-align: right; }
+@media (max-width: 640px) {
+  .ads-q > span:first-child { flex-direction: column; gap: 2px; }
+  .ads-q > span:first-child > small { text-align: left; }
+  .src-list-h { flex-wrap: wrap; }
+}

@@ -17,10 +17,11 @@ import { plink, provenanceLegend, aiUnavailableNote } from "./shared.js";
 import { errCopy } from "./radar.js";
 import { burstAt } from "../fx.js";
 import { adsSection, bindAds } from "./ads.js";
+import { sourcingSection, bindSourcing } from "./sourcing.js";
 
 const SECTIONS = [
   ["overview", "Overview"], ["score", "Opportunity score"], ["economics", "Profitability"], ["market", "Market opportunity"],
-  ["competition", "Competition"], ["marketing", "Marketing & brand"], ["ads", "Ads"], ["customer", "Customer"], ["validation", "Validation"],
+  ["competition", "Competition"], ["marketing", "Marketing & brand"], ["ads", "Ads"], ["sourcing", "Stores & suppliers"], ["customer", "Customer"], ["validation", "Validation"],
   ["risk", "Risk"], ["data", "Data confidence"], ["agents", "AI agents"],
 ];
 
@@ -79,6 +80,7 @@ export function render(params, id) {
           ${secCompetition(p, b, r)}
           ${secMarketing(p, b, r)}
           ${adsSection(p, m)}
+          ${sourcingSection(p, b, r, m)}
           ${secCustomer(p, b, r, m)}
           ${secValidation(p, b, r, d, m)}
           ${secRisk(p, b, r, d)}
@@ -706,6 +708,7 @@ export function mount(root, { rerender, params, id }) {
     }
   });
   bindAds(root, { id, rerender });
+  bindSourcing(root, { id, rerender });
   // Highlight the section in view.
   const io = "IntersectionObserver" in window ? new IntersectionObserver((entries) => {
     for (const en of entries) if (en.isIntersecting) {
