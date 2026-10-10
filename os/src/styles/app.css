@@ -610,3 +610,10 @@ button.li { border: 0; border-bottom: 1px solid var(--border); background: none;
   .ads-q > span:first-child > small { text-align: left; }
   .src-list-h { flex-wrap: wrap; }
 }
+.src-find { display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap; }
+.src-find .btn { flex-shrink: 0; }
+.src-find .xs { flex: 1 1 260px; min-width: 0; }
+.src-find .thinking { margin-right: 6px; }
+.tag.src-likely { background: var(--good-soft); color: var(--good); border-color: color-mix(in srgb, var(--good) 30%, transparent); }
+.tag.src-possible { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.li .body small.src-why { white-space: normal; color: var(--fg-2); margin-top: 2px; }

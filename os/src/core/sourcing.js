@@ -1,30 +1,29 @@
-// Stores selling a product and suppliers making it: where to search, what
-// the research already names, and the links you save on the product page.
-// Search pages are linked, not read: the shops and marketplaces block other
+// Stores selling a product and suppliers making it: where to search, the
+// dropshipping stores the n8n store finder found, and the links you save on
+// the product page. Search pages are linked, not read: the sites block other
 // pages from loading them.
 
 import { cleanUrl, newId, PRODUCT_ID, hostOf } from "./weblinks.js";
+import { adLibraryLinks } from "./ads.js";
 
 export const LINK_CURRENCIES = ["USD", "CNY", "GBP", "SEK", "EUR"];
 const LOCAL = { UK: "GBP", SE: "SEK" };
-const GOOGLE = { UK: { gl: "uk", hl: "en-GB", where: "the UK" }, SE: { gl: "se", hl: "sv", where: "Sweden" } };
-const AMAZON = { UK: ["www.amazon.co.uk", "Amazon UK"], SE: ["www.amazon.se", "Amazon.se"] };
+const GOOGLE = { UK: { gl: "uk", hl: "en-GB" }, SE: { gl: "se", hl: "sv" } };
 
 const clip = (q) => String(q || "").trim().slice(0, 100);
 
-// Marketplaces and shops selling it in one market.
-export function storeSearchLinks(query, market) {
-  const enc = encodeURIComponent(clip(query));
+// Where small dropshipping stores show up: Shopify stores on Google, and the
+// advertisers in Meta's Ad Library (dropshippers sell through ads, so they
+// rarely rank in ordinary search).
+export function dropshipSearchLinks(query, market) {
+  const q = clip(query).replace(/"/g, "");
   const g = GOOGLE[market] || GOOGLE.UK;
-  const [amazonHost, amazonLabel] = AMAZON[market] || AMAZON.UK;
-  const links = [
-    { id: "google-shopping", label: "Google Shopping", sub: `shops selling it in ${g.where}, with prices`,
-      url: `https://www.google.com/search?q=${enc}&udm=28&gl=${g.gl}&hl=${g.hl}` },
-    { id: "amazon", label: amazonLabel, sub: "listings, prices and review counts", url: `https://${amazonHost}/s?k=${enc}` },
+  return [
+    { id: "shopify-google", label: "Shopify stores on Google", sub: "small stores on Shopify that mention it",
+      url: `https://www.google.com/search?q=${encodeURIComponent(`"${q}" site:myshopify.com`)}&gl=${g.gl}&hl=${g.hl}` },
+    { id: "advertisers", label: "Advertisers in Meta's Ad Library", sub: "stores running ads for it now; most dropshippers sell this way",
+      url: adLibraryLinks(q, market)[0].url },
   ];
-  if (market !== "SE") links.push({ id: "ebay", label: "eBay UK", sub: "new and used listings, sold counts", url: `https://www.ebay.co.uk/sch/i.html?_nkw=${enc}` });
-  links.push({ id: "etsy", label: "Etsy", sub: "handmade and personalised versions", url: `https://www.etsy.com/search?q=${enc}` });
-  return links;
 }
 
 // Where Chinese suppliers list it. AliExpress takes the words in the path,
@@ -42,18 +41,34 @@ export function supplierSearchLinks(query) {
   ];
 }
 
-// Brands and shops the research names as market leaders, searched together
-// with the product. Generic descriptions ("Amazon generics") are left out.
-export function namedSellers(leaders, query, market) {
-  const g = GOOGLE[market] || GOOGLE.UK;
-  const list = Array.isArray(leaders) ? leaders : [];
+// The brands the research names as market leaders, so the store finder can
+// leave them out. Generic descriptions ("Amazon generics") are dropped.
+export function brandNames(leaders) {
   const seen = new Set();
-  return list
+  return (Array.isArray(leaders) ? leaders : [])
     .map((x) => String(x || "").replace(/\s*\([^)]*\)/g, "").trim())
-    .filter((x) => x && x.length <= 60 && !/generic|stores\b|own brands|brands that|\bused\b|\bvarious\b|\bothers?\b/i.test(x))
+    .filter((x) => x && x.length <= 60 && !/generic|stores\b|own brands?|brands that|\bused\b|\bvarious\b|\bothers?\b|garden centres/i.test(x))
     .filter((x) => !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase()))
-    .slice(0, 8)
-    .map((name) => ({ name, url: `https://www.google.com/search?q=${encodeURIComponent(`${name} ${clip(query)}`)}&gl=${g.gl}&hl=${g.hl}` }));
+    .slice(0, 12);
+}
+
+// How a saved store reads on the page: found by the store finder (likely or
+// possible dropshipping, with its reasons) or saved by you.
+export function storeVerdict(link) {
+  const sg = link?.signals;
+  if (link?.foundBy === "search" && sg && (sg.label === "likely" || sg.label === "possible")) {
+    return { kind: sg.label, label: sg.label === "likely" ? "Likely dropshipping" : "Possibly dropshipping", score: Number(sg.score) || 0, why: Array.isArray(sg.why) ? sg.why : [] };
+  }
+  return { kind: "yours", label: sg ? "Saved by you" : "", score: -1, why: Array.isArray(sg?.why) ? sg.why : [] };
+}
+
+// Likely first, then possible (highest score first), then your own, cheapest first.
+export function sortStores(stores) {
+  const rank = { likely: 0, possible: 1, yours: 2 };
+  return [...stores].sort((a, b) => {
+    const va = storeVerdict(a), vb = storeVerdict(b);
+    return rank[va.kind] - rank[vb.kind] || vb.score - va.score || (a.price ?? Infinity) - (b.price ?? Infinity);
+  });
 }
 
 // Check a store or supplier link the way the database will
@@ -91,18 +106,26 @@ export function normaliseLink(input, { productId, kind, market } = {}) {
 
 const median = (xs) => { const a = [...xs].sort((x, y) => x - y); const m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
 
-// What saved store prices say next to your own price (same currency only).
+// How many dropshipping stores sell it, and what they charge next to your
+// own price (same currency only).
 export function storeSummary(stores, { price, currency } = {}) {
+  if (!stores.length) return { text: "No stores yet. Find dropshipping stores above, or save one you found yourself.", tone: "" };
+  const kinds = stores.map((l) => storeVerdict(l).kind);
+  const likely = kinds.filter((k) => k === "likely").length, possible = kinds.filter((k) => k === "possible").length;
+  const n = (x, one, many = one + "s") => `${x} ${x === 1 ? one : many}`;
+  const found = likely + possible
+    ? `${n(likely + possible, "store")} look${likely + possible === 1 ? "s" : ""} like dropshipping (${likely} likely, ${possible} possible). `
+    : "";
   const priced = stores.filter((l) => l.price != null && l.currency === currency).map((l) => Number(l.price));
-  if (!stores.length) return { text: "No stores saved yet. Open a search above and save the shops that sell this product.", tone: "" };
-  if (!priced.length) return { text: `${stores.length} store${stores.length === 1 ? "" : "s"} saved. Add their prices in ${currency} to compare them with yours.`, tone: "" };
+  if (!priced.length) return { text: `${found}Add prices in ${currency} to compare the stores with yours.`.trim(), tone: "", likely, possible };
   const lo = Math.min(...priced), hi = Math.max(...priced), med = median(priced);
   let where = "";
   if (Number.isFinite(price)) {
     const below = priced.filter((x) => x < price).length;
-    where = price < lo ? " You are cheaper than every saved store." : price > hi ? " You are dearer than every saved store: the product page has to justify it." : ` ${below} of ${priced.length} saved store${priced.length === 1 ? "" : "s"} charge less than you.`;
+    where = price < lo ? " You are cheaper than all of them." : price > hi ? " You are dearer than all of them: the product page has to justify it." : ` ${below} of ${priced.length} charge less than you.`;
   }
-  return { lo, hi, med, count: priced.length, tone: Number.isFinite(price) && price > hi ? "warn" : "", text: `Saved stores charge ${fmtMoney(lo, currency)}${hi !== lo ? `–${fmtMoney(hi, currency)}` : ""}${priced.length > 2 ? ` (median ${fmtMoney(med, currency)})` : ""}.${where}` };
+  return { lo, hi, med, count: priced.length, likely, possible, tone: Number.isFinite(price) && price > hi ? "warn" : "",
+    text: `${found}${found ? "They charge" : stores.length === 1 ? "The saved store charges" : "Saved stores charge"} ${fmtMoney(lo, currency)}${hi !== lo ? `–${fmtMoney(hi, currency)}` : ""}${priced.length > 2 ? ` (median ${fmtMoney(med, currency)})` : ""}.${where}` };
 }
 
 // The cheapest saved quote in USD against the analysis' supplier price.

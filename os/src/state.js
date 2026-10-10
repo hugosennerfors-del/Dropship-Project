@@ -170,7 +170,7 @@ function applyLive(r) {
   store.overlays = { ...(store.dataset.overlays || {}), ...(r.overlays || {}) };
   store.runs = r.runs || [];
   if (Array.isArray(r.ads)) store.ads = r.ads;
-  if (Array.isArray(r.links)) store.links = r.links.map((l) => ({ ...l, price: l.price == null ? null : Number(l.price) }));
+  if (Array.isArray(r.links)) store.links = normLinks(r.links);
   store.settings = { markets: r.settings?.markets || {} };
   store.watch = r.settings?.watch || [];
   if (Array.isArray(r.ownSales) && r.ownSales.length) store.ownSalesRows = r.ownSales.map((x) => ({ ...x, period: String(x.period).slice(0, 10) }));
@@ -276,7 +276,19 @@ export const saveAd = (ad) => ads.save(ad);
 export const removeAd = (id) => ads.remove(id);
 
 const links = savedList("links");
+// Supabase returns numeric prices as text.
+const normLinks = (rows) => rows.map((l) => ({ ...l, price: l.price == null ? null : Number(l.price) }));
 export const linksFor = (productId, kind) => store.links.filter((l) => l.productId === productId && (!kind || l.kind === kind));
+
+// Saved links again from Supabase, after the store finder has added some.
+export async function refreshLinks() {
+  if (!live()) return false;
+  const r = await liveRead({ since: "9999-01-01T00:00:00Z" });
+  if (!Array.isArray(r.links)) return false;
+  store.links = normLinks(r.links);
+  changed("links");
+  return true;
+}
 export const saveLink = (link) => links.save(link);
 export const removeLink = (id) => links.remove(id);
 

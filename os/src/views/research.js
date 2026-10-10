@@ -9,7 +9,7 @@ import { MARKETS } from "../core/markets.js";
 import { fold } from "../core/nlq.js";
 import { researchRuns } from "../core/candidates.js";
 import { adLibraryLinks, defaultAdQuery } from "../core/ads.js";
-import { storeSearchLinks, supplierSearchLinks } from "../core/sourcing.js";
+import { dropshipSearchLinks, supplierSearchLinks } from "../core/sourcing.js";
 import { startResearch, checkAgain, clearResearch, researchAvailable } from "../research.js";
 import { runProfiler } from "../agents/index.js";
 import { aiUnavailableNote, shortName } from "./shared.js";
@@ -104,19 +104,19 @@ function card(c, i = 0) {
   </article>`;
 }
 
-// One-click searches for an idea: competitors' ads, shops selling it in its
-// market, and Chinese suppliers. Searches, not results: the sites block
+// One-click searches for an idea: competitors' ads, small Shopify stores
+// selling it, and Chinese suppliers. Searches, not results: the sites block
 // other pages from reading them.
 function findLinks(c) {
   const q = c.adPlan?.adLibraryQuery || defaultAdQuery(c.name);
   if (!q) return "";
   const market = ["UK", "SE"].includes(c.market) ? c.market : "UK";
   const a = (url, label, title) => `<a class="linkish" href="${attr(url)}" target="_blank" rel="noopener noreferrer" title="${attr(title)}">${esc(label)}</a>`;
-  const [shopping] = storeSearchLinks(q, market);
+  const [shopify] = dropshipSearchLinks(q, market);
   const [ali, alibaba] = supplierSearchLinks(q);
   return `<div class="r-find xs"><span class="muted">Find “${esc(shortName(q, 34))}”:</span>
     ${a(adLibraryLinks(q, c.market)[0].url, "Ads", "Competing ads in Meta's Ad Library")}
-    ${a(shopping.url, "Stores", `Shops selling it in ${market === "SE" ? "Sweden" : "the UK"} on Google Shopping`)}
+    ${a(shopify.url, "Stores", "Small Shopify stores selling it, on Google")}
     ${a(ali.url, "AliExpress", "Suppliers on AliExpress")}
     ${a(alibaba.url, "Alibaba", "Factories on Alibaba")}</div>`;
 }

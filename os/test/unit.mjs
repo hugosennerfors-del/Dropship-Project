@@ -160,18 +160,26 @@ const near = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
 {
   const S = await import("../src/core/sourcing.js");
   const W = await import("../src/core/weblinks.js");
-  const uk = S.storeSearchLinks("robe & towel", "UK");
-  ok(uk.map((l) => l.id).join() === "google-shopping,amazon,ebay,etsy", "UK store searches: Google Shopping, Amazon, eBay, Etsy");
-  ok(uk[0].url === "https://www.google.com/search?q=robe%20%26%20towel&udm=28&gl=uk&hl=en-GB" && uk[1].url === "https://www.amazon.co.uk/s?k=robe%20%26%20towel"
-    && uk[2].url === "https://www.ebay.co.uk/sch/i.html?_nkw=robe%20%26%20towel", "store search links carry the encoded words and the UK", uk.map((l) => l.url).join(" "));
-  const se = S.storeSearchLinks("hundtäcke", "SE");
-  ok(se.map((l) => l.id).join() === "google-shopping,amazon,etsy" && se[0].url.includes("gl=se&hl=sv") && se[1].url.startsWith("https://www.amazon.se/s?k=hundt%C3%A4cke"), "Swedish store searches: Amazon.se, no eBay UK");
+  const uk = S.dropshipSearchLinks('robe & "towel"', "UK");
+  ok(uk.map((l) => l.id).join() === "shopify-google,advertisers", "store searches look for small stores: Shopify on Google, advertisers in the Ad Library");
+  ok(uk[0].url === "https://www.google.com/search?q=%22robe%20%26%20towel%22%20site%3Amyshopify.com&gl=uk&hl=en-GB" && uk[1].url.includes("country=GB&q=robe%20%26%20towel"),
+    "store searches carry the quoted words and the UK; quotes in the words are dropped", uk.map((l) => l.url).join(" "));
+  const se = S.dropshipSearchLinks("hundtäcke", "SE");
+  ok(se[0].url.includes("gl=se&hl=sv") && se[1].url.includes("country=SE"), "Swedish store searches");
   const [ali, alibaba, cn] = S.supplierSearchLinks("Changing Robe");
   ok(ali.url === "https://www.aliexpress.com/w/wholesale-changing-robe.html" && alibaba.url === "https://www.alibaba.com/trade/search?SearchText=Changing%20Robe" && !cn.prefilled,
     "supplier searches: AliExpress path, Alibaba query, 1688 home page", `${ali.url} ${alibaba.url}`);
   ok(S.supplierSearchLinks("")[0].url === "https://www.aliexpress.com/", "no search words: AliExpress home page");
-  const named = S.namedSellers(["Dryrobe", "Red Original (premium)", "Amazon generics", "Large decor dropshipping stores", "dryrobe"], "changing robe", "UK");
-  ok(named.map((x) => x.name).join() === "Dryrobe,Red Original" && named[0].url === "https://www.google.com/search?q=Dryrobe%20changing%20robe&gl=uk&hl=en-GB", "named sellers: brands searched with the product, generic descriptions left out", JSON.stringify(named));
+  ok(S.brandNames(["Dryrobe", "Red Original (premium)", "Amazon generics", "Large decor dropshipping stores", "dryrobe", "garden centres"]).join() === "Dryrobe,Red Original",
+    "brands to leave out of the store finder: generic descriptions and duplicates dropped");
+  const found = (label, score, price) => ({ foundBy: "search", price, currency: "GBP", signals: { label, score, why: ["description images hosted on AliExpress"] } });
+  const mine = { foundBy: "you", price: 20, currency: "GBP" };
+  ok(S.storeVerdict(found("likely", 80)).label === "Likely dropshipping" && S.storeVerdict(found("possible", 45)).kind === "possible" && S.storeVerdict(mine).kind === "yours"
+    && S.storeVerdict({ foundBy: "search", signals: { label: "unlikely" } }).kind === "yours", "store verdicts: likely, possible, or your own");
+  ok(S.sortStores([mine, found("possible", 45, 30), found("likely", 70, 50), found("likely", 90, 40)]).map((x) => x.signals?.score ?? "you").join() === "90,70,45,you", "likely stores first, by score; your own last");
+  const sum = S.storeSummary([found("likely", 80, 39.99), found("possible", 45, 24.99), mine], { price: 29.99, currency: "GBP" });
+  ok(sum.likely === 1 && sum.possible === 1 && /2 stores look like dropshipping \(1 likely, 1 possible\)/.test(sum.text) && /£20–£39\.99 \(median £24\.99\)/.test(sum.text) && /2 of 3 charge less/.test(sum.text),
+    "store summary: dropshipping counts and prices next to yours", sum.text);
   const st = S.normaliseLink({ url: "shop.example/products/robe", name: " Robe Shop ", price: "£89,99", moq: "50" }, { productId: "changing-robe", kind: "store", market: "UK" });
   ok(st.link && st.link.url === "https://shop.example/products/robe" && st.link.price === 89.99 && st.link.currency === "GBP" && st.link.moq === null && st.link.market === "UK" && st.link.name === "Robe Shop", "a store link: https added, price parsed, market currency, no MOQ", JSON.stringify(st));
   const sp = S.normaliseLink({ url: "https://www.alibaba.com/product-detail/x.html", price: "11.5", currency: "usd", moq: "1,000" }, { productId: "changing-robe", kind: "supplier", market: "UK" });
@@ -182,12 +190,65 @@ const near = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
   ok(W.cleanUrl("http://a.test/x").url === "https://a.test/x" && W.cleanUrl("not a link").error, "links are completed to https or explained");
   const stores = [{ price: 89, currency: "GBP" }, { price: 120, currency: "GBP" }, { price: 175, currency: "GBP" }, { price: 999, currency: "SEK" }];
   const ss = S.storeSummary(stores, { price: 109, currency: "GBP" });
-  ok(ss.lo === 89 && ss.hi === 175 && ss.med === 120 && /1 of 3 saved stores charge less/.test(ss.text), "store prices: range, median and where your price sits", ss.text);
+  ok(ss.lo === 89 && ss.hi === 175 && ss.med === 120 && /1 of 3 charge less/.test(ss.text), "store prices: range, median and where your price sits", ss.text);
   ok(S.storeSummary(stores, { price: 200, currency: "GBP" }).tone === "warn", "dearer than every saved store: a warning");
   const ps = S.supplierSummary([{ price: 14, currency: "USD", moq: 50 }, { price: 11.5, currency: "USD", moq: 100, name: "Ningbo Co" }, { price: 60, currency: "CNY" }], 24);
   ok(ps.best.price === 11.5 && /\$11\.50 per unit at a minimum order of 100 from Ningbo Co/.test(ps.text) && /at or below the analysis' \$24\.00/.test(ps.text), "cheapest USD quote against the analysis", ps.text);
   ok(S.supplierSummary([{ price: 30, currency: "USD" }], 24).tone === "warn", "a quote above the analysis' supplier price is a warning");
   ok(S.fmtMoney(89.5, "GBP") === "£89.50" && S.fmtMoney(249, "SEK") === "249 kr" && S.fmtMoney(80, "CNY") === "¥80", "money in the link's own currency");
+}
+
+// The store finder's report.
+{
+  const { finderReport } = await import("../src/dropship.js");
+  ok(finderReport({ searched: 60, checked: 20, shopify: 12, selling: 8, found: 5, saved: {} }) === "Checked 20 stores from 60 search results: 12 run on Shopify and 8 sell it. 5 look like dropshipping.", "finder report: stores found");
+  const blocked = finderReport({ searched: 60, checked: 20, shopify: 0, selling: 0, found: 0, blocked: 14, degraded: true, saved: {} });
+  ok(/Shopify blocked 14 of the checks/.test(blocked) && /earlier finds were kept/.test(blocked) && !/deliver fast/.test(blocked), "finder report: a blocked run says so and keeps earlier finds", blocked);
+  ok(/9 earlier finds no longer qualify and were taken off the list/.test(finderReport({ searched: 41, checked: 20, shopify: 15, selling: 12, found: 0, saved: { retired: 9 } })), "finder report: retired finds are mentioned");
+  ok(finderReport({ searched: 0, checked: 0, errors: ["quota exceeded"] }) === "The search failed: quota exceeded", "finder report: a failed search");
+}
+
+// The store finder's scoring: the n8n Code node "Bedöm", run on made-up stores.
+{
+  const src = await readFile(join(root, "n8n/dropship-stores.workflow.js"), "utf8");
+  const at = src.indexOf("jsCode: `", src.indexOf("name: 'Bedöm'")) + "jsCode: `".length;
+  const code = new Function("return `" + src.slice(at, src.indexOf("`,\n", at)) + "`")();
+  const score = (stores) => {
+    const data = {
+      "Förbered": [{ productId: "heated-insoles", market: "UK", q: "heated insoles" }],
+      "Välj butiker": [{ results: 30, errors: [] }],
+      "Butiksinfo": stores.map((x) => ({ data: JSON.stringify(x.meta) })),
+      "Matcha": stores.map((x, i) => ({ origin: `https://s${i}.example`, host: `s${i}.example`, shopify: true, blocked: false, matched: true, handle: "insoles", title: "Heated insoles", price: null, productUrl: "/products/insoles" })),
+      "Produktdata": stores.map((x) => ({ data: JSON.stringify({ product: x.product }) })),
+      "Fraktpolicy": stores.map((x) => ({ data: x.policy })),
+    };
+    const $ = (name) => ({ first: () => ({ json: data[name][0] }), all: () => data[name].map((json) => ({ json })) });
+    return new Function("$", code)($)[0].json;
+  };
+  const product = (body = "<p>Warm feet all day.</p>", sku = "HI-1") => ({ title: "Heated insoles", body_html: body, variants: [{ sku, price: "29.99" }], created_at: "2026-09-01T10:00:00Z" });
+  const r = score([
+    // A UK retailer: delivery zones, a refund time and a big catalogue.
+    { meta: { country: "GB", currency: "GBP", published_products_count: 3094, domain: "retailer.example" }, product: product(),
+      policy: "<p>UK Mainland: 1-3 working days.</p><p>Europe: 5-10 working days.</p><p>Rest of World: 2-7 weeks.</p><p>Refunds are processed within 5-10 working days.</p>" },
+    // A dropshipper: AliExpress images and codes, a processing time before the delivery time.
+    { meta: { country: "GB", currency: "GBP", published_products_count: 1, domain: "warmfeet.example" }, product: product('<img src="https://ae01.alicdn.com/kf/a.jpg">', "14:193#Black;5:100014064"),
+      policy: "Processing time: 1-3 business days. Shipping time: 7-15 business days." },
+    // Slow and small with no supplier sign: a brand or a maker looks the same.
+    { meta: { country: "US", currency: "USD", published_products_count: 30, domain: "small.example" }, product: product(), policy: "Delivery takes 7-14 working days." },
+    // A big catalogue, slow delivery, no supplier sign.
+    { meta: { country: "GB", currency: "GBP", published_products_count: 3674, domain: "sports.example" }, product: product(), policy: "Delivery: 2-10 working days." },
+    // One weak sign: a somewhat slow delivery.
+    { meta: { country: "GB", currency: "GBP", published_products_count: 120, domain: "socks.example" }, product: product(), policy: "Standard delivery: 5-7 working days." },
+  ]);
+  const [retailer, drop, small, big, one] = r.checked;
+  ok(retailer.label === "unlikely" && retailer.why.includes("delivery 1–3 days: probably own stock"), "finder scoring: the market's own delivery zone counts, not the rest of the world or refunds", JSON.stringify(retailer));
+  ok(drop.label === "likely" && ["delivery 7–15 days", "description images hosted on AliExpress", "AliExpress-style product codes", "1 product"].every((w) => drop.why.includes(w)), "finder scoring: a dropshipper's delivery time after its processing time", JSON.stringify(drop));
+  ok(small.label === "possible" && small.score === 59, "finder scoring: without a supplier sign a store is at most possible", JSON.stringify(small));
+  ok(big.label === "unlikely", "finder scoring: a big catalogue without a supplier sign is a retailer", JSON.stringify(big));
+  ok(one.label === "unlikely" && one.why.includes("delivery 5–7 days"), "finder scoring: one weak sign is not enough", JSON.stringify(one));
+  const payload = JSON.parse(Buffer.from(/decode\('([^']+)'/.exec(r.sql)[1], "base64").toString("utf8"));
+  ok(r.stores.length === 2 && r.stores[0].url === "https://warmfeet.example/products/insoles" && payload.retire === true && payload.stores.length === 2,
+    "finder scoring: likely and possible stores are saved, linked on their own domain", JSON.stringify(payload).slice(0, 300));
 }
 
 console.log(fail ? `✗ ${fail} failed, ${pass} passed` : `✓ ${pass} unit tests passed`);

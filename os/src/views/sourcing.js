@@ -1,19 +1,22 @@
-// The product page's "Stores & suppliers" section: searches that list the
-// shops selling the product in the selected market and the Chinese
-// suppliers making it, the sellers the research names, and the stores and
-// supplier listings you save (with prices and minimum orders).
+// The product page's "Stores & suppliers" section: the small dropshipping
+// stores selling the product in the selected market (found by the n8n store
+// finder, or saved by you), searches that surface more of them, and the
+// Chinese suppliers making it, with the listings you save (prices and
+// minimum orders).
 
 import { store, linksFor, saveLink, removeLink, setOverlay, loadPref, savePref } from "../state.js";
 import { esc, attr, icon, glyph } from "../ui/dom.js";
 import { MARKETS } from "../core/markets.js";
 import { defaultAdQuery } from "../core/ads.js";
-import { LINK_CURRENCIES, storeSearchLinks, supplierSearchLinks, namedSellers, normaliseLink, storeSummary, supplierSummary, fmtMoney, hostOf } from "../core/sourcing.js";
+import { LINK_CURRENCIES, dropshipSearchLinks, supplierSearchLinks, brandNames, storeVerdict, sortStores, normaliseLink, storeSummary, supplierSummary, fmtMoney, hostOf } from "../core/sourcing.js";
+import { findDropshipStores, finderAvailable, finderReport } from "../dropship.js";
 import { burstAt } from "../fx.js";
 
 // Per product: search words, the form open (null or {kind, id}), its draft
-// and error, and the link whose Remove was clicked once.
+// and error, the link whose Remove was clicked once, and the store finder's
+// state per market.
 const ui = {};
-const uiFor = (pid) => (ui[pid] ||= { query: null, editing: null, draft: {}, error: null, armed: null });
+const uiFor = (pid) => (ui[pid] ||= { query: null, editing: null, draft: {}, error: null, armed: null, find: {} });
 
 function queryFor(p) {
   const u = uiFor(p.id);
@@ -23,6 +26,23 @@ function queryFor(p) {
 
 const linkCard = (l) => `<a class="ads-link" data-src-link="${attr(l.id)}" href="${attr(l.url)}" target="_blank" rel="noopener noreferrer">
   <b>${esc(l.label)} ${icon("ext", 11)}</b><small>${esc(l.sub)}</small>${l.prefilled === false ? '<span class="tag">paste the search</span>' : ""}</a>`;
+
+function finderBlock(u, q, m) {
+  const f = u.find[m] || { state: "idle" };
+  const market = MARKETS[m]?.name || m;
+  const live = store.live.state === "ready" && finderAvailable();
+  const running = f.state === "running";
+  const help = live
+    ? `Searches the web for small stores selling “${q}” in ${market}, then checks each store's public Shopify data for signs of dropshipping. About 20 seconds; three web searches on your n8n credits.`
+    : "Needs the live database through the n8n connector.";
+  const report = f.state === "done" ? `<div class="callout${f.found ? " good" : ""}" data-src-report>${icon(f.found ? "check" : "info", 16)}<span>${esc(f.text)}</span></div>`
+    : f.state === "error" ? `<div class="callout bad" data-src-report role="alert">${icon("warn", 16)}<span>${esc(f.text)}</span></div>`
+    : f.state === "slow" ? `<div class="callout" data-src-report>${icon("info", 16)}<span>${esc(f.text)} <button class="btn sm" type="button" data-src-wait>Check again</button></span></div>` : "";
+  return `<div class="src-find">
+      <button class="btn primary sm" type="button" data-src-find${live && !running && q.trim().length >= 3 ? "" : " disabled"}>${running ? '<span class="thinking"><i></i><i></i><i></i></span>Searching…' : `${icon("search", 13)}Find dropshipping stores`}</button>
+      <span class="xs muted">${esc(help)}</span>
+    </div>${report}`;
+}
 
 export function sourcingSection(p, b, r, m) {
   const u = uiFor(p.id);
@@ -34,23 +54,22 @@ export function sourcingSection(p, b, r, m) {
   const estimate = Number(p.core.supplierPriceUSD?.v);
   const sSum = storeSummary(stores, { price: r?.price, currency: MARKETS[m]?.currency });
   const pSum = supplierSummary(suppliers, Number.isFinite(estimate) ? estimate : null);
-  const named = namedSellers(b.mk.marketLeaders?.v, q, m);
   const supply = Object.values(store.evidenceIndex).filter((e) => e.kind === "supply" && (e.products || []).includes(p.id));
   const editing = (kind) => (u.editing?.kind === kind ? u.editing : null);
   return `<section class="p-sec" id="sec-sourcing">
-    <h2>Stores & suppliers <small>who sells it in ${esc(market)} and who makes it</small></h2>
+    <h2>Stores & suppliers <small>dropshipping stores selling it in ${esc(market)}, and who makes it</small></h2>
     <label class="field ads-q"><span>Search words<small class="xs muted">used for every search below; suppliers list in English</small></span>
       <span class="ads-q-row"><input id="src-q" type="text" maxlength="100" value="${attr(q)}" autocomplete="off" spellcheck="false"><button class="btn sm" type="button" data-src-copy>${icon("link", 13)}Copy</button></span></label>
 
-    <div class="panel"><div class="panel-h"><h3>Stores selling it</h3><span class="sub">${esc(market)} · opens in a new tab</span></div>
+    <div class="panel"><div class="panel-h"><h3>Dropshipping stores selling it</h3><span class="sub">${esc(market)} · small online stores, not big brands</span></div>
       <div class="panel-b stack">
-        <div class="ads-links">${storeSearchLinks(q, m).map(linkCard).join("")}</div>
-        ${named.length ? `<div class="src-named"><span class="xs muted">Named in the research</span>${named.map((x) => `<a class="chip" data-src-named href="${attr(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.name)} ${icon("ext", 10)}</a>`).join("")}</div>` : ""}
+        ${finderBlock(u, q, m)}
+        <div class="ads-links">${dropshipSearchLinks(q, m).map(linkCard).join("")}</div>
         <div class="callout${sSum.tone ? " " + sSum.tone : ""}" data-src-summary="store">${icon("info", 16)}<span>${esc(sSum.text)}</span></div>
       </div>
-      ${listBlock("store", stores, u, p, m)}
+      ${listBlock("store", stores, u)}
       ${editing("store") ? linkForm("store", u, stores.find((l) => l.id === u.editing.id), m) : ""}
-      ${otherStores ? `<div class="panel-b xs muted" style="border-top:1px solid var(--border)">${otherStores} more saved for ${esc(MARKETS[m === "UK" ? "SE" : "UK"]?.name || "the other market")}.</div>` : ""}
+      ${otherStores ? `<div class="panel-b xs muted" style="border-top:1px solid var(--border)">${otherStores} more for ${esc(MARKETS[m === "UK" ? "SE" : "UK"]?.name || "the other market")}.</div>` : ""}
     </div>
 
     <div class="panel"><div class="panel-h"><h3>Suppliers in China</h3><span class="sub">every market · opens in a new tab</span></div>
@@ -60,17 +79,27 @@ export function sourcingSection(p, b, r, m) {
         <div class="callout${pSum.tone ? " " + pSum.tone : ""}" data-src-summary="supplier">${icon("info", 16)}<span>${esc(pSum.text)}</span></div>
         <p class="xs muted">A listing's price is a starting point, not a quote. Ask for a sample, the price at your order size, shipping to ${esc(market)} and any certificates (CE/UKCA) before you order.</p>
       </div>
-      ${listBlock("supplier", suppliers, u, p, m, estimate)}
+      ${listBlock("supplier", suppliers, u, estimate)}
       ${editing("supplier") ? linkForm("supplier", u, suppliers.find((l) => l.id === u.editing.id), m) : ""}
     </div>
   </section>`;
 }
 
-function listBlock(kind, items, u, p, m, estimate) {
-  const title = kind === "store" ? "Saved stores" : "Saved suppliers";
+function listBlock(kind, items, u, estimate) {
   const add = u.editing?.kind === kind ? "" : `<button class="btn sm" type="button" data-src-new="${kind}">${icon("plus", 13)}${kind === "store" ? "Save a store" : "Save a supplier"}</button>`;
-  const sorted = [...items].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-  return `<div class="src-list-h"><b>${title}</b><span class="xs muted">${items.length ? `${items.length} saved, cheapest first` : "none yet"}</span>${add}</div>
+  let title, sub, sorted;
+  if (kind === "store") {
+    const kinds = items.map((l) => storeVerdict(l).kind);
+    const count = (k) => kinds.filter((x) => x === k).length;
+    title = "Stores";
+    sub = items.length ? [count("likely") && `${count("likely")} likely`, count("possible") && `${count("possible")} possible`, count("yours") && `${count("yours")} saved by you`].filter(Boolean).join(" · ") : "none yet";
+    sorted = sortStores(items);
+  } else {
+    title = "Saved suppliers";
+    sub = items.length ? `${items.length} saved, cheapest first` : "none yet";
+    sorted = [...items].sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  }
+  return `<div class="src-list-h"><b>${title}</b><span class="xs muted">${esc(sub)}</span>${add}</div>
     <div class="list" data-src-list="${kind}">${sorted.map((l) => linkRow(l, u, kind, estimate)).join("")}</div>`;
 }
 
@@ -83,8 +112,12 @@ function linkRow(l, u, kind, estimate) {
     ? (applied ? '<span class="tag">in the calculator</span>' : `<button class="btn sm" type="button" data-src-use="${attr(l.id)}" title="Save $${Number(l.price).toFixed(2)} as your verified supplier price; the calculator and scores update">Use price</button>`)
     : "";
   const armed = u.armed === l.id;
+  const v = kind === "store" ? storeVerdict(l) : null;
+  const found = v && v.kind !== "yours";
+  const title = found && l.signals?.productTitle ? `“${l.signals.productTitle}”` : "";
+  const sub = found ? [host, title, l.signals?.added && `listed ${l.signals.added}`].filter(Boolean).join(" · ") : [host, l.note].filter(Boolean).join(" · ");
   return `<div class="li src-row" data-link="${attr(l.id)}">
-    <span class="body"><b>${esc(l.name || host || "Link")}</b><small>${esc([host, l.note].filter(Boolean).join(" · "))}</small></span>
+    <span class="body"><b>${esc(l.name || host || "Link")}${found ? ` <span class="tag src-${v.kind}">${esc(v.label)}</span>` : ""}</b><small>${esc(sub)}</small>${found && v.why.length ? `<small class="src-why">${esc(v.why.join(" · "))}</small>` : ""}</span>
     <span class="side">${price}${moq}${use}
       <a class="btn sm" href="${attr(l.url)}" target="_blank" rel="noopener noreferrer">Open ${icon("ext", 11)}</a>
       <button class="btn sm ghost" type="button" data-src-edit="${attr(l.id)}" data-kind="${kind}">Edit</button>
@@ -116,8 +149,25 @@ const formData = (form) => {
   return { url: f.get("url"), name: f.get("name"), price: f.get("price"), currency: f.get("currency"), moq: f.get("moq"), note: f.get("note") };
 };
 
+// Runs the store finder for a product and market; the page shows the outcome.
+async function runFinder(p, m, rerender, executionId) {
+  const u = uiFor(p.id);
+  u.find[m] = { state: "running", executionId: executionId || null };
+  rerender();
+  try {
+    const res = await findDropshipStores({ productId: p.id, market: m, query: u.query, exclude: brandNames(p.built?.[m]?.mk?.marketLeaders?.v), executionId });
+    u.find[m] = { state: "done", found: res.found, text: finderReport(res) };
+    window.__toast?.(res.found ? `${res.found} dropshipping store${res.found === 1 ? "" : "s"} found.` : "No dropshipping stores found.");
+  } catch (err) {
+    u.find[m] = err?.code === "still_running"
+      ? { state: "slow", executionId: err.executionId, text: "n8n is still checking the stores." }
+      : { state: "error", text: err?.message || "The store finder did not answer." };
+  }
+  rerender();
+}
+
 // Events, delegated from the product page's root.
-export function bindSourcing(root, { id, rerender }) {
+export function bindSourcing(root, { id, rerender, product }) {
   const inSec = (el) => el?.closest?.("#sec-sourcing");
   const showError = (form, res) => {
     const p = form.querySelector(".ads-err");
@@ -132,8 +182,10 @@ export function bindSourcing(root, { id, rerender }) {
     const u = uiFor(id);
     if (e.target.id === "src-q") {
       u.query = e.target.value;
-      const all = [...storeSearchLinks(u.query, store.market), ...supplierSearchLinks(u.query)];
+      const all = [...dropshipSearchLinks(u.query, store.market), ...supplierSearchLinks(u.query)];
       root.querySelectorAll("[data-src-link]").forEach((a) => { const l = all.find((x) => x.id === a.dataset.srcLink); if (l) a.href = l.url; });
+      const find = root.querySelector("[data-src-find]");
+      if (find && u.find[store.market]?.state !== "running") find.disabled = !(store.live.state === "ready" && finderAvailable() && u.query.trim().length >= 3);
       const pref = loadPref().sourceQueries || {};
       savePref({ sourceQueries: Object.fromEntries(Object.entries({ ...pref, [id]: u.query }).slice(-50)) });
       return;
@@ -175,6 +227,8 @@ export function bindSourcing(root, { id, rerender }) {
       u.armed = null;
       if (!t.closest("button, a, input, select, textarea, label")) { rerender(); return; }
     }
+    if (t.closest("[data-src-find]")) { const p = product(); if (p) runFinder(p, store.market, rerender); return; }
+    if (t.closest("[data-src-wait]")) { const p = product(); if (p) runFinder(p, store.market, rerender, u.find[store.market]?.executionId); return; }
     const nw = t.closest("[data-src-new]");
     if (nw) { u.editing = { kind: nw.dataset.srcNew, id: null }; u.draft = {}; u.error = null; rerender(); root.querySelector("#srcForm [name=url]")?.focus(); return; }
     const ed = t.closest("[data-src-edit]");

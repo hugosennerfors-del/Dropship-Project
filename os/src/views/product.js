@@ -708,7 +708,7 @@ export function mount(root, { rerender, params, id }) {
     }
   });
   bindAds(root, { id, rerender });
-  bindSourcing(root, { id, rerender });
+  bindSourcing(root, { id, rerender, product: p });
   // Highlight the section in view.
   const io = "IntersectionObserver" in window ? new IntersectionObserver((entries) => {
     for (const en of entries) if (en.isIntersecting) {

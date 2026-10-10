@@ -96,7 +96,18 @@ const browser = await chromium.launch();
         window.__calls.push({ server, tool, input });
         if (tool === "execute_workflow") return { payload: { executionId: String(window.__calls.length) } };
         if (tool === "get_workflow_execution" && !input.includeData) return { payload: { execution: { status: "success" } } };
-        const body = window.__calls.filter((c) => c.tool === "execute_workflow").at(-1).input.inputs.webhookData.body;
+        const last = window.__calls.filter((c) => c.tool === "execute_workflow").at(-1).input;
+        const body = last.inputs.webhookData.body;
+        // The store finder saves a dropshipping store in Supabase and answers with a summary.
+        if (last.workflowId === "ix9qjSql5xiqexHT") {
+          live.links = [...live.links.filter((l) => l.foundBy !== "search"), { id: "0c3f1d2e-3333-4333-8333-000000000001", productId: body.productId, kind: "store", market: body.market,
+            url: "https://robeshop.example/products/changing-robe", name: "Robe Shop", price: "39.99", currency: "GBP", foundBy: "search", createdAt: "2026-10-09T00:00:00Z",
+            signals: { score: 80, label: "likely", why: ["description images hosted on AliExpress", "delivery 7–15 days"], productTitle: "Waterproof Changing Robe", added: "2026-08-20" } }];
+          const svar = { ok: true, productId: body.productId, market: body.market, query: body.query, searched: 41, found: 1, errors: [],
+            checked: [{ host: "robeshop.example", shopify: true, match: true, score: 80, label: "likely" }, { host: "bigshop.example", shopify: true, match: true, score: 10, label: "unlikely" }, { host: "other.example", shopify: false }],
+            saved: { ok: true, added: 1, refreshed: 0, skipped: 0, retired: 0 } };
+          return { payload: { data: { resultData: { runData: { Svar: [{ data: { main: [[{ json: svar }]] } }] } } } } };
+        }
         const result = body.op === "read" ? live : { ok: true };
         return { payload: { data: { resultData: { runData: { Svar: [{ data: { main: [[{ json: { ok: true, result } }]] } }] } } } } };
       },
@@ -200,8 +211,9 @@ const browser = await chromium.launch();
     ok(await page.locator("#sec-ads .ads-row").count() === 1, "ads: the removed ad leaves the list");
     // Sweden: Swedish ads, the UK ones counted separately.
     await page.click('[data-market="SE"]');
-    await page.waitForSelector("#sec-ads");
-    ok(/country=SE/.test(await meta()) && /1 more saved for United Kingdom/.test(await page.locator("#sec-ads").innerText()), "ads: Sweden searches Swedish ads and points to the UK ones");
+    // The section is already on the page and redraws on the next frame.
+    await page.waitForFunction(() => /country=SE/.test(document.querySelector('[data-ads-link="meta"]')?.getAttribute("href") || ""), null, { timeout: 5000 }).catch(() => {});
+    ok(/country=SE/.test(await meta()) && /1 more saved for United Kingdom/.test(await page.locator("#sec-ads").innerText()), "ads: Sweden searches Swedish ads and points to the UK ones", await meta());
     await page.click('[data-market="UK"]');
   }
   // Stores selling it and Chinese suppliers.
@@ -212,13 +224,26 @@ const browser = await chromium.launch();
     const sec = page.locator("#sec-sourcing");
     ok(await page.locator('.toc [data-toc="sourcing"]').count() === 1, "sourcing: the section is in the table of contents");
     const href = (id) => page.locator(`[data-src-link="${id}"]`).getAttribute("href");
-    ok(/udm=28&gl=uk/.test(await href("google-shopping")) && /^https:\/\/www\.amazon\.co\.uk\/s\?k=waterproof%20changing%20robe$/.test(await href("amazon")), "sourcing: store searches for the UK with the product's name", await href("amazon"));
+    ok(/site%3Amyshopify\.com&gl=uk/.test(await href("shopify-google")) && /country=GB&q=waterproof%20changing%20robe/.test(await href("advertisers")), "sourcing: store searches look for small Shopify stores and advertisers in the UK", await href("shopify-google"));
+    ok(await page.locator('[data-src-link="amazon"], [data-src-link="google-shopping"], [data-src-named]').count() === 0, "sourcing: no marketplaces or big brands in the store searches");
     ok(await href("aliexpress") === "https://www.aliexpress.com/w/wholesale-waterproof-changing-robe.html" && /SearchText=waterproof%20changing%20robe/.test(await href("alibaba")), "sourcing: AliExpress and Alibaba searches", await href("aliexpress"));
-    ok(await sec.locator("[data-src-named]").filter({ hasText: "Dryrobe" }).count() === 1, "sourcing: market leaders from the research are searchable");
     ok(/OEM suppliers offer changing robes/.test(await sec.innerText()), "sourcing: supply evidence from the research is shown");
-    ok(/£175/.test(await sec.locator('[data-src-list="store"]').innerText()) && /Saved stores charge £175/.test(await sec.locator('[data-src-summary="store"]').innerText()), "sourcing: a saved store from Supabase with its price");
+    ok(/£175/.test(await sec.locator('[data-src-list="store"]').innerText()) && /The saved store charges £175/.test(await sec.locator('[data-src-summary="store"]').innerText()), "sourcing: a saved store from Supabase with its price");
     await page.fill("#src-q", "dryrobe alternative");
     ok(await href("aliexpress") === "https://www.aliexpress.com/w/wholesale-dryrobe-alternative.html", "sourcing: editing the search words updates every link");
+    // The store finder: n8n searches, checks the stores and saves the dropshipping ones.
+    ok(await page.locator("[data-src-find]").isEnabled(), "sourcing: the store finder is available with the live database");
+    await page.click("[data-src-find]");
+    await page.waitForSelector("[data-src-report]", { timeout: 8000 });
+    const run = await page.evaluate(() => window.__calls.filter((c) => c.tool === "execute_workflow").map((c) => c.input).find((x) => x.workflowId === "ix9qjSql5xiqexHT"));
+    const fb = run?.inputs?.webhookData?.body || {};
+    ok(run?.triggerNodeName === "API: dropship-butiker" && fb.productId === "changing-robe" && fb.market === "UK" && fb.query === "dryrobe alternative"
+      && ["Dryrobe", "Red Original", "Passenger", "Northcore", "Decathlon"].every((x) => fb.exclude.includes(x)), "sourcing: the finder gets the product, market, search words and the brands to leave out", JSON.stringify(fb));
+    ok(/Checked 3 stores from 41 search results: 2 run on Shopify and 2 sell it\. 1 looks like dropshipping/.test(await page.locator("[data-src-report]").innerText()), "sourcing: the finder's report", await page.locator("[data-src-report]").innerText());
+    const foundRow = sec.locator('[data-src-list="store"] .src-row').first();
+    ok(/Robe Shop/.test(await foundRow.innerText()) && await foundRow.locator(".tag.src-likely").count() === 1 && /description images hosted on AliExpress/.test(await foundRow.innerText()) && /listed 2026-08-20/.test(await foundRow.innerText()),
+      "sourcing: the found store is listed first with its verdict and reasons", await foundRow.innerText());
+    ok(/1 store looks like dropshipping \(1 likely, 0 possible\)/.test(await sec.locator('[data-src-summary="store"]').innerText()), "sourcing: the summary counts dropshipping stores");
     // Save a supplier, then use its price in the calculator.
     await page.click('[data-src-new="supplier"]');
     await page.fill("#srcForm [name=url]", "alibaba.com/product-detail/robe_1.html");
@@ -248,8 +273,8 @@ const browser = await chromium.launch();
     await page.waitForFunction(() => window.__calls.some((c) => c.tool === "execute_workflow" && c.input.inputs.webhookData.body.action === "links.remove"), null, { timeout: 8000 });
     ok((await writes()).find((b) => b.action === "links.remove")?.payload?.id === save.payload.id, "sourcing: the second click removes it through n8n");
     await page.click('[data-market="SE"]');
-    await page.waitForSelector("#sec-sourcing");
-    ok(/gl=se&hl=sv/.test(await href("google-shopping")) && /amazon\.se/.test(await href("amazon")) && await page.locator('[data-src-link="ebay"]').count() === 0, "sourcing: Sweden searches Swedish shops");
+    await page.waitForFunction(() => /gl=se/.test(document.querySelector('[data-src-link="shopify-google"]')?.getAttribute("href") || ""), null, { timeout: 5000 }).catch(() => {});
+    ok(/gl=se&hl=sv/.test(await href("shopify-google")) && /country=SE/.test(await href("advertisers")), "sourcing: Sweden searches Swedish stores and advertisers", await href("shopify-google"));
     await page.click('[data-market="UK"]');
     // Research ideas carry the same searches.
     await page.goto(url + "#/research");

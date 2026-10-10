@@ -61,28 +61,61 @@ running, angle, note) in `intel.product_ads` through the `ads.save` and
 long-running, which the section reads as a sign that someone sells the
 product at a profit. Removing an ad keeps the row, marked removed.
 
-## Stores and suppliers
+## Dropshipping stores and suppliers
 
-Next to Ads, **Stores & suppliers** answers who sells the product and who
-makes it. One set of search words drives every link:
+Next to Ads, **Stores & suppliers** answers which small dropshipping stores
+already sell the product, and who makes it. Big brands and marketplaces are
+left out on purpose.
 
-- **Stores in the selected market:** Google Shopping, Amazon UK or Amazon.se,
-  eBay UK (UK only) and Etsy. The brands the research names as market leaders
-  are searched together with the product.
-- **Suppliers in China:** AliExpress (single units, samples) and Alibaba
-  (factories, minimum orders) take the search from the link. 1688 needs
-  Chinese words, so it opens on its home page. The research's supply notes
-  (minimum orders, price ranges) are shown beside them.
+**Find dropshipping stores** starts the n8n workflow
+*Plan-vy · Dropshipping-butiker* ([source](n8n/dropship-stores.workflow.js)):
 
-The sites do not let other pages read their results, so these are searches
-that open in a new tab, not lists filled in automatically. The stores and
-supplier listings you save (link, name, price, currency, and the minimum
-order for suppliers) go to `intel.product_links` through `links.save` and
-`links.remove`. The section compares saved store prices with yours and the
-cheapest USD quote with the analysis' supplier price. **Use price** saves a
-quote as your verified supplier price, so the calculator and scores use it.
-Each research idea links to the same searches (ads, stores, AliExpress,
-Alibaba).
+1. Three Brave searches for the product in the selected market (one limited
+   to `myshopify.com`), on n8n's gateway credits.
+2. Marketplaces, big chains, social media, comparison sites and the brands
+   the research names are dropped; a result must mention the product.
+3. Each remaining store's public Shopify files are read: `/meta.json` (name,
+   country, currency, catalogue size, countries it ships to), the store's
+   own product search, the matched product's `.json` and the shipping
+   policy.
+4. Each store is scored on dropshipping signals: description images hosted
+   on AliExpress or CJ Dropshipping, AliExpress- or CJ-style product codes,
+   long delivery times, "ships from abroad" wording, a store registered
+   abroad, and a small catalogue. Fast delivery (5 days or less) and a big
+   catalogue count against. When a shipping policy lists zones (UK 1–3
+   days, rest of the world 2–7 weeks), the market's own zone counts, and a
+   range after refund or processing wording is not a delivery time.
+   60+ is *likely*, 40–59 *possible*; the rest are not saved. *Likely* needs
+   a supplier sign (AliExpress or CJ images or codes, images on Chinese
+   servers, "ships from abroad" wording, a store registered in China or Hong
+   Kong). Slow delivery and a small catalogue alone fit a brand or a maker
+   too, so such a store is at most *possible*, and only with two of the
+   weaker signs (a delivery of 10 days or more counts as two); with over
+   1,000 products it counts as a retailer and is not saved.
+5. Likely and possible stores are saved in `intel.product_links`
+   (`found_by = 'search'`, with the reasons). A new run retires earlier finds
+   that no longer qualify. A store you removed is never added back, and a
+   found store you edit becomes yours.
+
+These are signs, not proof. Stores on other platforms (WooCommerce, Wix) and
+stores that hide their Shopify files are not checked.
+
+Two searches open in a new tab for more: Shopify stores on Google, and the
+advertisers in Meta's Ad Library (dropshippers sell through ads, so many
+never rank in ordinary search).
+
+**Suppliers in China:** AliExpress (single units, samples) and Alibaba
+(factories, minimum orders) take the search from the link; 1688 needs
+Chinese words, so it opens on its home page. The research's supply notes are
+shown beside them.
+
+Stores and supplier listings you save (link, name, price, currency, and the
+minimum order for suppliers) go to `intel.product_links` through
+`links.save` and `links.remove`. The section compares store prices with
+yours and the cheapest USD quote with the analysis' supplier price. **Use
+price** saves a quote as your verified supplier price, so the calculator and
+scores use it. Each research idea links to the same searches (ads, Shopify
+stores, AliExpress, Alibaba).
 
 ## Brand Builder and Shopify
 
@@ -157,8 +190,10 @@ src/views/        radar, discover, research, product (+ ads, sourcing), trends, 
 src/shopify/      Shopify client, auth, schema check, mapping, pipeline, edge function,
                   simulated store, brand concepts (shared by page, edge function and tests)
 supabase/         edge function intel-shopify and the SQL migrations
+n8n/              source of the n8n workflows built in code
 src/live.js       Supabase through n8n (any published workflow, polled to completion)
 src/research.js   new research from the search fields
+src/dropship.js   the store finder (n8n workflow Plan-vy · Dropshipping-butiker)
 src/fx.js         effects: entrances, count-ups, glow, sparks, confetti
 src/styles/       app.css (Chroma Glass palette and components), brands.css, fx.css (effects)
 src/state.js      the page's data layer
