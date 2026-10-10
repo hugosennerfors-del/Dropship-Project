@@ -142,6 +142,12 @@ const withConnection = (store, connectionId) => ({ ...store, async addResource(j
   const old = createMockShop({ clock: c.now, missingFields: ["ProductSetInput.productOptions", "Mutation.productSet(identifier)"] });
   const s2 = await verifySchema(createClient({ shop: old.shop.domain, token: "shpat_x1234567890123456", fetch: old.fetch, sleep: c.sleep }));
   ok(!s2.ok && s2.missing.includes("ProductSetInput.productOptions") && s2.missing.includes("Mutation.productSet(identifier)"), "a missing field or argument is named", s2.missing.join());
+  // 2026-07 deprecates collectionCreate's input argument (in favour of
+  // collection): it still works, so it is a warning, not a missing field.
+  const dep = createMockShop({ clock: c.now, deprecatedFields: ["Mutation.collectionCreate(input)", "CollectionInput.ruleSet"] });
+  const s3 = await verifySchema(createClient({ shop: dep.shop.domain, token: "shpat_x1234567890123456", fetch: dep.fetch, sleep: c.sleep }));
+  ok(s3.ok && s3.missing.length === 0 && s3.deprecated.includes("Mutation.collectionCreate(input)") && s3.deprecated.includes("CollectionInput.ruleSet"),
+    "a deprecated argument or input field is found and reported as deprecated, not missing", JSON.stringify({ missing: s3.missing, deprecated: s3.deprecated }));
 }
 // -- Access tokens: pasted token or Dev Dashboard app (client credentials) --
 {

@@ -12,7 +12,10 @@ export async function verifySchema(client, groups = Object.keys(NEEDS)) {
   const roots = { Query: root?.__schema?.queryType?.name || "QueryRoot", Mutation: root?.__schema?.mutationType?.name || "Mutation" };
   const typeOf = (p) => { const t = p.split(".")[0]; return roots[t] || t; };
   const names = [...new Set(paths.map(typeOf))];
-  const aliases = names.map((n, i) => `t${i}: __type(name: ${JSON.stringify(n)}) { name fields(includeDeprecated: true) { name isDeprecated args { name } } inputFields { name } }`);
+  // Deprecated arguments and input fields still work but are left out of
+  // introspection unless asked for (collectionCreate's input argument is
+  // deprecated from 2026-07): they count as deprecated, not missing.
+  const aliases = names.map((n, i) => `t${i}: __type(name: ${JSON.stringify(n)}) { name fields(includeDeprecated: true) { name isDeprecated args(includeDeprecated: true) { name isDeprecated } } inputFields(includeDeprecated: true) { name isDeprecated } }`);
   const { data } = await client.request(`query PlanvySchemaTypes { ${aliases.join(" ")} }`);
   const types = {};
   names.forEach((n, i) => { types[n] = data?.[`t${i}`] || null; });
@@ -24,8 +27,9 @@ export async function verifySchema(client, groups = Object.keys(NEEDS)) {
     if (!t) { missing.push(p); continue; }
     const field = (t.fields || []).find((f) => f.name === m[2]) || (t.inputFields || []).find((f) => f.name === m[2]);
     if (!field) { missing.push(p); continue; }
-    if (m[3] && !(field.args || []).some((a) => a.name === m[3])) { missing.push(p); continue; }
-    if (field.isDeprecated) deprecated.push(p);
+    const arg = m[3] ? (field.args || []).find((a) => a.name === m[3]) : null;
+    if (m[3] && !arg) { missing.push(p); continue; }
+    if (field.isDeprecated || arg?.isDeprecated) deprecated.push(p);
   }
   return { ok: missing.length === 0, missing, deprecated, checked: paths.length };
 }

@@ -32,7 +32,10 @@ export function createMockShop(opts = {}) {
   const gid = (type) => `gid://shopify/${type}/${++st.seq}`;
 
   // Schema for introspection: every path in NEEDS exists unless listed in
-  // missingFields.
+  // missingFields. Paths in deprecatedFields exist but are deprecated, and,
+  // as in GraphQL, a deprecated argument or input field is only listed when
+  // the query asks for it with includeDeprecated: true.
+  const deprecatedFields = new Set(opts.deprecatedFields || []);
   const types = {};
   const rootName = { Query: "QueryRoot", Mutation: "Mutation" };
   for (const p of Object.values(NEEDS).flat()) {
@@ -42,10 +45,16 @@ export function createMockShop(opts = {}) {
     const t = (types[tn] ||= { name: tn, fields: [], inputFields: [] });
     const isRoot = !!rootName[m[1]];
     const list = isRoot ? t.fields : t.inputFields;
+    const old = deprecatedFields.has(p);
     let f = list.find((x) => x.name === m[2]);
-    if (!f) { f = isRoot ? { name: m[2], isDeprecated: false, args: [] } : { name: m[2] }; list.push(f); }
-    if (m[3] && !f.args.some((a) => a.name === m[3])) f.args.push({ name: m[3] });
+    if (!f) { f = isRoot ? { name: m[2], isDeprecated: false, args: [] } : { name: m[2], isDeprecated: !m[3] && old }; list.push(f); }
+    if (m[3] && !f.args.some((a) => a.name === m[3])) f.args.push({ name: m[3], isDeprecated: old });
   }
+  const introspect = (t, q) => t && {
+    ...t,
+    fields: t.fields.map((f) => ({ ...f, args: /args\(includeDeprecated: true\)/.test(q) ? f.args : f.args.filter((a) => !a.isDeprecated) })),
+    inputFields: /inputFields\(includeDeprecated: true\)/.test(q) ? t.inputFields : t.inputFields.filter((f) => !f.isDeprecated),
+  };
 
   function charge(cost) {
     const b = st.bucket, t = clock();
@@ -64,7 +73,7 @@ export function createMockShop(opts = {}) {
     PlanvySchemaRoots: () => ({ __schema: { queryType: { name: "QueryRoot" }, mutationType: { name: "Mutation" } } }),
     PlanvySchemaTypes: (v, q) => {
       const out = {};
-      for (const m of q.matchAll(/(t\d+): __type\(name: "([^"]+)"\)/g)) out[m[1]] = types[m[2]] || null;
+      for (const m of q.matchAll(/(t\d+): __type\(name: "([^"]+)"\)/g)) out[m[1]] = introspect(types[m[2]], q) || null;
       return out;
     },
     PlanvyProductByHandle: (v) => ({ productByIdentifier: [...st.products.values()].find((p) => p.handle === v.handle) || null }),
