@@ -85,7 +85,12 @@ const BLOCK = ['amazon.', 'ebay.', 'etsy.', 'argos.', 'johnlewis.', 'decathlon.'
   'apotea.', 'lyko.', 'hm.com', 'primark.', 'marksandspencer.', 'matalan.', 'currys.', 'screwfix.', 'diy.com', 'homebase.', 'lakeland.', 'robertdyas.', 'wilko.',
   'notonthehighstreet.', 'onbuy.', 'fruugo.', 'cdiscount.', 'otto.de', 'bol.com', 'kaufland.', 'rakuten.', 'medium.com', 'linkedin.', 'x.com', 'twitter.', 'yahoo.',
   'msn.', 'forbes.', 'nytimes.', 'cnn.', 'shopify.com', 'shopify.dev', 'wordpress.', 'blogspot.', 'gov.uk', 'nhs.uk', 'ac.uk', 'sportsdirect.', 'harveynichols.',
-  'selfridges.', 'jdsports.', 'halfords.', 'costco.', 'aldi.', 'lidl.', 'coop.', 'ica.se', 'blocket.', 'tradera.', 'vinted.', 'gumtree.', 'depop.'];
+  'selfridges.', 'jdsports.', 'halfords.', 'costco.', 'aldi.', 'lidl.', 'coop.', 'ica.se', 'blocket.', 'tradera.', 'vinted.', 'gumtree.', 'depop.',
+  // Big chains, marketplaces and media seen in the results; several always
+  // answer with a bot check, which made runs count as blocked.
+  'manomano.', 'therange.', 'asda.', 'petsathome.', 'coopersofstortford.', 'habitat.', 'debenhams.', 'superdrug.', 'ryman.', 'home.bargains',
+  'bmstores.', 'savers.', 'wowcher.', 'u-buy.', 'lionshome.', 'trolley.co.uk', 'jdwilliams.', 'oliverbonas.', 'zooplus.', 'bitiba.', 'chewy.',
+  'homedepot.', 'dickssportinggoods.', 'accio.', 'wired.', 'standard.co.uk', 'marieclaire.', 'runnersworld.'];
 // Short names (Ring, Aura) would block any address containing them.
 const brands = (prep.exclude || []).map((x) => x.toLowerCase().replace(/[^a-z0-9]/g, '')).filter((x) => x.length >= 5);
 // An entry ending in a dot is a name in any domain (amazon. = amazon.co.uk,
