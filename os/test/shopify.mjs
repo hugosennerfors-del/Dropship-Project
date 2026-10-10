@@ -5,7 +5,7 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateConcept, sanitizeHtml, slugify, uniqueHandle, toHtml, variantMargin } from "../src/shopify/concept.js";
-import { CONCEPT_JSON_SCHEMA } from "../src/shopify/concept-schema.js";
+import { CONCEPT_JSON_SCHEMA, CONCEPT_TOOL_SCHEMA, jsonDepth } from "../src/shopify/concept-schema.js";
 import { buildPlan, planRollback, pageBody, adminUrl, publicUrl } from "../src/shopify/mapping.js";
 import { createClient, ShopifyError, redact } from "../src/shopify/client.js";
 import { verifySchema } from "../src/shopify/schema.js";
@@ -64,6 +64,11 @@ const withConnection = (store, connectionId) => ({ ...store, async addResource(j
   const noFg = clone(concept); noFg.identity.palette = noFg.identity.palette.filter((p) => p.role !== "fg");
   ok(/needs a fg colour/.test(validateConcept(noFg).errors.join()), "the palette needs text and background colours");
   ok(CONCEPT_JSON_SCHEMA.properties.products.items.properties.variants.items.required.includes("sku"), "the model's schema requires a SKU per variant");
+  // Claude's page tools refuse an inputSchema over 4 KB or nested more than 8 levels.
+  ok(JSON.stringify(CONCEPT_TOOL_SCHEMA).length <= 4096 && jsonDepth(CONCEPT_TOOL_SCHEMA) <= 8 && jsonDepth(CONCEPT_JSON_SCHEMA) > 8,
+    "the tool schema fits Claude's limits (4 KB, 8 levels); the full schema goes in the prompt", `${JSON.stringify(CONCEPT_TOOL_SCHEMA).length} bytes, depth ${jsonDepth(CONCEPT_TOOL_SCHEMA)}`);
+  ok(CONCEPT_TOOL_SCHEMA.required.join() === CONCEPT_JSON_SCHEMA.required.join() && CONCEPT_TOOL_SCHEMA.properties.products.items.required.includes("variants"),
+    "the tool schema keeps the required fields of the concept and its products");
 }
 // ── HTML, handles, margins ─────────────────────────────────────────────
 {

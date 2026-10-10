@@ -32,9 +32,27 @@ export const CONCEPT_JSON_SCHEMA = {
   },
 };
 
-// The same schema without descriptions and string lengths, for the page
-// tool Claude calls (tool schemas may be at most 4 KB). validateConcept()
-// still enforces every length and sends the errors back to Claude.
+// The schema for the page tool Claude calls. Tool schemas may be at most
+// 4 KB and nest at most 8 levels, so descriptions and string lengths go,
+// and parts deeper than TOOL_DEPTH keep only their type. The prompt carries
+// the full schema, and validateConcept() still checks every field and
+// sends the errors back to Claude.
+export const TOOL_DEPTH = 7;
+export const jsonDepth = (x) => (x && typeof x === "object" ? 1 + Math.max(0, ...Object.values(x).map(jsonDepth)) : 0);
 const strip = (x) => Array.isArray(x) ? x.map(strip)
   : x && typeof x === "object" ? Object.fromEntries(Object.entries(x).filter(([k]) => k !== "description" && k !== "maxLength").map(([k, v]) => [k, strip(v)])) : x;
-export const CONCEPT_TOOL_SCHEMA = strip(CONCEPT_JSON_SCHEMA);
+// A schema node within `budget` levels: an object's properties cost two
+// levels (the node and its property map), an array's items one.
+function fit(node, budget) {
+  if (jsonDepth(node) <= budget) return node;
+  const out = { type: node.type };
+  if (node.type === "object" && node.properties && budget >= 3) {
+    if (node.required) out.required = node.required;
+    out.properties = Object.fromEntries(Object.entries(node.properties).map(([k, v]) => [k, fit(v, budget - 2)]));
+  } else if (node.type === "array" && node.items && budget >= 2) {
+    for (const k of ["minItems", "maxItems"]) if (node[k] != null) out[k] = node[k];
+    out.items = fit(node.items, budget - 1);
+  }
+  return out;
+}
+export const CONCEPT_TOOL_SCHEMA = fit(strip(CONCEPT_JSON_SCHEMA), TOOL_DEPTH);

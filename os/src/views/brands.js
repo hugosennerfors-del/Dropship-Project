@@ -16,7 +16,7 @@ import { openPreview, openEditor, openPublish, openJobDrawer, paletteOf, fontsOf
 
 const ui = {
   form: { niche: "", audience: "", priceLevel: "mid", tone: "", market: null, productType: "physical", concepts: 3, products: 6 },
-  running: false, ctl: null, status: "", chars: 0, runIds: [], rejected: [], cached: null, msg: "",
+  running: false, failed: false, ctl: null, status: "", chars: 0, runIds: [], rejected: [], cached: null, msg: "",
   suggestions: [], suggesting: false, q: "", selected: {}, regen: {}, sourceProductId: null,
 };
 const toast = (m) => window.__toast?.(m);
@@ -88,7 +88,8 @@ export function render(params) {
           </div>
         </form>
         <div class="stack bb-results">
-          ${ui.running || ui.status ? `<section class="panel bb-run"><div class="panel-b row">
+          ${ui.failed && !ui.running ? `<div class="callout bad bb-run" role="alert">${icon("warn", 16)}<span>${esc(ui.status)}</span></div>`
+            : ui.running || ui.status ? `<section class="panel bb-run"><div class="panel-b row">
               ${ui.running ? '<span class="thinking"><i></i><i></i><i></i></span>' : icon("check", 14)}
               <span class="small">${esc(ui.status)}${ui.running && ui.chars ? ` · ${ui.chars.toLocaleString("en-GB")} characters written` : ""}</span></div></section>` : ""}
           ${ui.cached ? `<div class="callout">${icon("info", 16)}<span>Same brief as ${dateLabel(ui.cached.createdAt)}: showing those concepts instead of asking Claude again. “Generate anew” asks again (counts towards today's limit).</span></div>` : ""}
@@ -174,7 +175,7 @@ export function mount(root, { rerender, params }) {
     readForm(root);
     if (ui.running) return;
     ui.ctl = new AbortController();
-    Object.assign(ui, { running: true, status: "Starting…", chars: 0, runIds: [], rejected: [], cached: null });
+    Object.assign(ui, { running: true, failed: false, status: "Starting…", chars: 0, runIds: [], rejected: [], cached: null });
     rerender();
     try {
       const r = await generateConcepts({ ...ui.form, sourceProductId: ui.sourceProductId }, {
@@ -191,6 +192,7 @@ export function mount(root, { rerender, params }) {
       }
     } catch (e) {
       ui.running = false;
+      ui.failed = e?.code !== "cancelled";
       ui.status = e?.code === "cancelled" ? "Stopped." : errText(e);
       if (e?.code && !["cancelled", "input", "limit"].includes(e.code)) ui.status = sampleError(e);
     }
@@ -293,6 +295,7 @@ function sampleError(e) {
     case "tools_unavailable": return "This view cannot run tool calls; reload the page.";
     case "prompt_too_large": return "The brief is too long. Shorten it.";
     case "session_expired": return "Sign in to claude.ai again.";
+    case "invalid_request": return `Claude did not accept the request from this page (${e.message || "invalid request"}). This is a fault in the page, not in your brief.`;
     default: return errText(e);
   }
 }

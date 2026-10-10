@@ -10,7 +10,7 @@ import { store, changed } from "../state.js";
 import { liveRead, liveWrite, startWorkflow, SHOPIFY_INTAKE, MCP_FIX } from "../live.js";
 import { MARKETS } from "../core/markets.js";
 import { validateConcept, slugify, uniqueHandle, LIMITS, SECTION_TYPES } from "./concept.js";
-import { CONCEPT_TOOL_SCHEMA } from "./concept-schema.js";
+import { CONCEPT_JSON_SCHEMA, CONCEPT_TOOL_SCHEMA } from "./concept-schema.js";
 import { planRollback } from "./mapping.js";
 
 // Bumped when the prompt changes, so cached answers to the old prompt are
@@ -205,8 +205,8 @@ export function buildPrompt(input, { tools, avoid = [] } = {}) {
     "- No health, medical, safety or performance claims that need evidence. legalFlags lists what the user should check (names, claims, regulated products); it is not legal advice.",
     avoid.length ? `- Do not reuse these names: ${avoid.map((n) => s(n, 60)).join(", ")}.` : "",
     tools
-      ? `Call the tool submit_concept once per concept, with the whole concept as its input; you may submit several in one go. If the tool answers with errors, fix exactly those and submit that concept again. When all ${input.concepts} are accepted, reply with one short sentence.`
-      : `Reply with only JSON: {"concepts":[...]} where each concept follows this JSON Schema: ${JSON.stringify(CONCEPT_TOOL_SCHEMA)}`,
+      ? `Call the tool submit_concept once per concept, with the whole concept as its input; you may submit several in one go. The tool's own schema is shortened; each concept must follow this full JSON Schema: ${JSON.stringify(CONCEPT_JSON_SCHEMA)}\nIf the tool answers with errors, fix exactly those and submit that concept again. When all ${input.concepts} are accepted, reply with one short sentence.`
+      : `Reply with only JSON: {"concepts":[...]} where each concept follows this JSON Schema: ${JSON.stringify(CONCEPT_JSON_SCHEMA)}`,
   ].filter(Boolean).join("\n");
 }
 
@@ -228,8 +228,11 @@ export async function generateConcepts(rawInput, { signal, onConcept = () => {},
     gen = await liveWrite("generation.start", { kind: "brand", input, inputHash: hash, model: tools ? "default (tool use)" : "default (JSON)", force: force || !!replace });
   } catch (e) { throw { code: "limit", message: errText(e) }; }
   if (gen.cached) {
-    const ids = gen.cached.output?.brandIds || [];
-    return { cached: true, createdAt: gen.cached.createdAt, brandIds: ids.filter((id) => brandById(id)), used: gen.used, limit: gen.limit };
+    const ids = (gen.cached.output?.brandIds || []).filter((id) => brandById(id));
+    if (ids.length) return { cached: true, createdAt: gen.cached.createdAt, brandIds: ids, used: gen.used, limit: gen.limit };
+    // The earlier answer's brands are gone (archived): ask Claude again.
+    try { gen = await liveWrite("generation.start", { kind: "brand", input, inputHash: hash, model: tools ? "default (tool use)" : "default (JSON)", force: true }); }
+    catch (e) { throw { code: "limit", message: errText(e) }; }
   }
 
   const prompt = buildPrompt(input, { tools, avoid });
@@ -285,6 +288,13 @@ export async function generateConcepts(rawInput, { signal, onConcept = () => {},
     }
   }
   const saved = (await Promise.all(saves)).filter((r) => r.ok);
+  // Nothing passed the checks: a failed run, so the same brief is not
+  // answered from the cache with nothing and it does not count as used.
+  if (!saved.length) {
+    const why = rejected.length ? rejected.slice(0, 2).map((r) => `${r.name}: ${(r.errors || []).slice(0, 2).join("; ")}`).join(" · ") : "Claude did not submit a concept that passed the checks.";
+    await liveWrite("generation.finish", { id: gen.id, status: "failed", error: (error ? `${error}; ` : "") + why, tokensIn: estTokens(prompt), tokensOut: estTokens(text), estimated: true }).catch(() => {});
+    throw { code: "empty", message: `No concept was saved. ${why} Try again, or ask for fewer concepts or products.` };
+  }
   await liveWrite("generation.finish", {
     id: gen.id, status, error,
     output: { brandIds: saved.map((r) => r.id), names: accepted.map((c) => c.name), rejected: rejected.map((r) => ({ name: r.name, errors: r.errors.slice(0, 5) })) },

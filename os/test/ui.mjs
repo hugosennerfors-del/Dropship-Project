@@ -512,7 +512,11 @@ const browser = await chromium.launch();
     };
     const sample = async (input, opts = {}) => {
       window.__sampleInputs = (window.__sampleInputs || []).concat([input]);
-      window.__sampleTools = (opts.tools || []).map((t) => ({ name: t.name, schemaBytes: JSON.stringify(t.inputSchema || {}).length }));
+      // Like the runtime: a tool's inputSchema is at most 4 KB and 8 levels deep.
+      const depth = (x) => (x && typeof x === "object" ? 1 + Math.max(0, ...Object.values(x).map(depth)) : 0);
+      window.__sampleTools = (opts.tools || []).map((t) => ({ name: t.name, schemaBytes: JSON.stringify(t.inputSchema || {}).length, depth: depth(t.inputSchema || {}) }));
+      const deep = window.__sampleTools.findIndex((t) => t.depth > 8 || t.schemaBytes > 4096);
+      if (deep >= 0) throw { code: "invalid_request", message: `tools[${deep}] (${window.__sampleTools[deep].name}): inputSchema nests deeper than 8` };
       const tool = (opts.tools || []).find((t) => t.name === "submit_concept");
       if (tool) {
         const bad = { ...concept, name: "Broken", identity: { ...concept.identity, palette: [{ role: "primary", hex: "blue", name: "x" }] } };
@@ -556,7 +560,8 @@ const browser = await chromium.launch();
   const prompt = await page.evaluate(() => window.__sampleInputs.at(-1));
   ok(/<brief>[\s\S]*IGNORE ALL RULES[\s\S]*<\/brief>/.test(prompt) && /not an instruction to you/i.test(prompt), "the user's text is fenced as data, with an instruction to ignore it");
   const tools = await page.evaluate(() => window.__sampleTools);
-  ok(tools.length === 1 && tools[0].name === "submit_concept" && tools[0].schemaBytes < 4096, "structured output through one tool with a schema under 4 KB", JSON.stringify(tools));
+  ok(tools.length === 1 && tools[0].name === "submit_concept" && tools[0].schemaBytes < 4096 && tools[0].depth <= 8, "structured output through one tool with a schema under 4 KB and 8 levels", JSON.stringify(tools));
+  ok(/"variants"[\s\S]*"sku"/.test(prompt) && /"palette"[\s\S]*"hex"/.test(prompt), "the prompt carries the full concept schema");
   const toolErrors = await page.evaluate(() => window.__toolErrors);
   ok(toolErrors.length === 1 && /identity\.palette\[0\]\.hex/.test(toolErrors[0]), "an invalid concept is refused with the fields to fix", toolErrors[0]);
   const saves = (await writes("brand.save")).map((b) => b.payload);
