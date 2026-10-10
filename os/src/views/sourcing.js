@@ -7,8 +7,7 @@
 import { store, linksFor, saveLink, removeLink, setOverlay, loadPref, savePref } from "../state.js";
 import { esc, attr, icon, glyph } from "../ui/dom.js";
 import { MARKETS } from "../core/markets.js";
-import { defaultAdQuery } from "../core/ads.js";
-import { LINK_CURRENCIES, dropshipSearchLinks, supplierSearchLinks, brandNames, storeVerdict, sortStores, normaliseLink, storeSummary, supplierSummary, fmtMoney, hostOf } from "../core/sourcing.js";
+import { LINK_CURRENCIES, dropshipSearchLinks, supplierSearchLinks, brandNames, finderQuery, storeVerdict, sortStores, normaliseLink, storeSummary, supplierSummary, fmtMoney, hostOf } from "../core/sourcing.js";
 import { findDropshipStores, finderAvailable, finderReport } from "../dropship.js";
 import { burstAt } from "../fx.js";
 
@@ -18,10 +17,10 @@ import { burstAt } from "../fx.js";
 const ui = {};
 const uiFor = (pid) => (ui[pid] ||= { query: null, editing: null, draft: {}, error: null, armed: null, find: {} });
 
-function queryFor(p) {
-  const u = uiFor(p.id);
-  if (u.query == null) u.query = loadPref().sourceQueries?.[p.id] ?? defaultAdQuery(p.core.name?.v);
-  return u.query;
+// Your own words for the product, else the words that found its stores in
+// this market, else its name.
+function queryFor(p, m) {
+  return uiFor(p.id).query ?? loadPref().sourceQueries?.[p.id] ?? finderQuery(p.core.name?.v, linksFor(p.id, "store").filter((l) => l.market === m));
 }
 
 const linkCard = (l) => `<a class="ads-link" data-src-link="${attr(l.id)}" href="${attr(l.url)}" target="_blank" rel="noopener noreferrer">
@@ -46,7 +45,7 @@ function finderBlock(u, q, m) {
 
 export function sourcingSection(p, b, r, m) {
   const u = uiFor(p.id);
-  const q = queryFor(p);
+  const q = queryFor(p, m);
   const market = MARKETS[m]?.name || m;
   const stores = linksFor(p.id, "store").filter((l) => l.market === m);
   const otherStores = linksFor(p.id, "store").length - stores.length;
@@ -155,7 +154,7 @@ async function runFinder(p, m, rerender, executionId) {
   u.find[m] = { state: "running", executionId: executionId || null };
   rerender();
   try {
-    const res = await findDropshipStores({ productId: p.id, market: m, query: u.query, exclude: brandNames(p.built?.[m]?.mk?.marketLeaders?.v), executionId });
+    const res = await findDropshipStores({ productId: p.id, market: m, query: queryFor(p, m), exclude: brandNames(p.built?.[m]?.mk?.marketLeaders?.v), executionId });
     u.find[m] = { state: "done", found: res.found, text: finderReport(res) };
     window.__toast?.(res.found ? `${res.found} dropshipping store${res.found === 1 ? "" : "s"} found.` : "No dropshipping stores found.");
   } catch (err) {

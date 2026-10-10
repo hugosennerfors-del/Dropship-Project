@@ -166,6 +166,11 @@ const near = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
     "store searches carry the quoted words and the UK; quotes in the words are dropped", uk.map((l) => l.url).join(" "));
   const se = S.dropshipSearchLinks("hundtäcke", "SE");
   ok(se[0].url.includes("gl=se&hl=sv") && se[1].url.includes("country=SE"), "Swedish store searches");
+  ok(S.finderQuery("Padel racket backpack with thermal compartment") === "padel racket backpack" && S.finderQuery("Wi-Fi digital photo frame for families") === "wi-fi digital photo frame",
+    "finder words: the product's name without its qualifiers");
+  const searched = (query, checkedAt) => ({ foundBy: "search", signals: { query, checkedAt } });
+  ok(S.finderQuery("EMS fascia relaxation ring", [searched("old words", "2026-10-09T10:00:00Z"), searched("fascia ring", "2026-10-10T00:33:00Z"), { foundBy: "you", signals: null }]) === "fascia ring",
+    "finder words: the words that found the saved stores, newest first");
   const [ali, alibaba, cn] = S.supplierSearchLinks("Changing Robe");
   ok(ali.url === "https://www.aliexpress.com/w/wholesale-changing-robe.html" && alibaba.url === "https://www.alibaba.com/trade/search?SearchText=Changing%20Robe" && !cn.prefilled,
     "supplier searches: AliExpress path, Alibaba query, 1688 home page", `${ali.url} ${alibaba.url}`);

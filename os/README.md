@@ -97,6 +97,11 @@ left out on purpose.
    that no longer qualify. A store you removed is never added back, and a
    found store you edit becomes yours.
 
+The finder searches with the section's search words: yours if you typed
+some, else the words that found the saved stores (a run with other words
+would retire them), else the product's name without qualifiers such as
+"with …" or "for …", since a result must contain most of the words.
+
 These are signs, not proof. Stores on other platforms (WooCommerce, Wix) and
 stores that hide their Shopify files are not checked.
 

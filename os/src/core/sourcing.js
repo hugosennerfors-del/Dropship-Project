@@ -4,7 +4,7 @@
 // pages from loading them.
 
 import { cleanUrl, newId, PRODUCT_ID, hostOf } from "./weblinks.js";
-import { adLibraryLinks } from "./ads.js";
+import { adLibraryLinks, defaultAdQuery } from "./ads.js";
 
 export const LINK_CURRENCIES = ["USD", "CNY", "GBP", "SEK", "EUR"];
 const LOCAL = { UK: "GBP", SE: "SEK" };
@@ -43,6 +43,17 @@ export function supplierSearchLinks(query) {
 
 // The brands the research names as market leaders, so the store finder can
 // leave them out. Generic descriptions ("Amazon generics") are dropped.
+// The search words to start from: the words that found the saved stores (a
+// run with other words would retire them), else the product's name without
+// its qualifiers ("… with thermal compartment", "… for families"), since the
+// finder wants most of the words in every result.
+export function finderQuery(name, stores = []) {
+  const found = stores.filter((l) => l.foundBy === "search" && l.signals?.query)
+    .sort((a, b) => String(b.signals.checkedAt || "").localeCompare(String(a.signals.checkedAt || "")));
+  if (found.length) return String(found[0].signals.query);
+  return defaultAdQuery(name).split(/\s+(?:with|for|and|in)\s+/)[0];
+}
+
 export function brandNames(leaders) {
   const seen = new Set();
   return (Array.isArray(leaders) ? leaders : [])
