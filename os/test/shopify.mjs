@@ -12,7 +12,7 @@ import { verifySchema } from "../src/shopify/schema.js";
 import { runJob, runRollback } from "../src/shopify/pipeline.js";
 import { createMockShop } from "../src/shopify/mockshop.js";
 import { accessToken } from "../src/shopify/auth.js";
-import { Q } from "../src/shopify/documents.js";
+import { Q, scopeFix } from "../src/shopify/documents.js";
 import { SHOPIFY_API_VERSION } from "../src/shopify/version.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -174,6 +174,10 @@ const withConnection = (store, connectionId) => ({ ...store, async addResource(j
   ok(await accessToken(cc, { secrets, fetch: shop.fetch, now: () => t }) === "mock-cc-token-1" && exchanges() === 1, "a cached token is reused while it is valid");
   t = t0 + (86399 - 200) * 1000;
   ok(await accessToken(cc, { secrets, fetch: shop.fetch, now: () => t }) === "mock-cc-token-2" && exchanges() === 2, "a token about to expire is renewed by asking again");
+  t = t0 + (86399 + 3600) * 1000;
+  ok(await accessToken(cc, { secrets, fetch: shop.fetch, now: () => t }) === "mock-cc-token-2" && exchanges() === 2, "the renewed token is cached in turn");
+  ok(await accessToken(cc, { secrets, fetch: shop.fetch, now: () => t, fresh: true }) === "mock-cc-token-3" && exchanges() === 3, "a connection test asks for a new token, so newly released scopes count at once");
+  ok(await accessToken(cc, { secrets, fetch: shop.fetch, now: () => t }) === "mock-cc-token-3" && exchanges() === 3, "and the new token replaces the cached one");
   const client = createClient({ shop: shop.shop.domain, token: "mock-cc-token-2", fetch: shop.fetch, sleep: async () => {} });
   ok((await client.request(Q.shop)).data.shop.plan.publicDisplayName === "Development", "the renewed token works for Admin API calls");
 
@@ -282,7 +286,8 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
 {
   const { client, store } = await setup({ scopes: ["write_products"] });
   const r = await runJob({ job: job("j8"), concept, connection: conn, client, store });
-  ok(r.status === "failed" && r.error.kind === "scopes" && /write_content/.test(r.error.message), "missing scopes are named with what they are for", r.error?.message);
+  ok(r.status === "failed" && r.error.kind === "scopes" && /write_content/.test(r.error.message) && /check the store again/.test(r.error.message), "missing scopes are named with what they are for and how to add them", r.error?.message);
+  ok(/Dev Dashboard/.test(scopeFix("client_credentials")) && /release it/.test(scopeFix("client_credentials")) && !/Dev Dashboard/.test(scopeFix("token")), "the fix names the Dev Dashboard only for apps connected with client credentials");
 }
 {
   const { client, store } = await setup({ missingFields: ["PageCreateInput.isPublished"] });

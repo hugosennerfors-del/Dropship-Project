@@ -92,17 +92,17 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
       conn.token_expires_at = expiresAt;
     },
   };
-  async function clientFor(conn) {
+  async function clientFor(conn, { fresh = false } = {}) {
     const shopLog = (o) => log({ ...o, shop: conn.shop_domain });
     if (/\.mock\.test$/.test(conn.shop_domain)) {
       const [saved] = await sql`select state from intel.sim_stores where domain = ${conn.shop_domain}`;
       const mock = createMockShop({ domain: conn.shop_domain, name: conn.label || "Simulated store", currency: /^se-/.test(conn.shop_domain) ? "SEK" : "GBP", restore: saved?.state || null });
-      const token = await accessToken(conn, { secrets, fetch: mock.fetch });
+      const token = await accessToken(conn, { secrets, fetch: mock.fetch, fresh });
       const client = createClient({ shop: conn.shop_domain, token, version: conn.api_version || SHOPIFY_API_VERSION, fetch: mock.fetch, log: shopLog });
       client.persist = async () => { await sql`insert into intel.sim_stores (domain, state, updated_at) values (${conn.shop_domain}, ${sql.json(mock.snapshot())}, now()) on conflict (domain) do update set state = excluded.state, updated_at = now()`; };
       return client;
     }
-    const token = await accessToken(conn, { secrets, fetch: fetchImpl });
+    const token = await accessToken(conn, { secrets, fetch: fetchImpl, fresh });
     const client = createClient({ shop: conn.shop_domain, token, version: conn.api_version || SHOPIFY_API_VERSION, fetch: fetchImpl, log: shopLog });
     client.persist = async () => {};
     return client;
@@ -113,7 +113,8 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
     const [conn] = await sql`select * from intel.shopify_connections where id = ${id}`;
     if (!conn) return;
     try {
-      const client = await clientFor(conn);
+      // A new token, so scopes released since the last one are seen now.
+      const client = await clientFor(conn, { fresh: true });
       const { data: s } = await client.request(Q.shop);
       const { data: sc } = await client.request(Q.scopes);
       const have = new Set((sc?.currentAppInstallation?.accessScopes || []).map((x) => x.handle));

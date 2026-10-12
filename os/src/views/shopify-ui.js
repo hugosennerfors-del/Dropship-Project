@@ -7,10 +7,10 @@ import { store, onChange } from "../state.js";
 import { esc, attr, icon, money, dateLabel } from "../ui/dom.js";
 import { validateConcept, sanitizeHtml, toHtml, variantMargin, SECTION_TYPES, PALETTE_ROLES, LIMITS } from "../shopify/concept.js";
 import { buildPlan, DEFAULT_OPTIONS } from "../shopify/mapping.js";
-import { SCOPES } from "../shopify/documents.js";
+import { SCOPES, scopeFix } from "../shopify/documents.js";
 import {
   brandById, connectionById, jobById, isLive, storeBadge, saveBrand, startPublish, retryJob, rollbackJob, loadJob, loadShopify,
-  undoPlan, newIdempotencyKey, TERMINAL, IMAGE_PROVIDERS,
+  undoPlan, newIdempotencyKey, recheckConnection, TERMINAL, IMAGE_PROVIDERS,
 } from "../shopify/brands.js";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -369,7 +369,7 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
   const conns = store.shopify.connections.filter((c) => c.status !== "disconnected");
   const pick = conns.find((c) => c.status === "connected" && !isLive(c)) || conns.find((c) => c.status === "connected") || conns[0] || null;
   const ui = {
-    connectionId: pick?.id || "", confirm: false, liveText: "", dry: false, busy: false, error: "", key: newIdempotencyKey(),
+    connectionId: pick?.id || "", confirm: false, liveText: "", dry: false, busy: false, error: "", key: newIdempotencyKey(), checking: false, checkNote: "",
     options: { ...DEFAULT_OPTIONS, includeBrand: !productHandles, productHandles },
   };
   const scopeOk = (have, need) => have.includes(need) || (need.startsWith("read_") && have.includes("write_" + need.slice(5)));
@@ -380,17 +380,17 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
     const plan = buildPlan(c, ui.options);
     const live = isLive(conn);
     const blockers = [];
+    let missing = [];
     if (!conn) blockers.push("Choose a store.");
     else {
       if (conn.status !== "connected") blockers.push(`This store is not connected (${conn.status}). Test it under Data > Shopify stores.`);
       if (conn.currency && plan.ok && conn.currency !== plan.summary.currency) blockers.push(`The store sells in ${conn.currency} but this concept is priced in ${plan.summary.currency}.`);
-      const missing = plan.ok ? plan.summary.scopes.filter((x) => !scopeOk(conn.scopes || [], x)) : [];
-      if (missing.length) blockers.push(`The store's app lacks access: ${missing.map((x) => `${x} (${SCOPES[x] || "needed"})`).join("; ")}.`);
+      missing = plan.ok ? plan.summary.scopes.filter((x) => !scopeOk(conn.scopes || [], x)) : [];
       if (conn.schema && conn.schema.ok === false) blockers.push(`The store's API version lacks fields this integration uses: ${(conn.schema.missing || []).slice(0, 6).join(", ")}.`);
     }
     if (!plan.ok) blockers.push(...plan.errors.slice(0, 8));
     const liveOk = !live || ui.liveText.trim().toLowerCase() === (conn?.shopDomain || "");
-    const can = !blockers.length && ui.confirm && liveOk && !ui.busy;
+    const can = !blockers.length && !missing.length && ui.confirm && liveOk && !ui.busy;
     const sm = plan.summary;
     const o = ui.options;
     const what = sm ? [
@@ -414,16 +414,20 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
         <section class="bb-box"><h4>Exactly what will be created</h4><ul class="bullets small">${what.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>
           ${sm ? `<p class="xs muted">About ${sm.apiCalls} API calls, about ${sm.estSeconds} s. Runs in the background; you can close this page.</p>` : ""}</section>
         <section class="bb-box"><h4>Choices</h4>
+          <div class="row"><span class="small">Quick choice</span><div class="seg" role="group" aria-label="Quick choice">
+            <button data-pub="preset" data-v="safe" aria-pressed="${o.productStatus === "DRAFT" && !o.publishPage && !o.publishToOnlineStore}">Draft, hidden</button><button data-pub="preset" data-v="live" aria-pressed="${o.productStatus === "ACTIVE" && o.publishToOnlineStore && (o.publishPage || !o.includeBrand)}">Visible to shoppers now</button></div></div>
           <div class="row"><span class="small">Product status</span><div class="seg" role="group" aria-label="Product status">
             <button data-pub="status" data-v="DRAFT" aria-pressed="${o.productStatus === "DRAFT"}">Draft</button><button data-pub="status" data-v="ACTIVE" aria-pressed="${o.productStatus === "ACTIVE"}">Active</button></div></div>
           <label class="bb-check"><input type="checkbox" data-pub="publishPage" data-k="pp"${o.publishPage ? " checked" : ""}${o.includeBrand ? "" : " disabled"}> Publish the brand page now <small>(off: the page is created hidden)</small></label>
           <label class="bb-check"><input type="checkbox" data-pub="addToMenu" data-k="am"${o.addToMenu ? " checked" : ""}${o.includeBrand ? "" : " disabled"}> Add the brand to a menu</label>
           ${o.addToMenu ? `<label class="field bb-indent"><span>Menu handle</span><input type="text" class="mono" data-pub="menuHandle" data-k="mh" value="${attr(o.menuHandle)}"></label>` : ""}
           <label class="bb-check"><input type="checkbox" data-pub="publishToOnlineStore" data-k="os"${o.publishToOnlineStore ? " checked" : ""}> Publish to the Online Store sales channel <small>(off: nothing is visible to shoppers)</small></label>
+          ${o.publishToOnlineStore && o.productStatus === "DRAFT" ? `<p class="xs muted bb-indent">Draft products stay hidden from shoppers even on the Online Store; choose Active to sell them now.</p>` : ""}
           <label class="bb-check bb-off"><input type="checkbox" disabled> Write a theme template <small>(not built yet; the theme is never touched)</small></label>
         </section>
         ${plan.warnings?.length ? `<div class="callout warn">${icon("warn", 16)}<ul class="bullets small">${plan.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
         ${blockers.length ? `<div class="callout bad">${icon("warn", 16)}<ul class="bullets small">${blockers.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
+        ${missing.length ? accessHtml(conn, missing, ui) : ""}
         <section class="bb-box"><div class="row between"><h4>Dry run</h4><button class="btn sm" data-pub="dry">${ui.dry ? "Hide" : "Show"} the exact requests</button></div>
           ${ui.dry ? (plan.ok ? `<p class="xs muted">Validated. These are the steps and the exact GraphQL variables the job sends; nothing is sent now.</p><ol class="bb-dry">${plan.steps.map((s) => `<li><b>${esc(s.title)}</b>${s.variables || s.check || s.targets || s.item ? `<pre>${esc(JSON.stringify(s.variables || s.check || s.targets || s.item, null, 2))}</pre>` : ""}</li>`).join("")}</ol>` : `<p class="small">The concept does not validate; see the list above.</p>`) : `<p class="xs muted">Validates everything and shows the payload without writing to Shopify.</p>`}
         </section>
@@ -431,17 +435,19 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
         ${conn && live ? `<label class="field"><span>This is a LIVE store. Type its address to publish there</span><input type="text" class="mono" data-pub="liveText" data-k="lt" placeholder="${attr(conn.shopDomain)}" value="${attr(ui.liveText)}" autocomplete="off"></label>` : ""}
         ${ui.error ? `<div class="callout bad">${icon("warn", 16)}<span>${esc(ui.error)}</span></div>` : ""}
       </div>
-      <div class="bb-mfoot"><span class="xs muted">${conn?.simulated ? "Simulated store: the job runs for real, against a store that only exists in the database." : "Products are created as drafts unless you chose Active."}</span>
+      <div class="bb-mfoot">${missing.length ? `<span class="xs bb-err">Locked: Shopify has not given the app ${esc(scopesToAdd(missing).join(", "))}. See the red box.</span>` : `<span class="xs muted">${conn?.simulated ? "Simulated store: the job runs for real, against a store that only exists in the database." : "Products are created as drafts unless you chose Active."}</span>`}
         <div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" data-pub="go"${can ? "" : " disabled"}>${ui.busy ? "Starting…" : productHandles ? `Create ${productHandles.length} product${productHandles.length === 1 ? "" : "s"}` : "Publish"}</button></div></div>`;
   };
 
   return openModal({
     cls: "bb-publish", label: `Publish ${brand.concept.name}`, render,
-    mount: (box, { paint, close }) => {
+    mount: (box, { paint: repaint, close }) => {
+      // A choice that needs access the app lacks brings the explanation into view.
+      const paint = () => { const had = !!box.querySelector(".bb-access"); repaint(); if (!had) box.querySelector(".bb-access")?.scrollIntoView({ block: "nearest" }); };
       box.addEventListener("change", (e) => {
         const t = e.target, k = t.dataset.pub;
         if (!k) return;
-        if (k === "conn") { ui.connectionId = t.value; ui.confirm = false; ui.liveText = ""; }
+        if (k === "conn") { ui.connectionId = t.value; ui.confirm = false; ui.liveText = ""; ui.checkNote = ""; }
         else if (k === "confirm") ui.confirm = t.checked;
         else if (["publishPage", "addToMenu", "publishToOnlineStore"].includes(k)) ui.options[k] = t.checked;
         paint();
@@ -457,6 +463,18 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
         const b = t.closest("[data-pub]");
         if (!b || b.tagName === "INPUT" || b.tagName === "SELECT") return;
         if (b.dataset.pub === "status") { ui.options.productStatus = b.dataset.v; return paint(); }
+        if (b.dataset.pub === "preset") {
+          const live = b.dataset.v === "live";
+          Object.assign(ui.options, { productStatus: live ? "ACTIVE" : "DRAFT", publishToOnlineStore: live, publishPage: live && ui.options.includeBrand });
+          return paint();
+        }
+        if (b.dataset.pub === "recheck") {
+          ui.checking = true; ui.checkNote = ""; paint();
+          const r = await recheckConnection(ui.connectionId);
+          ui.checking = false;
+          ui.checkNote = r.ok ? `Checked ${new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}.` : r.reason;
+          return paint();
+        }
         if (b.dataset.pub === "dry") { ui.dry = !ui.dry; return paint(); }
         if (b.dataset.pub === "go") {
           const conn = connectionById(ui.connectionId);
@@ -472,6 +490,20 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
       });
     },
   });
+}
+
+// Scopes the chosen publish needs and the store's app lacks: what to add,
+// where, and a button that checks the store again without leaving.
+const scopesToAdd = (missing) => [...new Set(missing.map((x) => x.replace(/^read_/, "write_")))];
+function accessHtml(conn, missing, ui) {
+  const add = scopesToAdd(missing);
+  return `<div class="callout bad bb-access" role="alert">${icon("warn", 16)}<div class="stack" style="gap:6px">
+      <b>Shopify has not given the app access to publish this. Add ${add.length === 1 ? "this scope" : "these scopes"} (write includes read):</b>
+      <ul class="bullets small">${add.map((x) => `<li><code>${esc(x)}</code>: ${esc(String(SCOPES[x] || "needed").replace(/ \(optional\)$/, ""))}</li>`).join("")}</ul>
+      <p class="small">${esc(scopeFix(conn.auth))}</p>
+      <div class="row"><button class="btn sm" data-pub="recheck"${ui.checking ? " disabled" : ""}>${ui.checking ? "Checking the store…" : "Check access again"}</button>
+        ${ui.checkNote ? `<span class="xs">${esc(ui.checkNote)} ${missing.length ? "Still missing." : ""}</span>` : ""}</div>
+    </div></div>`;
 }
 
 // -- Status drawer --------------------------------------------------------------

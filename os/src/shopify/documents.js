@@ -84,6 +84,15 @@ export const SCOPES = {
   write_publications: "publish to the Online Store channel (optional)",
   read_publications: "find the Online Store publication (optional)",
 };
+// Where a missing scope is added, by how the store was connected. A Dev
+// Dashboard app gets new scopes from a released version; for a store in the
+// app's own organisation the release is the approval (shopify.dev, "Manage
+// access scopes").
+export function scopeFix(auth) {
+  return auth === "client_credentials"
+    ? "In Shopify's Dev Dashboard, open the app, create a new version with these scopes added under Access scopes, and release it. If the store admin asks you to approve the new access, approve it. Then check the store again here."
+    : "Add these Admin API scopes to the app where it was made and install the update on the store. Then check the store again here; if Shopify gave you a new token, connect the store again with it.";
+}
 export const SCOPES_FOR = {
   product: ["read_products", "write_products"],
   collection: ["read_products", "write_products"],

@@ -486,6 +486,12 @@ const browser = await chromium.launch();
         db.jobs.unshift({ id: job.id, brandId: p.brandId, brandVersion: p.version, connectionId: p.connectionId, status: "queued", options: p.options, progress: {}, createdAt: job.created_at });
         return { ok: true, job };
       }
+      if (action === "shopify.test") {
+        const c = db.connections.find((x) => x.id === p.connectionId);
+        if (c && window.__grantOnTest) { c.scopes = [...c.scopes, ...window.__grantOnTest]; c.schema.optionalScopesMissing = []; }
+        if (c) c.lastVerifiedAt = new Date().toISOString();
+        return { ok: true, id: p.connectionId };
+      }
       if (action === "publish.rollback") { const j = db.jobs.find((x) => x.id === p.jobId); if (j) { j.status = "rolling_back"; j.rollback = { mode: p.mode }; } return { ok: true, id: p.jobId }; }
       return { ok: true };
     };
@@ -622,6 +628,17 @@ const browser = await chromium.launch();
   await page.fill(".bb-publish [data-pub=liveText]", "real-shop.myshopify.com");
   ok(!(await page.locator(".bb-publish [data-pub=go]").isDisabled()), "typing the live store's address unlocks it");
   await shot("6-publish-live");
+  // Publishing for shoppers needs write_publications; the dialog says where to add it and checks again.
+  await page.click('.bb-publish [data-pub=preset][data-v=live]');
+  const access = await page.locator(".bb-publish .bb-access").innerText();
+  ok(/write_publications/.test(access) && /Dev Dashboard/.test(access) && !/read_publications/.test(access) && await page.locator(".bb-publish [data-pub=go]").isDisabled() && /Locked.*write_publications/.test(await page.locator(".bb-publish .bb-mfoot").innerText()), "a missing scope blocks publishing and says what to add and where", access);
+  ok(/status: active/.test(await page.locator(".bb-publish .bb-box").first().innerText()) && await page.locator(".bb-publish [data-pub=publishToOnlineStore]").isChecked(), "the quick choice makes products active and lists them on the Online Store");
+  await shot("6b-publish-access");
+  await page.evaluate(() => { window.__grantOnTest = ["write_publications"]; });
+  await page.click(".bb-publish [data-pub=recheck]");
+  await page.waitForSelector(".bb-publish .bb-access", { state: "detached", timeout: 10000 });
+  ok((await writes("shopify.test")).at(-1)?.payload.connectionId === "c-live" && !(await page.locator(".bb-publish [data-pub=go]").isDisabled()), "after the scope is released, Check access again unlocks publishing in the same dialog");
+  await page.click('.bb-publish [data-pub=preset][data-v=safe]');
   await page.selectOption(".bb-publish [data-pub=conn]", "c-sim");
   await page.check(".bb-publish [data-pub=confirm]");
   await page.click(".bb-publish [data-pub=go]");

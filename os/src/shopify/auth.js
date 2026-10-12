@@ -21,7 +21,9 @@ import { ShopifyError } from "./client.js";
 
 export const RENEW_BEFORE_S = 300;
 
-export async function accessToken(conn, { secrets, fetch: fetchImpl = globalThis.fetch, now = () => Date.now() }) {
+// `fresh` skips the cached token, so a connection test sees scopes released
+// since the token was issued.
+export async function accessToken(conn, { secrets, fetch: fetchImpl = globalThis.fetch, now = () => Date.now(), fresh = false }) {
   if (conn.auth_kind !== "client_credentials") {
     if (!conn.token_secret_id) throw new ShopifyError("config", "The store is disconnected.");
     const t = await secrets.read(conn.token_secret_id);
@@ -29,7 +31,7 @@ export async function accessToken(conn, { secrets, fetch: fetchImpl = globalThis
     return t;
   }
   const expires = conn.token_expires_at ? new Date(conn.token_expires_at).getTime() : 0;
-  if (conn.token_secret_id && expires - now() > RENEW_BEFORE_S * 1000) {
+  if (!fresh && conn.token_secret_id && expires - now() > RENEW_BEFORE_S * 1000) {
     const cached = await secrets.read(conn.token_secret_id);
     if (cached) return cached;
   }

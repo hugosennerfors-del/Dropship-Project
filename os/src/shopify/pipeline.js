@@ -16,7 +16,7 @@
 // updateJob, audit.
 
 import { buildPlan, adminUrl, publicUrl, planRollback } from "./mapping.js";
-import { Q, M, SCOPES } from "./documents.js";
+import { Q, M, SCOPES, scopeFix } from "./documents.js";
 import { verifySchema } from "./schema.js";
 import { ShopifyError, redact } from "./client.js";
 
@@ -99,7 +99,7 @@ const STEPS = {
     const have = new Set((sc?.currentAppInstallation?.accessScopes || []).map((x) => x.handle));
     // write_* implies read_* on Shopify.
     const missingScopes = step.check.scopes.filter((x) => !have.has(x) && !(x.startsWith("read_") && have.has("write_" + x.slice(5))));
-    if (missingScopes.length) throw new ShopifyError("scopes", `The app is missing access: ${missingScopes.map((x) => `${x} (${SCOPES[x] || "needed"})`).join("; ")}. Add them in the store's app settings, then reinstall the app.`, { missing: missingScopes });
+    if (missingScopes.length) throw new ShopifyError("scopes", `The app is missing access: ${missingScopes.map((x) => `${x} (${SCOPES[x] || "needed"})`).join("; ")}. ${scopeFix(connection?.auth_kind)}`, { missing: missingScopes });
     const schema = await verifySchema(client, step.check.groups);
     if (!schema.ok) throw new ShopifyError("schema", `The store's Admin API (version ${connection?.api_version || "pinned"}) lacks fields this integration uses: ${schema.missing.join(", ")}. The pinned API version needs updating.`, { missing: schema.missing });
 

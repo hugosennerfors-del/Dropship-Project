@@ -10,7 +10,7 @@ import { CONNECTOR_STATUS } from "../core/connectors.js";
 import { EVIDENCE_LEVELS } from "../core/provenance.js";
 import { LIVE } from "../live.js";
 import { provenanceLegend } from "./shared.js";
-import { SCOPES, SCOPES_FOR } from "../shopify/documents.js";
+import { SCOPES, SCOPES_FOR, scopeFix } from "../shopify/documents.js";
 import { SHOPIFY_API_VERSION } from "../shopify/version.js";
 import { loadShopify, connectStore, testConnection, disconnectStore, saveGenerationLimit, simulatedStoreForm, storeBadge } from "../shopify/brands.js";
 import { openJobDrawer } from "./shopify-ui.js";
@@ -204,7 +204,7 @@ function connRow(c) {
       <small>${esc(c.shopDomain)} · ${esc(c.plan || "plan unknown")} · ${esc(c.currency || "currency unknown")} · ${c.auth === "client_credentials" ? `Dev Dashboard app ${esc(c.clientId || "")}${c.tokenExpiresAt ? `, token renews before ${new Date(c.tokenExpiresAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : ""}` : "Admin API token"}</small>
       <small>${c.status === "connected" ? `Checked ${c.lastVerifiedAt ? dateLabel(c.lastVerifiedAt) + " " + new Date(c.lastVerifiedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : ""}${c.schema ? ` · ${c.schema.checked} API fields checked${c.schema.deprecated?.length ? `, ${c.schema.deprecated.length} deprecated` : ""}` : ""}` : esc(c.status)}</small>
       ${c.scopes?.length ? `<span class="bb-scopes">${c.scopes.map((s) => `<code>${esc(s)}</code>`).join("")}</span>` : ""}
-      ${missing.length ? `<span class="small" style="color:var(--bad);white-space:normal;display:block">Missing: ${missing.map((s) => `<code>${esc(s)}</code> (${esc(SCOPES[s] || "needed")})`).join("; ")}. Add them to the app, release a new version and reinstall it.</span>` : ""}
+      ${missing.length ? `<span class="small" style="color:var(--bad);white-space:normal;display:block">Missing: ${missing.map((s) => `<code>${esc(s)}</code> (${esc(SCOPES[s] || "needed")})`).join("; ")}. ${esc(scopeFix(c.auth))}</span>` : ""}
       ${optional.length ? `<small style="white-space:normal">Optional, not granted: ${optional.map((s) => `${esc(s)} (${esc(SCOPES[s] || "")})`).join("; ")}</small>` : ""}
       ${mismatch ? `<span class="small" style="color:var(--warn);white-space:normal;display:block">Added as a test store, but Shopify does not report it as a development store: it is treated as live.</span>` : ""}
       ${c.lastError ? `<span class="small" style="color:${c.status === "connected" ? "var(--warn)" : "var(--bad)"};white-space:normal;display:block">${esc(c.lastError)}</span>` : ""}

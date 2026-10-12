@@ -365,6 +365,20 @@ export async function testConnection(id) {
   try { await liveWrite("shopify.test", { connectionId: id }); await loadShopify({ quiet: true }); return { ok: true }; }
   catch (e) { return { ok: false, reason: errText(e) }; }
 }
+// Test a store and wait for the result: the test runs in the background, so
+// poll until the connection's check time moves (or give up after `wait` ms).
+export async function recheckConnection(id, { wait = 30000, every = 2000 } = {}) {
+  const before = connectionById(id)?.lastVerifiedAt || null;
+  const r = await testConnection(id);
+  if (!r.ok) return r;
+  for (let t = 0; t < wait; t += every) {
+    const c = connectionById(id);
+    if (c && c.lastVerifiedAt !== before) return { ok: true, conn: c };
+    await new Promise((res) => setTimeout(res, every));
+    await loadShopify({ quiet: true });
+  }
+  return { ok: false, reason: `The check did not finish within ${Math.round(wait / 1000)} s. Try again in a minute.` };
+}
 export async function disconnectStore(id) {
   try { await liveWrite("shopify.disconnect", { connectionId: id }); await loadShopify({ quiet: true }); return { ok: true }; }
   catch (e) { return { ok: false, reason: errText(e) }; }

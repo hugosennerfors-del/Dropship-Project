@@ -118,6 +118,8 @@ Since **1 January 2026** Shopify no longer lets a store create new "legacy custo
 
 The app does **not** request themes, files, translations, inventory or orders, because those features are not built.
 
+**Adding a scope later.** For a Dev Dashboard app: create a new version with the scope added and release it. For a store in the app's own organisation, the release is the approval (shopify.dev, "Manage access scopes"). Then press *Check access again* in the publish dialog, or *Test* under *Data > Shopify stores*. A connection test always asks Shopify for a new client-credentials token, so a newly released scope counts at once instead of after the cached token expires. Products need status **Active** as well as the Online Store listing before shoppers can see them; the dialog's *Visible to shoppers now* choice sets both.
+
 ### Where secrets live
 
 - **Tokens and client secrets.** They go once from the page form (password fields, cleared at once) through the n8n workflow **Plan-vy · Shopify-anslutning**. That workflow stores no execution data, success or failure. From there they go to `intel.shopify_intake` and into **Supabase Vault**.
