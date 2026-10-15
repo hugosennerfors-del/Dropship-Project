@@ -16,6 +16,7 @@ import { Q, scopeFix } from "../src/shopify/documents.js";
 import { SHOPIFY_API_VERSION } from "../src/shopify/version.js";
 import { econSettings, orderEconomics, conceptEconomics, econProblems } from "../src/shopify/economics.js";
 import { logoLayout, logoSvg, logoSettings } from "../src/shopify/logo.js";
+import { complianceChecks, attest, productGroups, businessGaps } from "../src/shopify/compliance.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const concept = JSON.parse(await readFile(join(root, "test/fixtures-brand-concept.json"), "utf8"));
@@ -343,6 +344,30 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   const word = logoLayout(c, { measure, style: "wordmark" });
   ok(word.items.filter((i) => i.t === "text").length === 1, "the wordmark has the name only, with an accent dot");
   ok(logoSettings({ ...c, logo: { style: "x", shape: "y" } }).style === "badge", "unknown saved settings fall back to the defaults");
+}
+
+// Checks before selling: store details, withdrawal, delivery, product rules.
+{
+  const se = clone(concept); se.market = "SE";
+  se.products[0].title = "Golden Hour LED Lamp"; se.products[0].tags = ["lamp", "usb"];
+  let ch = complianceChecks(se);
+  const ids = ch.items.map((i) => i.id);
+  ok(!ch.done && ["business", "vat", "withdrawal", "delivery", "complaints", "gpsr", "ce", "weee"].every((x) => ids.includes(x)), "a Swedish brand with a lamp gets the EU, CE and electrical-waste checks", ids.join());
+  ok(ch.items.find((i) => i.id === "business").status === "missing" && ch.items.find((i) => i.id === "vat").status === "ok", "empty store details are missing; VAT is already in every price");
+  ok(productGroups({ title: "Babyfilt" }).includes("toys") && productGroups({ title: "Ansiktsserum" }).includes("cosmetics") && productGroups({ title: "Skrivbordslampa med USB" }).includes("electrical") && !productGroups({ title: "Dry bag" }).length && !productGroups({ title: "Ledger notebook", productType: "Fantastic stationery" }).length, "product groups come from words in the product, Swedish compounds too, without matching inside unrelated words");
+  ok(businessGaps({ legalName: "X AB", orgNumber: "5566", address: "Gatan 1", email: "a@b.se" }, "SE").includes("orgNumber:format") && !businessGaps({ legalName: "X AB", orgNumber: "556677-8899", address: "Gatan 1", email: "a@b.se" }, "SE").length, "a Swedish organisation number must look like 556677-8899");
+  se.business = { legalName: "Setlight AB", orgNumber: "556677-8899", address: "Gatan 1, 111 22 Stockholm", email: "hej@setlight.se", shipping: { maxDays: 7 }, returns: { days: 14 }, euResponsible: { name: "Setlight AB", address: "Gatan 1", email: "hej@setlight.se" } };
+  ch = complianceChecks(se);
+  ok(ch.items.find((i) => i.id === "gpsr").status === "confirm" && ch.items.find((i) => i.id === "withdrawal").status === "confirm" && !ch.done, "with details filled in, what the page cannot see still needs a confirmation");
+  let done = se;
+  for (const i of ch.items.filter((x) => x.status === "confirm")) done = attest(done, i.id, i.products);
+  ok(complianceChecks(done).done, "confirming every remaining item completes the checklist");
+  const more = clone(done); more.products.push({ ...clone(more.products[0]), title: "LED Strip", handle: "setlight-led-strip" });
+  ok(!complianceChecks(more).done && complianceChecks(more).blocking.some((i) => i.id === "ce"), "a new electrical product needs the CE confirmation again");
+  const short = clone(done); short.business.returns.days = 10;
+  ok(complianceChecks(short).items.find((i) => i.id === "withdrawal").status === "missing", "a return period under 14 days is not accepted");
+  const uk = clone(concept); uk.market = "UK";
+  ok(!complianceChecks(uk).items.some((i) => i.id === "gpsr"), "the GPSR item is for the EU market only");
 }
 
 // The edge function's copies (what was deployed) match src/shopify.

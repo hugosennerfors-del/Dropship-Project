@@ -8,11 +8,12 @@ import { esc, attr, icon, dateLabel } from "../ui/dom.js";
 import { MARKETS } from "../core/markets.js";
 import { burstAt } from "../fx.js";
 import { LIMITS } from "../shopify/concept.js";
+import { complianceChecks } from "../shopify/compliance.js";
 import {
   loadShopify, generateConcepts, regenerateBrand, suggestNiches, duplicateBrand, archiveBrand, importConcept, brandById,
   storeBadge, PRICE_LEVELS, TONES, PRODUCT_TYPES, IMAGE_PROVIDERS, errText,
 } from "../shopify/brands.js";
-import { openPreview, openEditor, openPublish, openJobDrawer, openRegenerate, openLogo, paletteOf, fontsOf, loadFonts, placeholderSvg, brandVars } from "./shopify-ui.js";
+import { openPreview, openEditor, openPublish, openJobDrawer, openRegenerate, openLogo, openChecks, paletteOf, fontsOf, loadFonts, placeholderSvg, brandVars } from "./shopify-ui.js";
 
 const ui = {
   form: { niche: "", audience: "", priceLevel: "mid", tone: "", market: null, productType: "physical", concepts: 3, products: 6 },
@@ -137,6 +138,7 @@ function card(b, isFresh = false) {
       <div class="bb-wire" aria-label="Page plan">${(c.pagePlan?.sections || []).map((s) => `<span class="bb-w bb-w-${attr(s.type)}">${esc(SECTION_SHORT[s.type] || s.type)}</span>`).join("")}</div>
       <div class="bb-tools" aria-label="Brand tools">
         <button class="btn sm ghost" data-bb-logo>${icon("wand", 12)}Logo${c.logo ? " ✓" : ""}</button>
+        ${(() => { const ch = complianceChecks(c); return `<button class="btn sm ghost${ch.done ? "" : " bb-tool-open"}" data-bb-checks data-tip="${attr(ch.done ? "Store details and checks are done" : `${ch.blocking.length} check${ch.blocking.length === 1 ? "" : "s"} open before selling to shoppers`)}">${icon("shield", 12)}Checks ${ch.done ? "✓" : `${ch.items.length - ch.blocking.length}/${ch.items.length}`}</button>`; })()}
       </div>
       ${job ? `<button class="bb-job" data-bb-job="${attr(job.id)}"><span class="bb-st bb-st-${attr(job.status)}">${esc(job.status.replace("_", " "))}</span><span class="xs muted">last publish ${dateLabel(job.createdAt)}${store.shopify.connections.find((x) => x.id === job.connectionId) ? ` · ${storeBadge(store.shopify.connections.find((x) => x.id === job.connectionId))}` : ""}</span></button>` : ""}
       ${regen ? `<div class="bb-regen"><span class="thinking"><i></i><i></i><i></i></span><span class="small">${esc(regen.status || "Regenerating…")}</span><button class="btn sm" data-bb-regen-stop>Stop</button></div>` : ""}
@@ -267,6 +269,7 @@ export function mount(root, { rerender, params }) {
     if (!b) return;
     if (t.closest("[data-bb-preview]")) return openPreview(b.concept);
     if (t.closest("[data-bb-logo]")) return openLogo(b, { onSaved: () => rerender() });
+    if (t.closest("[data-bb-checks]")) return openChecks(b, { onSaved: () => rerender() });
     if (t.closest("[data-bb-edit]")) return openEditor(b, { onSaved: () => rerender() });
     if (t.closest("[data-bb-publish]")) return openPublish(b);
     if (t.closest("[data-bb-job]")) return openJobDrawer(t.closest("[data-bb-job]").dataset.bbJob);

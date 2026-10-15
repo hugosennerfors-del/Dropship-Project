@@ -10,6 +10,7 @@ import { buildPlan, DEFAULT_OPTIONS } from "../shopify/mapping.js";
 import { SCOPES, scopeFix } from "../shopify/documents.js";
 import { conceptEconomics, econSettings, orderEconomics } from "../shopify/economics.js";
 import { LOGO_STYLES, LOGO_SHAPES, logoLayout, logoSvg, drawLogo, logoSettings } from "../shopify/logo.js";
+import { complianceChecks, attest } from "../shopify/compliance.js";
 import {
   brandById, connectionById, jobById, isLive, storeBadge, saveBrand, startPublish, retryJob, rollbackJob, loadJob, loadShopify,
   undoPlan, newIdempotencyKey, recheckConnection, regeneratePart, PARTS, TERMINAL, IMAGE_PROVIDERS,
@@ -189,6 +190,78 @@ function productPage(c, i) {
       ${p.bulletPoints?.length ? `<ul>${p.bulletPoints.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
       ${p.images?.length ? `<p class="xs">${p.images.length} image link${p.images.length === 1 ? "" : "s"} will be sent to Shopify (not shown in the preview).</p>` : ""}
     </div></div></section>`;
+}
+
+// -- Store details and checks ----------------------------------------------------
+// The seller's details, delivery and returns, and the checklist before a
+// brand is sold to consumers (compliance.js). Saved with the brand.
+const STATUS_TXT = { ok: "Done", missing: "Missing", confirm: "Confirm" };
+export function openChecks(brand, { onSaved } = {}) {
+  const w = structuredClone(brand.concept);
+  const se = w.market === "SE";
+  w.business ||= {};
+  w.business.shipping ||= {};
+  w.business.returns ||= { days: 14, whoPays: "customer" };
+  w.business.euResponsible ||= {};
+  const ui = { busy: false, error: "", tick: {} };
+  const others = store.shopify.brands.filter((b) => b.id !== brand.id && b.concept?.business?.legalName);
+  const field = (path, label, { hint, rows, mono, ph } = {}) => {
+    const v = getPath(w, path) ?? "";
+    const a = `data-ck-path="${attr(path)}" data-k="${attr(path)}"`;
+    return `<label class="field"><span>${esc(label)}${hint ? `<small class="xs muted">${esc(hint)}</small>` : ""}</span>${rows ? `<textarea ${a} rows="${rows}">${esc(v)}</textarea>` : `<input type="text" ${a} value="${attr(v)}"${mono ? ' class="mono"' : ""}${ph ? ` placeholder="${attr(ph)}"` : ""}>`}</label>`;
+  };
+  // What the checklist would say with the boxes ticked so far.
+  const pending = () => Object.entries(ui.tick).filter(([, v]) => v).reduce((c, [id]) => attest(c, id, (complianceChecks(c).items.find((i) => i.id === id)?.products) || []), w);
+  const listHtml = () => {
+    const ch = complianceChecks(pending());
+    return `<div class="row between"><h4 class="row" style="gap:6px">${ch.done ? `${icon("check", 14)}<span>Ready to sell</span>` : `${ch.blocking.length} of ${ch.items.length} still open`}</h4><span class="xs muted">${se ? "Sweden (EU)" : "United Kingdom"} · not legal advice</span></div>
+      <ul class="bb-ck">${ch.items.map((i) => `<li class="bb-ck-${i.status}"><span class="bb-ck-st">${STATUS_TXT[i.status]}</span><div><b>${esc(i.title)}</b>${i.detail ? `<div class="small">${esc(i.detail)}</div>` : ""}<div class="xs muted">${esc(i.why)} <i>${esc(i.source)}</i></div>
+        ${i.status === "confirm" || (ui.tick[i.id] && i.status === "ok") ? `<label class="bb-check"><input type="checkbox" data-ck-tick="${attr(i.id)}"${ui.tick[i.id] ? " checked" : ""}> I have checked this</label>` : ""}</div></li>`).join("")}</ul>`;
+  };
+  const render = () => `
+    <div class="bb-mhead"><div><div class="eyebrow">${icon("shield", 13)} Store details and checks · ${esc(brand.id)} v${brand.version}</div><h2>${esc(w.name)}</h2></div>
+      <button class="btn sm ghost" data-close aria-label="Close">${icon("x", 14)}</button></div>
+    <div class="bb-mbody stack">
+      <p class="small muted">Before products go live (Active or listed in the Online Store), every item below must be done. Drafts can be published at any time. The page checks what it can see and asks you to confirm the rest; it is a checklist, not legal advice.</p>
+      ${others.length ? `<div class="row"><span class="small">Copy store details from</span>${others.slice(0, 4).map((b) => `<button class="btn sm" data-ck-copy="${attr(b.id)}">${esc(b.name)}</button>`).join("")}</div>` : ""}
+      <section class="bb-box"><h4>Seller</h4><div class="grid g2">
+        ${field("business.legalName", se ? "Company name" : "Business name")}${field("business.orgNumber", se ? "Organisation number" : "Company number", { mono: true, ph: se ? "556677-8899" : "" })}
+        ${field("business.vatNumber", "VAT number", { hint: "if registered", mono: true })}${field("business.email", "Email for customers")}
+        ${field("business.phone", "Phone", { hint: "optional" })}${field("business.address", "Postal address", { rows: 2 })}</div></section>
+      <section class="bb-box"><h4>Delivery and returns</h4><div class="grid g3">
+        ${field("business.shipping.minDays", "Delivery from (days)", { mono: true })}${field("business.shipping.maxDays", "Delivery to (days)", { mono: true })}${field("business.shipping.carrier", "Carrier", { hint: "optional" })}
+        ${field("business.shipping.cost", "Shipping price to the customer", { mono: true, hint: currencyOf(w) })}${field("business.shipping.freeOver", "Free shipping over", { mono: true, hint: "optional" })}${field("business.returns.days", "Return period (days)", { mono: true, hint: "at least 14" })}</div>
+        <div class="row"><span class="small">Return shipping is paid by</span><div class="seg" role="group" aria-label="Return shipping paid by"><button data-ck-who="customer" aria-pressed="${w.business.returns.whoPays !== "store"}">the customer</button><button data-ck-who="store" aria-pressed="${w.business.returns.whoPays === "store"}">the store</button></div></div></section>
+      ${se ? `<section class="bb-box"><h4>EU responsible person for product safety (GPSR)</h4><p class="xs muted">When the manufacturer is outside the EU (most dropshipping), an EU-based economic operator must be named on each product: the importer, an authorised representative or a fulfilment service provider. If you import the goods yourself, that is you.</p><div class="grid g3">
+        ${field("business.euResponsible.name", "Name")}${field("business.euResponsible.email", "Email")}${field("business.euResponsible.address", "Postal address", { rows: 2 })}</div></section>` : ""}
+      <section class="bb-box" data-ck-list>${listHtml()}</section>
+      ${ui.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(ui.error)}</span></div>` : ""}
+    </div>
+    <div class="bb-mfoot"><span class="xs muted">Saved as version ${brand.version + 1}; earlier versions are kept.</span>
+      <div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" data-ck="save"${ui.busy ? " disabled" : ""}>${ui.busy ? "Saving…" : "Save"}</button></div></div>`;
+  return openModal({
+    cls: "bb-checks", label: `Store details and checks for ${w.name}`, render,
+    mount: (box, { paint, close }) => {
+      const relist = () => { const el = box.querySelector("[data-ck-list]"); if (el) el.innerHTML = listHtml(); };
+      box.addEventListener("input", (e) => { const p = e.target.dataset.ckPath; if (p) { setPath(w, p, e.target.value); relist(); } });
+      box.addEventListener("change", (e) => { const id = e.target.dataset.ckTick; if (id) { ui.tick[id] = e.target.checked; relist(); } });
+      box.addEventListener("click", async (e) => {
+        const t = e.target;
+        if (t.closest("[data-close]")) return close();
+        const who = t.closest("[data-ck-who]"); if (who) { w.business.returns.whoPays = who.dataset.ckWho; return paint(); }
+        const cp = t.closest("[data-ck-copy]");
+        if (cp) { const src = brandById(cp.dataset.ckCopy)?.concept?.business; if (src) { w.business = structuredClone(src); toast(`Copied from ${brandById(cp.dataset.ckCopy).name}. Check the details, then save.`); } return paint(); }
+        if (!t.closest("[data-ck=save]")) return;
+        ui.busy = true; ui.error = ""; paint();
+        const r = await saveBrand(pending(), { id: brand.id, note: "Store details and checks" });
+        ui.busy = false;
+        if (!r.ok) { ui.error = r.reason || (r.errors || []).join("; "); return paint(); }
+        const ch = complianceChecks(pending());
+        toast(ch.done ? `Saved as version ${r.version}: ready to sell.` : `Saved as version ${r.version}: ${ch.blocking.length} item${ch.blocking.length === 1 ? "" : "s"} still open.`);
+        close(); onSaved?.(r);
+      });
+    },
+  });
 }
 
 // -- Logo ------------------------------------------------------------------------
@@ -529,6 +602,7 @@ function rebuildVariants(p) {
 // choices are the defaults: draft products, hidden page, no theme, no menu,
 // no sales channel. A live store also needs its address typed.
 export function openPublish(brand, { productHandles = null, onStarted } = {}) {
+  const brandId = brand.id;
   const conns = store.shopify.connections.filter((c) => c.status !== "disconnected");
   const pick = conns.find((c) => c.status === "connected" && !isLive(c)) || conns.find((c) => c.status === "connected") || conns[0] || null;
   const ui = {
@@ -553,7 +627,12 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
     }
     if (!plan.ok) blockers.push(...plan.errors.slice(0, 8));
     const liveOk = !live || ui.liveText.trim().toLowerCase() === (conn?.shopDomain || "");
-    const can = !blockers.length && !missing.length && ui.confirm && liveOk && !ui.busy;
+    // Selling to shoppers (Active, or listed in the Online Store) needs the
+    // checklist done; drafts do not.
+    const selling = ui.options.productStatus === "ACTIVE" || ui.options.publishToOnlineStore;
+    const checks = complianceChecks(c);
+    const checksBlock = selling && !checks.done;
+    const can = !blockers.length && !missing.length && !checksBlock && ui.confirm && liveOk && !ui.busy;
     const sm = plan.summary;
     const o = ui.options;
     const what = sm ? [
@@ -592,6 +671,9 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
         ${plan.warnings?.length ? `<div class="callout warn">${icon("warn", 16)}<ul class="bullets small">${plan.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
         ${blockers.length ? `<div class="callout bad">${icon("warn", 16)}<ul class="bullets small">${blockers.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
         ${missing.length ? accessHtml(conn, missing, ui) : ""}
+        ${checksBlock ? `<div class="callout bad bb-checks-block" role="alert">${icon("shield", 16)}<div class="stack" style="gap:6px"><b>Before products are sold to shoppers, finish the checks (${checks.blocking.length} open):</b>
+          <ul class="bullets small">${checks.blocking.map((i) => `<li>${esc(i.title)}${i.detail ? ` <span class="muted">${esc(i.detail)}</span>` : ""}</li>`).join("")}</ul>
+          <div class="row"><button class="btn sm" data-pub="checks">Open store details and checks</button><span class="xs muted">Drafts can be published without them.</span></div></div></div>` : ""}
         <section class="bb-box"><div class="row between"><h4>Dry run</h4><button class="btn sm" data-pub="dry">${ui.dry ? "Hide" : "Show"} the exact requests</button></div>
           ${ui.dry ? (plan.ok ? `<p class="xs muted">Validated. These are the steps and the exact GraphQL variables the job sends; nothing is sent now.</p><ol class="bb-dry">${plan.steps.map((s) => `<li><b>${esc(s.title)}</b>${s.variables || s.check || s.targets || s.item ? `<pre>${esc(JSON.stringify(s.variables || s.check || s.targets || s.item, null, 2))}</pre>` : ""}</li>`).join("")}</ol>` : `<p class="small">The concept does not validate; see the list above.</p>`) : `<p class="xs muted">Validates everything and shows the payload without writing to Shopify.</p>`}
         </section>
@@ -599,7 +681,7 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
         ${conn && live ? `<label class="field"><span>This is a LIVE store. Type its address to publish there</span><input type="text" class="mono" data-pub="liveText" data-k="lt" placeholder="${attr(conn.shopDomain)}" value="${attr(ui.liveText)}" autocomplete="off"></label>` : ""}
         ${ui.error ? `<div class="callout bad">${icon("warn", 16)}<span>${esc(ui.error)}</span></div>` : ""}
       </div>
-      <div class="bb-mfoot">${missing.length ? `<span class="xs bb-err">Locked: Shopify has not given the app ${esc(scopesToAdd(missing).join(", "))}. See the red box.</span>` : `<span class="xs muted">${conn?.simulated ? "Simulated store: the job runs for real, against a store that only exists in the database." : "Products are created as drafts unless you chose Active."}</span>`}
+      <div class="bb-mfoot">${missing.length ? `<span class="xs bb-err">Locked: Shopify has not given the app ${esc(scopesToAdd(missing).join(", "))}. See the red box.</span>` : checksBlock ? `<span class="xs bb-err">Locked: ${checks.blocking.length} check${checks.blocking.length === 1 ? "" : "s"} open before selling to shoppers. See the red box.</span>` : `<span class="xs muted">${conn?.simulated ? "Simulated store: the job runs for real, against a store that only exists in the database." : "Products are created as drafts unless you chose Active."}</span>`}
         <div class="row"><button class="btn" data-close>Cancel</button><button class="btn primary" data-pub="go"${can ? "" : " disabled"}>${ui.busy ? "Starting…" : productHandles ? `Create ${productHandles.length} product${productHandles.length === 1 ? "" : "s"}` : "Publish"}</button></div></div>`;
   };
 
@@ -631,6 +713,10 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
           const live = b.dataset.v === "live";
           Object.assign(ui.options, { productStatus: live ? "ACTIVE" : "DRAFT", publishToOnlineStore: live, publishPage: live && ui.options.includeBrand });
           return paint();
+        }
+        if (b.dataset.pub === "checks") {
+          openChecks(brandById(brandId) || brand, { onSaved: () => { brand = brandById(brandId) || brand; paint(); } });
+          return;
         }
         if (b.dataset.pub === "recheck") {
           ui.checking = true; ui.checkNote = ""; paint();

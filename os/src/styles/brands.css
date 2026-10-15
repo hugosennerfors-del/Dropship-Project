@@ -239,3 +239,12 @@ button.li.bb-hrow:hover { background: rgba(255, 255, 255, .6); }
 .bb-logo-sizes span { border-radius: var(--r-sm); padding: 10px 14px; display: grid; place-items: center; border: 1px solid var(--border); }
 .bb-logo-sizes svg { height: 34px; width: auto; }
 .bb-logo-img svg { height: 34px; width: auto; display: block; }
+
+/* Store details and checks */
+.bb-ck { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.bb-ck li { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: start; padding: 8px 10px; border-radius: var(--r-sm); border: 1px solid var(--border); background: rgba(255,255,255,.5); }
+.bb-ck-st { font-size: 11px; font-weight: 600; text-align: center; padding: 2px 6px; border-radius: 99px; }
+.bb-ck-ok .bb-ck-st { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+.bb-ck-missing .bb-ck-st { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.bb-ck-confirm .bb-ck-st { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.bb-tool-open { color: var(--warn); }
