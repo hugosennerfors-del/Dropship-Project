@@ -5,12 +5,12 @@
 // Model B (one Shopify store per brand) is a choice of connection, not a
 // different plan: a plan never assumes which store it goes to.
 
-import { validateConcept, toHtml, stripHtml, sanitizeHtml, variantMargin } from "./concept.js";
+import { validateConcept, toHtml, stripHtml, sanitizeHtml, variantMargin, POLICY_KEYS, POLICY_SLUGS, FILL_IN } from "./concept.js";
 import { SCOPES_FOR } from "./documents.js";
 import { groupsFor } from "./schema.js";
 
 export const BRAND_METAOBJECT_TYPE = "plan_vy_brand";
-export const DEFAULT_OPTIONS = { productStatus: "DRAFT", includeBrand: true, publishPage: false, publishToOnlineStore: false, addToMenu: false, menuHandle: "main-menu", writeTheme: false, productHandles: null };
+export const DEFAULT_OPTIONS = { productStatus: "DRAFT", includeBrand: true, publishPage: false, publishToOnlineStore: false, addToMenu: false, menuHandle: "main-menu", writeTheme: false, productHandles: null, includePolicies: false };
 const CURRENCY = { UK: "GBP", SE: "SEK" };
 const VAT = { UK: 0.2, SE: 0.25 };
 const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -18,10 +18,10 @@ const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").
 export function normaliseOptions(o = {}) {
   const out = { ...DEFAULT_OPTIONS, ...o };
   out.productStatus = out.productStatus === "ACTIVE" ? "ACTIVE" : "DRAFT";
-  for (const k of ["includeBrand", "publishPage", "publishToOnlineStore", "addToMenu", "writeTheme"]) out[k] = !!out[k];
+  for (const k of ["includeBrand", "publishPage", "publishToOnlineStore", "addToMenu", "writeTheme", "includePolicies"]) out[k] = !!out[k];
   out.menuHandle = /^[a-z0-9-]{1,60}$/.test(String(out.menuHandle || "")) ? out.menuHandle : "main-menu";
   out.productHandles = Array.isArray(out.productHandles) && out.productHandles.length ? out.productHandles.map(String) : null;
-  if (!out.includeBrand) { out.publishPage = false; out.addToMenu = false; }
+  if (!out.includeBrand) { out.publishPage = false; out.addToMenu = false; out.includePolicies = false; }
   // Theme templates are phase 7; until then the option cannot be switched on.
   out.writeTheme = false;
   return out;
@@ -39,6 +39,10 @@ export function buildPlan(conceptInput, optionsInput = {}) {
   const brandTag = `brand:${c.handle}`;
   const images = products.some((p) => p.images.length);
   const warnings = [];
+  const policies = o.includePolicies ? policyPages(c) : [];
+  if (o.includePolicies && !policies.length) return { ok: false, errors: ["policies: this brand has no policy pages yet; write them first or untick them"], steps: [], summary: null, warnings: [] };
+  const unfilled = policies.filter((p) => FILL_IN.test(p.body)).map((p) => p.title);
+  if (unfilled.length) return { ok: false, errors: [`policies: fill in the marked gaps first ([FYLL I] / [FILL IN]) in: ${unfilled.join(", ")}`], steps: [], summary: null, warnings: [] };
 
   const opts = { collection: o.includeBrand, metaobject: o.includeBrand, page: o.includeBrand, addToMenu: o.addToMenu, publishToOnlineStore: o.publishToOnlineStore };
   const groups = groupsFor(opts, { images });
@@ -47,7 +51,7 @@ export function buildPlan(conceptInput, optionsInput = {}) {
 
   const steps = [];
   steps.push({ key: "preflight", kind: "preflight", title: "Check the store: token, scopes, API fields, currency, free handles",
-    check: { groups, scopes, currency, productHandles: products.map((p) => p.handle), collectionHandle: o.includeBrand ? c.handle : null, pageHandle: o.includeBrand ? c.handle : null } });
+    check: { groups, scopes, currency, productHandles: products.map((p) => p.handle), collectionHandle: o.includeBrand ? c.handle : null, pageHandle: o.includeBrand ? c.handle : null, ...(policies.length ? { policyHandles: policies.map((p) => p.handle) } : {}) } });
 
   if (o.includeBrand) {
     steps.push({ key: "metaobject-definition", kind: "metaobjectDefinition", title: "Brand metaobject type (created once per store)",
@@ -98,6 +102,10 @@ export function buildPlan(conceptInput, optionsInput = {}) {
     if (skipped.length) warnings.push(`Not published on the page: ${skipped.join(", ")} (testimonials must be real customer quotes; add them in Shopify).`);
     steps.push({ key: "page", kind: "page", title: `Page: ${c.name} (${o.publishPage ? "published" : "hidden"})`,
       variables: { page: { title: c.name, handle: c.handle, body: html, isPublished: o.publishPage } } });
+    for (const p of policies) {
+      steps.push({ key: `policy:${p.handle}`, kind: "policyPage", handle: p.handle, title: `Policy page: ${p.title} (${o.publishPage ? "published" : "hidden"})`,
+        variables: { page: { title: p.title, handle: p.handle, body: p.body, isPublished: o.publishPage } } });
+    }
   }
   if (o.addToMenu) steps.push({ key: "menu", kind: "menu", title: `Menu item \u201c${c.name}\u201d in ${o.menuHandle}`, menuHandle: o.menuHandle, item: { title: c.name, type: "COLLECTION", resourceId: "<collection id from the collection step>" } });
   if (o.publishToOnlineStore) steps.push({ key: "publish", kind: "publish", title: "Publish to the Online Store channel", targets: [...(o.includeBrand ? ["collection"] : []), ...products.map((p) => `product:${p.handle}`)] });
@@ -107,14 +115,21 @@ export function buildPlan(conceptInput, optionsInput = {}) {
   if (o.productStatus === "ACTIVE") warnings.push("Products are created as ACTIVE: they can be bought as soon as they are published to a sales channel.");
 
   const variantsTotal = products.reduce((n, p) => n + p.variants.length, 0);
-  const apiCalls = 5 + products.length * 2 + (o.includeBrand ? 7 : 0) + (o.addToMenu ? 2 : 0) + (o.publishToOnlineStore ? 1 + products.length + (o.includeBrand ? 1 : 0) : 0);
+  const apiCalls = 5 + products.length * 2 + (o.includeBrand ? 7 : 0) + policies.length * 2 + (o.addToMenu ? 2 : 0) + (o.publishToOnlineStore ? 1 + products.length + (o.includeBrand ? 1 : 0) : 0);
   const summary = {
     brand: c.name, handle: c.handle, market, currency, status: o.productStatus,
     products: products.length, variants: variantsTotal, images: products.reduce((n, p) => n + p.images.length, 0),
-    collection: o.includeBrand ? 1 : 0, page: o.includeBrand ? 1 : 0, metaobject: o.includeBrand ? 1 : 0, menuItem: o.addToMenu ? 1 : 0,
+    collection: o.includeBrand ? 1 : 0, page: o.includeBrand ? 1 : 0, metaobject: o.includeBrand ? 1 : 0, menuItem: o.addToMenu ? 1 : 0, policyPages: policies.length,
     publishToOnlineStore: o.publishToOnlineStore, pagePublished: o.publishPage, apiCalls, estSeconds: Math.round(apiCalls * 0.7 + products.length * 1.5 + 3), scopes,
   };
   return { ok: true, errors: [], steps, summary, warnings, options: o, concept: c };
+}
+
+// The brand's policy pages, in a fixed order, with brand-specific handles
+// (one store can carry several brands).
+export function policyPages(c) {
+  const slugs = POLICY_SLUGS[c.market === "SE" ? "SE" : "UK"];
+  return POLICY_KEYS.filter((k) => c.policies?.[k]?.body).map((k) => ({ key: k, handle: `${c.handle}-${slugs[k]}`.slice(0, 120), title: c.policies[k].title, body: sanitizeHtml(c.policies[k].body) }));
 }
 
 export function metaobjectDefinition() {

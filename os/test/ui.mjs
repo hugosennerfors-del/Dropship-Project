@@ -486,6 +486,7 @@ const browser = await chromium.launch();
         db.jobs.unshift({ id: job.id, brandId: p.brandId, brandVersion: p.version, connectionId: p.connectionId, status: "queued", options: p.options, progress: {}, createdAt: job.created_at });
         return { ok: true, job };
       }
+      if (action === "brand.names") return { ok: true, id: "nc-1" };
       if (action === "shopify.test") {
         const c = db.connections.find((x) => x.id === p.connectionId);
         if (c && window.__grantOnTest) { c.scopes = [...c.scopes, ...window.__grantOnTest]; c.schema.optionalScopesMissing = []; }
@@ -504,7 +505,7 @@ const browser = await chromium.launch();
         if (tool === "execute_workflow") {
           const id = String(window.__calls.length);
           const body = input.inputs.webhookData.body;
-          if (input.workflowId !== "89WVWxRHegBLsz3X") results[id] = body.op === "read" ? (body.params?.shopifyOnly ? { ok: true, shopify: shopify(body.params.job), generatedAt: new Date().toISOString() } : live) : write(body.action, body.payload);
+          if (input.workflowId !== "89WVWxRHegBLsz3X") results[id] = body.op === "read" ? (body.params?.nameCheck ? { ok: true, nameCheck: { id: body.params.nameCheck, status: "done", results: { Seaglow: [{ domain: "seaglow.co.uk", status: "free", via: "rdap", note: "Not registered at the registry." }, { domain: "seaglow.com", status: "taken", via: "dns" }] } } } : body.params?.shopifyOnly ? { ok: true, shopify: shopify(body.params.job), generatedAt: new Date().toISOString() } : live) : write(body.action, body.payload);
           if (input.workflowId === "89WVWxRHegBLsz3X") {
             const b = input.inputs.webhookData.body;
             db.connections.push({ id: "c-new", label: b.label, shopDomain: b.shop, isTestStore: b.isTest, simulated: /\.mock\.test$/.test(b.shop), status: "connected", shopName: "New shop", plan: "Development", currency: "GBP", scopes: ["write_products"], missingScopes: ["write_content"], schema: { ok: true, checked: 102, missing: [], deprecated: [], partnerDevelopment: true, optionalScopesMissing: [] }, lastError: null, lastVerifiedAt: new Date().toISOString(), hasToken: true, auth: b.kind === "app" ? "client_credentials" : "token" });
@@ -547,6 +548,12 @@ const browser = await chromium.launch();
         const fixed = /did not pass the checks/.test(input);
         return { products: Array.from({ length: fixed ? n : n + 1 }, (_, i) => ({ title: `New title ${i + 1}`, description: "A new selling description that stays honest about what the product does.", bulletPoints: ["One", "Two", "Three"], seo: { title: `New SEO ${i + 1}`, description: "New meta description" } })) };
       }
+      if (/You write standard consumer policy pages/.test(input)) return {
+        terms: { title: "Terms of purchase", body: "<h3>Seller</h3><p>Tidewarm Ltd, 1 Harbour Street, Falmouth.</p><script>x()</script>" },
+        returns: { title: "Returns", body: "<p>You may cancel within 14 days of receiving the goods.</p>" },
+        shipping: { title: "Delivery", body: "<p>Delivered by [FILL IN: carrier] within 6 days.</p>" },
+        privacy: { title: "Privacy", body: "<p>Tidewarm Ltd is the controller of your data.</p>" },
+      };
       return { niches: [{ niche: "Cold-water swimming gear", why: "Year-round dippers" }] };
     };
     window.__saves = [];
@@ -750,11 +757,55 @@ const browser = await chromium.launch();
   ok(rb?.payload.mode === "unpublish" && rb.payload.confirm === true, "undo is soft by default");
   await page.click(".bb-drawer [data-dr=close]");
 
+  // Policy pages: written from the store details, gaps marked, saved, then published with the brand.
+  await page.locator(`[data-brand="${firstId}"] [data-bb-policies]`).click();
+  await page.waitForSelector(".bb-policies");
+  await page.click(".bb-policies [data-pol=write]");
+  await page.waitForSelector(".bb-policies .bb-pol-read");
+  const polPrompt = await page.evaluate(() => window.__jsonInputs.at(-1));
+  ok(/"name":"Tidewarm Ltd"/.test(polPrompt) && /Never invent a fact/.test(polPrompt) && /Consumer Contracts/.test(polPrompt), "the policy prompt carries the store details and forbids made-up facts");
+  ok(/Marked gaps in: Delivery/.test(await page.locator(".bb-policies").innerText()), "a gap Claude could not fill is shown");
+  await page.click(".bb-policies [data-pol-tab=shipping]");
+  ok(await page.locator(".bb-policies .bb-pol-read mark").count() === 1, "the gap is highlighted in the text");
+  await page.click(".bb-policies [data-pol-view=edit]");
+  await page.fill(".bb-policies [data-pol-body]", "<p>Delivered by Royal Mail within 6 days.</p>");
+  await page.click(".bb-policies [data-pol=save]");
+  await page.waitForSelector(".bb-policies", { state: "detached" });
+  const polSave = (await writes("brand.save")).at(-1).payload;
+  ok(polSave.note === "Policy pages" && Object.keys(polSave.concept.policies).length === 4 && !/script/.test(polSave.concept.policies.terms.body) && /Royal Mail/.test(polSave.concept.policies.shipping.body), "the four pages are saved with the brand, sanitised and edited", JSON.stringify(Object.keys(polSave.concept.policies)));
+  await page.locator(`[data-brand="${firstId}"] [data-bb-publish]`).click();
+  await page.waitForSelector(".bb-publish");
+  ok(/4 policy pages/.test(await page.locator(".bb-publish .bb-box").first().innerText()) && await page.locator(".bb-publish [data-pub=includePolicies]").isChecked(), "the publish dialog includes the policy pages once they have no gaps");
+  await page.keyboard.press("Escape");
+
+  // Name check: domains looked up in the background, trade mark registers linked.
+  await page.locator(`[data-brand="${firstId}"] [data-bb-names]`).click();
+  await page.waitForSelector(".bb-names");
+  await page.click(".bb-names [data-nm=go]");
+  await page.waitForSelector(".bb-names .bb-nm", { timeout: 10000 });
+  const nm = await page.locator(".bb-names").innerText();
+  const nmWrite = (await writes("brand.names")).at(-1)?.payload;
+  ok(nmWrite?.names?.[0] === "Seaglow" && nmWrite.market === "UK" && /seaglow\.co\.uk\s*Free/.test(nm) && /seaglow\.com\s*Taken/.test(nm), "the name check asks for the brand's name and shows free and taken domains", nm.slice(0, 160));
+  ok(await page.locator(".bb-names a[href^='https://euipo.europa.eu/']").count() === 1 && await page.locator(".bb-names a[href^='https://trademarks.ipo.gov.uk/']").count() === 1 && /Not legal advice/.test(nm), "trade mark registers are linked for a manual search, with the caveat");
+  await page.keyboard.press("Escape");
+
   // One product only.
   await page.locator(`[data-brand="${firstId}"] [data-bb-pubprod]`).first().click();
   await page.waitForSelector(".bb-publish");
   ok(/1 product /.test(await page.locator(".bb-publish .bb-box").first().innerText()) && /Create products in Shopify/.test(await page.locator(".bb-publish .bb-mhead").innerText()), "a single product can be published without the brand");
   await page.keyboard.press("Escape");
+
+  // The whole concept again: the store's own details stay; the policy pages, which name the old brand, do not.
+  const beforeWhole = (await writes("brand.save")).at(-1).payload.concept;
+  await page.locator(`[data-brand="${firstId}"] [data-bb-regen]`).click();
+  await page.waitForSelector(".bb-regen-dlg");
+  await page.check('.bb-regen-dlg input[name=bb-part][value=whole]');
+  await page.click(".bb-regen-dlg [data-rg=go]");
+  await page.waitForFunction(() => window.__calls.some((c) => c.tool === "execute_workflow" && c.input.inputs.webhookData.body.action === "brand.save" && c.input.inputs.webhookData.body.payload.note === "Regenerated"), null, { timeout: 10000 });
+  const whole = (await writes("brand.save")).filter((w) => w.payload.note === "Regenerated").at(-1).payload;
+  const same = (k) => JSON.stringify(whole.concept[k]) === JSON.stringify(beforeWhole[k]);
+  ok(whole.id === firstId && beforeWhole.business?.legalName && beforeWhole.logo && same("business") && same("economics") && same("logo") && same("compliance") && !whole.concept.policies && beforeWhole.policies,
+    "a new whole concept keeps the store details, profit settings, logo and confirmations, and leaves out the old policy pages", JSON.stringify(Object.keys(whole.concept)));
 
   // Shopify stores: credentials go only to the intake workflow, never stay in the page.
   await page.goto(url + "#/data?tab=shopify");

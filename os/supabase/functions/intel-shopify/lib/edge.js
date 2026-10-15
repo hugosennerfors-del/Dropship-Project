@@ -11,6 +11,7 @@
 //   run       claim a publish job (a lease, so it never runs twice), run the
 //             pipeline within a time budget, re-dispatch itself to continue
 //   rollback  undo a job (soft by default; delete only what it created)
+//   names     look up whether brand names are free as domains (names.js)
 //
 // `sql` is a postgres.js client on SUPABASE_DB_URL; everything else is
 // injected so the logic stays plain JavaScript.
@@ -22,6 +23,7 @@ import { verifySchema } from "./schema.js";
 import { Q, SCOPES, SCOPES_FOR } from "./documents.js";
 import { createMockShop } from "./mockshop.js";
 import { SHOPIFY_API_VERSION } from "./version.js";
+import { checkNames } from "./names.js";
 
 const CORE_SCOPES = [...new Set([...SCOPES_FOR.product, ...SCOPES_FOR.collection, ...SCOPES_FOR.metaobject, ...SCOPES_FOR.page])];
 const OPTIONAL_SCOPES = [...new Set([...SCOPES_FOR.menu, ...SCOPES_FOR.publish])];
@@ -193,6 +195,19 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
     }
   }
 
+  // -- names ------------------------------------------------------------
+  async function names(id) {
+    const [row] = await sql`update intel.name_checks set status = 'running' where id = ${id} and status = 'queued' returning *`;
+    if (!row) return;
+    try {
+      const results = await checkNames(row.names, row.market, { fetch: fetchImpl });
+      await sql`update intel.name_checks set status = 'done', results = ${sql.json(results)}, finished_at = now() where id = ${id}`;
+      log({ event: "names", id, names: row.names.length });
+    } catch (e) {
+      await sql`update intel.name_checks set status = 'failed', error = ${String(e?.message || e).slice(0, 300)}, finished_at = now() where id = ${id}`;
+    }
+  }
+
   async function redispatch(action, id) {
     const s = await fnSecret();
     await fetchImpl(selfUrl, { method: "POST", headers: { "Content-Type": "application/json", "x-intel-secret": s }, body: JSON.stringify({ action, id }) });
@@ -206,7 +221,7 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
     try { body = await req.json(); } catch { return json(400, { error: "invalid JSON" }); }
     const { action, id } = body || {};
     if (!/^[0-9a-f-]{36}$/.test(String(id || ""))) return json(400, { error: "invalid id" });
-    const work = { test, run, rollback }[action];
+    const work = { test, run, rollback, names }[action];
     if (!work) return json(400, { error: "unknown action" });
     waitUntil(work(id).catch((e) => log({ event: action, id, crashed: String(e?.message || e).slice(0, 200), detail: redact(String(e?.stack || "")).slice(0, 400) })));
     return json(202, { accepted: true, action, id });

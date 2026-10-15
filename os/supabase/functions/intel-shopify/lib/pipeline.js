@@ -122,6 +122,13 @@ const STEPS = {
       const pg = (data?.pages?.nodes || []).find((x) => x.handle === step.check.pageHandle);
       if (pg) { if (await store.ownedResource(job.connection_id, "page", pg.id, job.brand_id)) existing.page = { id: pg.id, isPublished: pg.isPublished }; else conflicts.push(`page \u201c${pg.handle}\u201d`); }
     }
+    for (const handle of step.check.policyHandles || []) {
+      const { data } = await client.request(Q.pageByHandle, { query: `handle:${handle}` });
+      const pg = (data?.pages?.nodes || []).find((x) => x.handle === handle);
+      if (!pg) continue;
+      if (await store.ownedResource(job.connection_id, "page", pg.id, job.brand_id)) (existing.policies ||= {})[handle] = { id: pg.id, isPublished: pg.isPublished };
+      else conflicts.push(`page \u201c${pg.handle}\u201d`);
+    }
     if (conflicts.length) throw new ShopifyError("conflict", `Already in use in the store and not made by this brand: ${conflicts.join(", ")}. Rename the brand or product (the handle follows the name) and try again.`);
     const response = { shop: { name: shop.name, domain: shop.myshopifyDomain, host: shop.primaryDomain?.host || shop.myshopifyDomain, currency: shop.currencyCode, plan: shop.plan?.publicDisplayName || null }, schema: { checked: schema.checked, deprecated: schema.deprecated }, existing };
     // Later steps in this run read what the preflight found.
@@ -173,16 +180,12 @@ const STEPS = {
   },
 
   async page({ step, ctx, client, connection }) {
-    const ex = ctx.existing?.page;
-    if (ex) {
-      const { payload } = await client.mutate(M.pageUpdate, { id: ex.id, page: { title: step.variables.page.title, body: step.variables.page.body, isPublished: step.variables.page.isPublished } }, "pageUpdate");
-      return { gid: ex.id, response: { id: ex.id, updated: true, isPublished: payload.page?.isPublished },
-        resources: [{ resource_type: "page", shopify_gid: ex.id, handle: step.variables.page.handle, admin_url: adminUrl(connection?.shop_domain, "page", ex.id), public_url: publicUrl(ctx.shop?.host, "page", step.variables.page.handle), previous_state: { existed: true, isPublished: ex.isPublished } }] };
-    }
-    const { payload } = await client.mutate(M.pageCreate, step.variables, "pageCreate");
-    const pg = payload.page;
-    return { gid: pg.id, response: { id: pg.id, handle: pg.handle, isPublished: pg.isPublished },
-      resources: [{ resource_type: "page", shopify_gid: pg.id, handle: pg.handle, admin_url: adminUrl(connection?.shop_domain, "page", pg.id), public_url: publicUrl(ctx.shop?.host, "page", pg.handle), previous_state: null }] };
+    return pageStep(step, ctx.existing?.page, { ctx, client, connection });
+  },
+
+  // A policy page: the same as the brand page, with its own handle.
+  async policyPage({ step, ctx, client, connection }) {
+    return pageStep(step, ctx.existing?.policies?.[step.handle], { ctx, client, connection });
   },
 
   // Adds the collection to a menu. The menu's earlier items are saved, so
@@ -220,6 +223,21 @@ const STEPS = {
     return { response: { brand: plan.summary.handle, ids: ctx.ids, host: ctx.shop?.host || null } };
   },
 };
+
+// Creates a page, or updates the one an earlier publish of this brand made
+// (`ex`), keeping what it was so undo can put it back.
+async function pageStep(step, ex, { ctx, client, connection }) {
+  const v = step.variables.page;
+  if (ex) {
+    const { payload } = await client.mutate(M.pageUpdate, { id: ex.id, page: { title: v.title, body: v.body, isPublished: v.isPublished } }, "pageUpdate");
+    return { gid: ex.id, response: { id: ex.id, updated: true, isPublished: payload.page?.isPublished },
+      resources: [{ resource_type: "page", shopify_gid: ex.id, handle: v.handle, admin_url: adminUrl(connection?.shop_domain, "page", ex.id), public_url: publicUrl(ctx.shop?.host, "page", v.handle), previous_state: { existed: true, isPublished: ex.isPublished } }] };
+  }
+  const { payload } = await client.mutate(M.pageCreate, step.variables, "pageCreate");
+  const pg = payload.page;
+  return { gid: pg.id, response: { id: pg.id, handle: pg.handle, isPublished: pg.isPublished },
+    resources: [{ resource_type: "page", shopify_gid: pg.id, handle: pg.handle, admin_url: adminUrl(connection?.shop_domain, "page", pg.id), public_url: publicUrl(ctx.shop?.host, "page", pg.handle), previous_state: null }] };
+}
 
 // Undo a job: soft by default (see planRollback). Every action is logged
 // on the resource; a failed action leaves the rest untouched and the job

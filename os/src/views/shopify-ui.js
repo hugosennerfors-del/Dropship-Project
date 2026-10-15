@@ -5,15 +5,15 @@
 
 import { store, onChange } from "../state.js";
 import { esc, attr, icon, money, dateLabel } from "../ui/dom.js";
-import { validateConcept, sanitizeHtml, toHtml, SECTION_TYPES, PALETTE_ROLES, LIMITS } from "../shopify/concept.js";
+import { validateConcept, sanitizeHtml, toHtml, SECTION_TYPES, PALETTE_ROLES, LIMITS, POLICY_KEYS, FILL_IN } from "../shopify/concept.js";
 import { buildPlan, DEFAULT_OPTIONS } from "../shopify/mapping.js";
 import { SCOPES, scopeFix } from "../shopify/documents.js";
 import { conceptEconomics, econSettings, orderEconomics } from "../shopify/economics.js";
 import { LOGO_STYLES, LOGO_SHAPES, logoLayout, logoSvg, drawLogo, logoSettings } from "../shopify/logo.js";
-import { complianceChecks, attest } from "../shopify/compliance.js";
+import { complianceChecks, attest, businessGaps } from "../shopify/compliance.js";
 import {
   brandById, connectionById, jobById, isLive, storeBadge, saveBrand, startPublish, retryJob, rollbackJob, loadJob, loadShopify,
-  undoPlan, newIdempotencyKey, recheckConnection, regeneratePart, PARTS, TERMINAL, IMAGE_PROVIDERS,
+  undoPlan, newIdempotencyKey, recheckConnection, regeneratePart, PARTS, writePolicies, policyGaps, checkNames, trademarkLinks, TERMINAL, IMAGE_PROVIDERS,
 } from "../shopify/brands.js";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -259,6 +259,116 @@ export function openChecks(brand, { onSaved } = {}) {
         const ch = complianceChecks(pending());
         toast(ch.done ? `Saved as version ${r.version}: ready to sell.` : `Saved as version ${r.version}: ${ch.blocking.length} item${ch.blocking.length === 1 ? "" : "s"} still open.`);
         close(); onSaved?.(r);
+      });
+    },
+  });
+}
+
+// -- Name check ---------------------------------------------------------------------
+const DOMAIN_TXT = { taken: "Taken", free: "Free", "probably free": "Probably free", unknown: "Unclear" };
+export function openNames(brand) {
+  const c = brand.concept;
+  const se = c.market === "SE";
+  const ui = { names: c.name || "", busy: false, status: "", error: "", result: null };
+  const render = () => `
+    <div class="bb-mhead"><div><div class="eyebrow">${icon("search", 13)} Name check · ${esc(brand.id)}</div><h2>${esc(c.name)}</h2></div>
+      <button class="btn sm ghost" data-close aria-label="Close">${icon("x", 14)}</button></div>
+    <div class="bb-mbody stack">
+      <label class="field"><span>Names to check <small class="xs muted">one per line, up to 5</small></span><textarea data-nm-names data-k="nm" rows="3">${esc(ui.names)}</textarea></label>
+      <div class="row"><button class="btn primary sm" data-nm="go"${ui.busy ? " disabled" : ""}>${icon("search", 12)}${ui.busy ? "Checking…" : "Check domains"}</button>${ui.busy ? `<span class="thinking"><i></i><i></i><i></i></span><span class="small">${esc(ui.status)}</span>` : ""}</div>
+      ${ui.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(ui.error)}</span></div>` : ""}
+      ${ui.result ? Object.entries(ui.result.results || {}).map(([name, rows]) => `<section class="bb-box"><h4>${esc(name)}</h4><div class="tbl-wrap"><table class="tbl bb-nm"><tbody>
+        ${rows.map((r) => `<tr><td class="mono">${esc(r.domain)}</td><td><span class="bb-dom bb-dom-${attr(r.status.replace(" ", "-"))}">${esc(DOMAIN_TXT[r.status] || r.status)}</span></td><td class="xs muted">${esc(r.note || (r.status === "taken" ? "Has name servers: someone owns it." : ""))}</td></tr>`).join("")}
+        </tbody></table></div></section>`).join("") : ""}
+      <section class="bb-box"><h4>Trade marks</h4>
+        <p class="small">No free service answers this automatically, so search the registers yourself for the name and names like it, in the classes you sell in. The buttons open each register's search; the name is copied so you can paste it.</p>
+        <div class="row">${trademarkLinks(se ? "SE" : "UK").map(([label, url, what]) => `<a class="btn sm" href="${attr(url)}" target="_blank" rel="noopener" data-nm-tm data-tip="${attr(what)}">${esc(label)} ${icon("ext", 11)}</a>`).join("")}</div>
+        ${(c.legalFlags || []).length ? `<div class="xs muted">Claude's notes when it made the brand: ${esc(c.legalFlags.join(" · "))}</div>` : ""}
+        <p class="xs muted">Not legal advice. A free domain does not mean the name is free to use as a brand.</p></section>
+    </div>
+    <div class="bb-mfoot"><span class="xs muted">${se ? ".se and .nu are checked in DNS: “probably free” means no such domain exists there." : ".com, .uk and .shop are confirmed at the registry when DNS has nothing."}</span><div class="row"><button class="btn" data-close>Close</button></div></div>`;
+  return openModal({
+    cls: "bb-names", label: `Name check for ${c.name}`, render,
+    mount: (box, { paint, close }) => {
+      box.addEventListener("input", (e) => { if (e.target.hasAttribute("data-nm-names")) ui.names = e.target.value; });
+      box.addEventListener("click", async (e) => {
+        const t = e.target;
+        if (t.closest("[data-close]")) return close();
+        if (t.closest("[data-nm-tm]")) { try { await navigator.clipboard?.writeText(ui.names.split("\n")[0].trim()); toast("Name copied; paste it into the search."); } catch { /* opening the link is enough */ } return; }
+        if (!t.closest("[data-nm=go]")) return;
+        ui.busy = true; ui.error = ""; ui.result = null; paint();
+        try { ui.result = await checkNames(brand, ui.names.split("\n"), { onStatus: (x) => { ui.status = x; paint(); } }); }
+        catch (err) { ui.error = err?.message || "The lookup failed."; }
+        ui.busy = false; paint();
+      });
+    },
+  });
+}
+
+// -- Policy pages ------------------------------------------------------------------
+// Write the four policy pages with Claude from the store details, review and
+// edit them, and save them with the brand. They are published as pages with
+// the brand (an option in the publish dialog).
+const POLICY_LABEL = { terms: "Terms of purchase", returns: "Returns and withdrawal", shipping: "Delivery", privacy: "Privacy" };
+export function openPolicies(brand, { onSaved } = {}) {
+  const c = brand.concept;
+  const se = c.market === "SE";
+  const ui = { pages: structuredClone(c.policies || {}), tab: "terms", busy: false, status: "", error: "", ctl: null, view: "edit" };
+  const gaps = businessGaps(c.business || {}, se ? "SE" : "UK");
+  const has = () => POLICY_KEYS.some((k) => ui.pages[k]?.body);
+  const render = () => {
+    const page = ui.pages[ui.tab];
+    const marks = policyGaps(ui.pages);
+    return `
+    <div class="bb-mhead"><div><div class="eyebrow">${icon("data", 13)} Policy pages · ${esc(brand.id)} v${brand.version}</div><h2>${esc(c.name)}</h2></div>
+      <button class="btn sm ghost" data-close aria-label="Close">${icon("x", 14)}</button></div>
+    <div class="bb-mbody stack">
+      <p class="small muted">${se ? "Written in Swedish" : "Written in English"} from your store details, for you to read through: a starting point, not legal advice. Claude uses only the details you gave; anything missing is marked ${se ? "[FYLL I: …]" : "[FILL IN: …]"}, and pages with marks cannot be published. To show the texts at checkout too, copy them into Shopify under Settings › Policies.</p>
+      ${gaps.length ? `<div class="callout warn">${icon("warn", 16)}<span>Fill in the store details first (company name, ${se ? "organisation number" : "company number"}, address and email): the pages are written from them. <button class="btn sm" data-pol="details">Store details</button></span></div>` : ""}
+      <div class="row between"><div class="tabs" role="tablist">${POLICY_KEYS.map((k) => `<button role="tab" aria-selected="${ui.tab === k}" data-pol-tab="${k}">${esc(ui.pages[k]?.title || POLICY_LABEL[k])}${marks.includes(k) ? " ⚠" : ""}</button>`).join("")}</div>
+        <div class="seg" role="group" aria-label="View"><button data-pol-view="edit" aria-pressed="${ui.view === "edit"}">Edit</button><button data-pol-view="read" aria-pressed="${ui.view === "read"}">Read</button></div></div>
+      ${ui.busy ? `<div class="row"><span class="thinking"><i></i><i></i><i></i></span><span class="small">${esc(ui.status)}</span></div>`
+        : page ? (ui.view === "edit" ? `<label class="field"><span>Title</span><input type="text" data-pol-title data-k="pt-${ui.tab}" value="${attr(page.title)}"></label>
+          <label class="field"><span>Text <small class="xs muted">HTML: &lt;h3&gt; &lt;p&gt; &lt;ul&gt; &lt;li&gt; &lt;strong&gt;</small></span><textarea data-pol-body data-k="pb-${ui.tab}" rows="16" class="mono">${esc(page.body)}</textarea></label>`
+          : `<article class="bb-rt bb-pol-read">${sanitizeHtml(page.body).replace(/\[(FYLL I|FILL IN)[^\]]*\]/gi, (m) => `<mark>${m}</mark>`)}</article>`)
+        : `<div class="empty">No policy pages yet. Write them with Claude, then read them through.</div>`}
+      ${marks.length && !ui.busy ? `<div class="callout warn">${icon("warn", 16)}<span>Marked gaps in: ${esc(marks.map((k) => ui.pages[k].title).join(", "))}. Replace each ${se ? "[FYLL I: …]" : "[FILL IN: …]"} with the right detail before publishing.</span></div>` : ""}
+      ${ui.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(ui.error)}</span></div>` : ""}
+    </div>
+    <div class="bb-mfoot"><span class="row">${ui.busy ? `<button class="btn" data-pol="stop">Stop</button>` : `<button class="btn sm" data-pol="write"${gaps.length || store.sampleState !== "ready" ? " disabled" : ""}>${icon("spark", 12)}${has() ? "Write again" : "Write with Claude"}</button>`}</span>
+      <div class="row"><button class="btn" data-close>Close</button><button class="btn primary" data-pol="save"${has() && !ui.busy ? "" : " disabled"}>Save with the brand</button></div></div>`;
+  };
+  return openModal({
+    cls: "bb-policies", label: `Policy pages for ${c.name}`, render,
+    mount: (box, { paint, close }) => {
+      box.addEventListener("input", (e) => {
+        const p = ui.pages[ui.tab];
+        if (!p) return;
+        if (e.target.hasAttribute("data-pol-title")) p.title = e.target.value;
+        if (e.target.hasAttribute("data-pol-body")) p.body = e.target.value;
+      });
+      box.addEventListener("click", async (e) => {
+        const t = e.target;
+        if (t.closest("[data-close]")) return close();
+        const tab = t.closest("[data-pol-tab]"); if (tab) { ui.tab = tab.dataset.polTab; return paint(); }
+        const v = t.closest("[data-pol-view]"); if (v) { ui.view = v.dataset.polView; return paint(); }
+        const b = t.closest("[data-pol]"); if (!b) return;
+        if (b.dataset.pol === "details") { close(); return openChecks(brand, { onSaved }); }
+        if (b.dataset.pol === "stop") { ui.ctl?.abort(); return; }
+        if (b.dataset.pol === "write") {
+          ui.busy = true; ui.error = ""; ui.ctl = new AbortController(); paint();
+          try { ui.pages = await writePolicies(brand, { signal: ui.ctl.signal, onStatus: (x) => { ui.status = x; paint(); } }); ui.view = "read"; }
+          catch (err) { ui.error = err?.code === "cancelled" ? "Stopped; nothing changed." : err?.message || "Something went wrong."; }
+          ui.busy = false; return paint();
+        }
+        if (b.dataset.pol === "save") {
+          const pages = Object.fromEntries(POLICY_KEYS.filter((k) => ui.pages[k]?.body).map((k) => [k, { title: ui.pages[k].title.trim(), body: sanitizeHtml(ui.pages[k].body) }]));
+          const r = await saveBrand({ ...c, policies: pages }, { id: brand.id, note: "Policy pages" });
+          if (!r.ok) { ui.error = r.reason || (r.errors || []).slice(0, 3).join("; "); return paint(); }
+          const marks = policyGaps(pages);
+          toast(marks.length ? `Saved as version ${r.version}; fill in the marked gaps before publishing.` : `Policy pages saved (version ${r.version}).`);
+          close(); onSaved?.(r);
+        }
       });
     },
   });
@@ -607,12 +717,13 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
   const pick = conns.find((c) => c.status === "connected" && !isLive(c)) || conns.find((c) => c.status === "connected") || conns[0] || null;
   const ui = {
     connectionId: pick?.id || "", confirm: false, liveText: "", dry: false, busy: false, error: "", key: newIdempotencyKey(), checking: false, checkNote: "",
-    options: { ...DEFAULT_OPTIONS, includeBrand: !productHandles, productHandles },
+    options: { ...DEFAULT_OPTIONS, includeBrand: !productHandles, productHandles, includePolicies: !productHandles && POLICY_KEYS.some((k) => brand.concept.policies?.[k]?.body) && !POLICY_KEYS.some((k) => FILL_IN.test(brand.concept.policies?.[k]?.body || "")) },
   };
   const scopeOk = (have, need) => have.includes(need) || (need.startsWith("read_") && have.includes("write_" + need.slice(5)));
 
   const render = () => {
     const c = brand.concept;
+    const hasPolicies = POLICY_KEYS.some((k) => c.policies?.[k]?.body);
     const conn = connectionById(ui.connectionId);
     const plan = buildPlan(c, ui.options);
     const live = isLive(conn);
@@ -641,6 +752,7 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
       o.includeBrand ? `1 smart collection “${sm.brand}” (products tagged brand:${sm.handle})` : null,
       o.includeBrand ? `1 page “${sm.brand}” (${o.publishPage ? "published" : "hidden"})` : null,
       o.includeBrand ? "1 brand entry (metaobject) with palette, fonts, story and USPs" : null,
+      sm.policyPages ? `${sm.policyPages} policy page${sm.policyPages === 1 ? "" : "s"} (${o.publishPage ? "published" : "hidden"})` : null,
       o.addToMenu ? `1 menu item in “${o.menuHandle}”` : null,
       o.publishToOnlineStore ? "Published to the Online Store sales channel" : "Not published to any sales channel",
       "No theme files are written",
@@ -661,6 +773,7 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
           <div class="row"><span class="small">Product status</span><div class="seg" role="group" aria-label="Product status">
             <button data-pub="status" data-v="DRAFT" aria-pressed="${o.productStatus === "DRAFT"}">Draft</button><button data-pub="status" data-v="ACTIVE" aria-pressed="${o.productStatus === "ACTIVE"}">Active</button></div></div>
           <label class="bb-check"><input type="checkbox" data-pub="publishPage" data-k="pp"${o.publishPage ? " checked" : ""}${o.includeBrand ? "" : " disabled"}> Publish the brand page now <small>(off: the page is created hidden)</small></label>
+          <label class="bb-check"><input type="checkbox" data-pub="includePolicies" data-k="ip"${o.includePolicies ? " checked" : ""}${o.includeBrand && hasPolicies ? "" : " disabled"}> Publish the policy pages <small>${hasPolicies ? "(terms, returns, delivery, privacy; shown like the brand page)" : "(write them first under Policies on the brand)"}</small></label>
           <label class="bb-check"><input type="checkbox" data-pub="addToMenu" data-k="am"${o.addToMenu ? " checked" : ""}${o.includeBrand ? "" : " disabled"}> Add the brand to a menu</label>
           ${o.addToMenu ? `<label class="field bb-indent"><span>Menu handle</span><input type="text" class="mono" data-pub="menuHandle" data-k="mh" value="${attr(o.menuHandle)}"></label>` : ""}
           <label class="bb-check"><input type="checkbox" data-pub="publishToOnlineStore" data-k="os"${o.publishToOnlineStore ? " checked" : ""}> Publish to the Online Store sales channel <small>(off: nothing is visible to shoppers)</small></label>
@@ -695,7 +808,7 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
         if (!k) return;
         if (k === "conn") { ui.connectionId = t.value; ui.confirm = false; ui.liveText = ""; ui.checkNote = ""; }
         else if (k === "confirm") ui.confirm = t.checked;
-        else if (["publishPage", "addToMenu", "publishToOnlineStore"].includes(k)) ui.options[k] = t.checked;
+        else if (["publishPage", "addToMenu", "publishToOnlineStore", "includePolicies"].includes(k)) ui.options[k] = t.checked;
         paint();
       });
       box.addEventListener("input", (e) => {

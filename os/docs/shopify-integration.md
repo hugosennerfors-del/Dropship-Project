@@ -184,10 +184,49 @@ Once a quarter:
   - Tokens are logged as estimates from text length. Claude usage is paid by the viewer's own Claude plan, so there is no per-call price to log (`cost_cents` stays empty).
 - **Testimonials.** Fabricated reviews are never published. A testimonials section stays a placeholder in the preview and is left out of the page.
 
+### Brand tools
+
+Each brand card has these tools. Everything they save is stored with the concept as a new version.
+
+- **Regenerate one part** (`regeneratePart` in `brands.js`).
+  - The parts are: name and tagline, look, story, product texts, page plan, SEO. Claude rewrites only the chosen part; handles, variants and prices stay.
+  - An optional wish goes to Claude between `<wish>` delimiters, as data.
+  - The answer must pass `validateConcept`; Claude gets one retry with the errors.
+  - *The whole concept* still makes a new concept. It keeps the store details, profit settings, logo choice and confirmations (`keptOnRegenerate`), but not the policy pages, because they name the old brand.
+- **Profit per order** (`economics.js`).
+  - Fields: shipping, ad cost per order, returns, payment fees and a target margin. Fee and return values the owner has not set are shown as assumptions.
+  - Per variant it shows the contribution, profit after ads, break-even CPA and ROAS, and the price needed for the target margin.
+- **Logo** (`logo.js`).
+  - A wordmark, a badge or a stacked logo, built from the name, palette and heading font.
+  - Downloads as SVG or PNG (transparent background optional); the choice is saved as `concept.logo`.
+- **Store details and checks** (`compliance.js`).
+  - Store details are saved in `concept.business`: company, organisation number, contact, delivery, returns, and the EU responsible person for Sweden.
+  - The checklist covers:
+    - the seller's details;
+    - prices with VAT;
+    - the 14-day right of withdrawal;
+    - delivery information;
+    - for Sweden, three years to complain about faults and GPSR product safety;
+    - CE, WEEE, batteries, toys and cosmetics where the product words match.
+  - What the page cannot see (a supplier's declaration, a registration) the owner confirms per product.
+  - While anything is open, the publish dialog will not make products buyable (Active or published to the Online Store). Drafts are still allowed.
+  - It is a checklist with the law named for each line, not legal advice.
+- **Policy pages** (`buildPolicyPrompt`, `writePolicies`).
+  - Claude writes terms, returns and right of withdrawal, delivery, and privacy, in the brand's language and tone, from the store details only. A fact it was not given becomes `[FYLL I: …]` / `[FILL IN: …]`.
+  - The owner edits the pages in the dialog; the HTML is sanitised.
+  - *Policy pages* in the publish dialog creates them as Shopify pages, with handles such as `tidewarm-retur-och-angerratt`. They are checked in the preflight, updated on re-publish and hidden or deleted by undo.
+  - Publishing is refused while a gap mark is left.
+- **Name check** (`names.js`, edge action `names`, table `intel.name_checks`).
+  - Up to five names; up to 30 checks an hour across the database.
+  - Each name is tried as up to eight domains for the market: `.se .com .nu .shop` for Sweden, `.co.uk .com .uk .shop` for the UK.
+  - The edge function looks each one up in DNS (`dns.google`); where IANA lists an RDAP server, it asks the registry too.
+  - Results are *taken*, *free* (the registry says it is not registered), *probably free* (no such domain in DNS; `.se` and `.nu` have no public RDAP) or *unknown*. Only a registrar can confirm.
+  - Trade marks are not checked automatically: EUIPO, TMview, WIPO and the UK IPO have no free search API that can be used from here. The dialog links to their searches and copies the name.
+
 ## Tests
 
 ```
-npm test                 unit, Shopify (77), build, smoke, UI in Chromium (87)
+npm test                 unit (95), Shopify (129), build, smoke, UI in Chromium (154)
 npm run test:shopify     the Shopify suite on its own
 npm run shopify:schema   contract check (simulated store, or a real one with SHOPIFY_* set)
 ```
@@ -198,7 +237,8 @@ The Shopify suite runs against `mockshop.js`. It covers:
 - the client: throttling, 5xx, auth, pauses, pagination, redaction;
 - the schema check, and access tokens (client credentials, renewal, errors);
 - the pipeline: happy path, idempotent re-run, re-publish updates, conflicts, cross-brand conflicts, partial failure and retry, the time budget;
-- live publish with undo and delete, currency, scope and schema failures.
+- live publish with undo and delete, currency, scope and schema failures;
+- profit per order, the logo layout, the checklist, policy pages (plan, publish, update, undo, conflict) and the name check against a fake DNS and RDAP.
 
 The UI suite drives the page with mocked Claude and n8n:
 
@@ -224,5 +264,6 @@ The deployed edge function and SQL were also exercised end to end against a simu
 | OAuth (authorization-code grant) for other merchants' stores | Not built; see "Connecting a store". |
 | Webhooks (`products/delete`, `app/uninstalled`, compliance topics) with HMAC | Not built. |
 | Translations, Markets, blog posts, bulk operations (>50 products), JSON-LD | Not built. |
-| Regenerating only part of a concept | Not built; *Regenerate* makes a whole new concept as the brand's next version. |
+| Automatic trade mark search (PRV, EUIPO, UK IPO) | Not built; no free search API can be used from here. The name check links to the registers instead. |
+| FAQ from competitors' reviews | Not built yet. |
 | Multiple users and roles | Not built; the database serves one owner (as the rest of Plan-vy). |

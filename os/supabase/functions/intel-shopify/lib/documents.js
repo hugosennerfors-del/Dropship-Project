@@ -62,7 +62,7 @@ export const NEEDS = {
     "MetaobjectAccessInput.storefront", "Mutation.metaobjectUpsert(handle)", "Mutation.metaobjectUpsert(metaobject)", "MetaobjectHandleInput.type",
     "MetaobjectHandleInput.handle", "MetaobjectUpsertInput.fields", "MetaobjectFieldInput.key", "MetaobjectFieldInput.value"],
   page: ["Query.pages(query)", "Mutation.pageCreate(page)", "PageCreateInput.title", "PageCreateInput.handle", "PageCreateInput.body", "PageCreateInput.isPublished",
-    "Mutation.pageUpdate(id)", "Mutation.pageUpdate(page)", "PageUpdateInput.isPublished"],
+    "Mutation.pageUpdate(id)", "Mutation.pageUpdate(page)", "PageUpdateInput.title", "PageUpdateInput.body", "PageUpdateInput.isPublished"],
   menu: ["Query.menus", "Mutation.menuUpdate(id)", "Mutation.menuUpdate(title)", "Mutation.menuUpdate(items)", "MenuItemUpdateInput.title", "MenuItemUpdateInput.type",
     "MenuItemUpdateInput.resourceId", "MenuItemUpdateInput.url", "MenuItemUpdateInput.items", "MenuItemUpdateInput.id"],
   publish: ["Query.publications", "Mutation.publishablePublish(id)", "Mutation.publishablePublish(input)", "PublicationInput.publicationId"],

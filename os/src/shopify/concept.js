@@ -10,6 +10,26 @@ export const SECTION_TYPES = ["hero", "featured-collection", "rich-text", "image
 export const PALETTE_ROLES = ["primary", "secondary", "accent", "bg", "fg"];
 export const LIMITS = { concepts: 5, products: 12, options: 3, optionValues: 20, variants: 100, sections: 12 };
 
+// Policy pages a brand can carry, with their handle suffix per market.
+export const POLICY_KEYS = ["terms", "returns", "shipping", "privacy"];
+export const POLICY_SLUGS = {
+  SE: { terms: "kopvillkor", returns: "retur-och-angerratt", shipping: "frakt-och-leverans", privacy: "integritetspolicy" },
+  UK: { terms: "terms", returns: "returns", shipping: "shipping", privacy: "privacy" },
+};
+// A gap the policy writer could not fill from the facts it was given.
+export const FILL_IN = /\[(FYLL I|FILL IN)\b[^\]]*\]/i;
+
+// What a brand keeps when its whole concept is generated again: the
+// owner's store details, profit settings, logo choice and confirmations.
+// Policy pages are not kept, since they name the old brand; the earlier
+// version still has them.
+export const KEPT_ON_REGENERATE = ["business", "economics", "logo", "compliance"];
+export function keptOnRegenerate(prev) {
+  const out = {};
+  for (const k of KEPT_ON_REGENERATE) if (prev?.[k] != null) out[k] = JSON.parse(JSON.stringify(prev[k]));
+  return out;
+}
+
 // -- Handles ------------------------------------------------------------
 // Shopify handles: lower case letters, digits and hyphens. Å, ä and ö
 // become a, a and o.
@@ -171,6 +191,19 @@ export function validateConcept(input, opts = {}) {
   if (opts.market) v.market = opts.market;
   else if (c.market) v.market = str("market", c.market, { max: 8 });
   if (c.currency) v.currency = str("currency", c.currency, { max: 3 });
+  // Policy pages (optional): a title and sanitised HTML each.
+  if (c.policies != null) {
+    if (!obj(c.policies)) err("policies", "must be an object");
+    else {
+      v.policies = {};
+      for (const k of POLICY_KEYS) {
+        const pol = c.policies[k];
+        if (pol == null) continue;
+        if (!obj(pol)) { err(`policies.${k}`, "must be an object"); continue; }
+        v.policies[k] = { title: str(`policies.${k}.title`, pol.title, { max: 120 }), body: sanitizeHtml(text(`policies.${k}.body`, pol.body, 20000)) };
+      }
+    }
+  }
   return { ok: errors.length === 0, errors, value: v };
 }
 

@@ -248,3 +248,11 @@ button.li.bb-hrow:hover { background: rgba(255, 255, 255, .6); }
 .bb-ck-missing .bb-ck-st { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
 .bb-ck-confirm .bb-ck-st { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
 .bb-tool-open { color: var(--warn); }
+.bb-pol-read { max-height: 52vh; overflow: auto; border: 1px solid var(--border); border-radius: var(--r-md); padding: 14px 18px; background: rgba(255,255,255,.6); }
+.bb-pol-read mark { background: color-mix(in srgb, var(--warn) 30%, transparent); padding: 0 3px; border-radius: 3px; }
+.bb-nm td { padding: 4px 8px; }
+.bb-dom { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
+.bb-dom-taken { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.bb-dom-free { background: color-mix(in srgb, var(--good) 16%, transparent); color: var(--good); }
+.bb-dom-probably-free { background: color-mix(in srgb, var(--good) 9%, transparent); color: var(--good); }
+.bb-dom-unknown { background: color-mix(in srgb, var(--warn) 16%, transparent); color: var(--warn); }

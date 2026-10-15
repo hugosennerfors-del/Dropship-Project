@@ -4,7 +4,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateConcept, sanitizeHtml, slugify, uniqueHandle, toHtml, variantMargin } from "../src/shopify/concept.js";
+import { validateConcept, sanitizeHtml, slugify, uniqueHandle, toHtml, variantMargin, keptOnRegenerate } from "../src/shopify/concept.js";
 import { CONCEPT_JSON_SCHEMA, CONCEPT_TOOL_SCHEMA, jsonDepth } from "../src/shopify/concept-schema.js";
 import { buildPlan, planRollback, pageBody, adminUrl, publicUrl } from "../src/shopify/mapping.js";
 import { createClient, ShopifyError, redact } from "../src/shopify/client.js";
@@ -17,6 +17,7 @@ import { SHOPIFY_API_VERSION } from "../src/shopify/version.js";
 import { econSettings, orderEconomics, conceptEconomics, econProblems } from "../src/shopify/economics.js";
 import { logoLayout, logoSvg, logoSettings } from "../src/shopify/logo.js";
 import { complianceChecks, attest, productGroups, businessGaps } from "../src/shopify/compliance.js";
+import { domainLabel, domainCandidates, checkDomain, checkNames } from "../src/shopify/names.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const concept = JSON.parse(await readFile(join(root, "test/fixtures-brand-concept.json"), "utf8"));
@@ -304,6 +305,48 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   ok(r.status === "failed" && base.jobs.get("j10").error.kind === "validation", "an invalid concept never reaches Shopify");
 }
 
+// Policy pages: validated, planned with brand handles, published, updated, undone.
+{
+  const pol = clone(concept);
+  pol.policies = { terms: { title: "Terms", body: "<p>Sold by Tidewarm Ltd.</p><script>x()</script>" }, returns: { title: "Returns", body: "<p>14 days.</p>" }, shipping: { title: "Delivery", body: "<p>3–6 days.</p>" }, privacy: { title: "Privacy", body: "<p>We keep orders.</p>" } };
+  const v = validateConcept(pol);
+  ok(v.ok && v.value.policies.terms.body === "<p>Sold by Tidewarm Ltd.</p>", "policy pages are validated and their HTML sanitised", v.errors.join());
+  const plan = buildPlan(pol, { includePolicies: true });
+  const keys = plan.steps.filter((s) => s.kind === "policyPage").map((s) => s.handle);
+  ok(plan.ok && keys.join() === "tidewarm-terms,tidewarm-returns,tidewarm-shipping,tidewarm-privacy" && plan.summary.policyPages === 4 && plan.steps[0].check.policyHandles.length === 4, "four policy pages with the brand's handle, checked in the preflight", keys.join());
+  const se = clone(pol); se.market = "SE";
+  ok(buildPlan(se, { includePolicies: true }).steps.some((s) => s.handle === "tidewarm-retur-och-angerratt"), "Swedish brands get Swedish page handles");
+  const owned = { ...pol, business: { legalName: "Tidewarm Ltd" }, economics: { adCost: "5" }, logo: { style: "badge" }, compliance: { attested: { gpsr: { at: "2026-10-15T08:00:00Z", products: ["a"] } } } };
+  const kept = keptOnRegenerate(owned);
+  ok(Object.keys(kept).join() === "business,economics,logo,compliance" && kept.business.legalName === "Tidewarm Ltd" && kept.business !== owned.business && !("policies" in kept) && Object.keys(keptOnRegenerate({ name: "x" })).length === 0,
+    "a new whole concept keeps the owner's store details, settings and confirmations, as copies, but not the policy pages");
+  ok(!buildPlan(pol, {}).steps.some((s) => s.kind === "policyPage"), "policy pages are only published when chosen");
+  const gap = clone(pol); gap.policies.shipping.body = "<p>Delivered by [FILL IN: carrier] in 3–6 days.</p>";
+  ok(!buildPlan(gap, { includePolicies: true }).ok && /fill in the marked gaps/.test(buildPlan(gap, { includePolicies: true }).errors[0]), "a page with a [FILL IN] mark cannot be published");
+  ok(!buildPlan(concept, { includePolicies: true }).ok, "choosing policy pages for a brand without them is an error, not a silent skip");
+
+  const { shop, client, base, store } = await setup();
+  const r = await runJob({ job: job("jp1", { includePolicies: true, publishPage: true }), concept: pol, connection: conn, client, store });
+  const pages = [...shop.state.pages.values()];
+  ok(r.status === "succeeded" && pages.length === 5 && pages.filter((p) => /^tidewarm-/.test(p.handle)).every((p) => p.isPublished), "the brand page and four published policy pages are created", JSON.stringify(r));
+  const edited = clone(pol); edited.policies.returns.body = "<p>30 days.</p>";
+  const r2 = await runJob({ job: job("jp2", { includePolicies: true, publishPage: true }), concept: edited, connection: conn, client, store });
+  ok(r2.status === "succeeded" && shop.state.pages.size === 5 && [...shop.state.pages.values()].find((p) => p.handle === "tidewarm-returns").body === "<p>30 days.</p>", "publishing again updates the policy pages instead of duplicating them");
+  const rb = await runRollback({ job: job("jp2"), mode: "unpublish", client, store });
+  ok(rb.status === "rolled_back" && [...shop.state.pages.values()].filter((p) => /^tidewarm-/.test(p.handle)).every((p) => p.isPublished === true), "undoing the update puts the pages back as they were before it (published by the first job)", JSON.stringify(rb.done));
+  const rb1 = await runRollback({ job: job("jp1"), mode: "unpublish", client, store });
+  ok(rb1.status === "rolled_back" && [...shop.state.pages.values()].every((p) => p.isPublished === false), "undoing the first publish hides every page it made");
+  void base;
+}
+{
+  const pol = clone(concept);
+  pol.policies = { terms: { title: "Terms", body: "<p>x</p>" } };
+  const { shop, client, store } = await setup();
+  shop.state.pages.set("gid://shopify/Page/77", { id: "gid://shopify/Page/77", handle: "tidewarm-terms", isPublished: true, title: "Someone's terms" });
+  const r = await runJob({ job: job("jp3", { includePolicies: true }), concept: pol, connection: conn, client, store });
+  ok(r.status === "failed" && /tidewarm-terms/.test(r.error.message), "a page someone else made with the same handle stops the job before anything is written", r.error?.message);
+}
+
 // Unit economics: VAT, landed cost, shipping, fees, returns and ad cost per order.
 {
   const se = econSettings({ market: "SE", economics: { shipping: "49", adCost: "150" } });
@@ -368,6 +411,34 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   ok(complianceChecks(short).items.find((i) => i.id === "withdrawal").status === "missing", "a return period under 14 days is not accepted");
   const uk = clone(concept); uk.market = "UK";
   ok(!complianceChecks(uk).items.some((i) => i.id === "gpsr"), "the GPSR item is for the EU market only");
+}
+
+// Name check: DNS first, then the registry's RDAP where IANA lists one.
+{
+  ok(domainLabel("Åsa & Co!") === "asa-and-co" && domainLabel("Setlight") === "setlight", "names become domain labels (å folds, & becomes and)");
+  ok(domainCandidates("Golden Hour", "SE").join() === "goldenhour.se,goldenhour.com,goldenhour.nu,goldenhour.shop,golden-hour.se,golden-hour.com,golden-hour.nu,golden-hour.shop" && domainCandidates("Tidewarm", "UK")[0] === "tidewarm.co.uk", "domains per market, with and without the hyphen");
+  const res = (status, body) => ({ ok: status >= 200 && status < 300, status, json: async () => body });
+  const calls = [];
+  const fake = async (url) => {
+    calls.push(url);
+    if (url.includes("data.iana.org")) return res(200, { services: [[["com", "net"], ["https://rdap.verisign.com/com/v1/"]], [["uk"], ["https://rdap.nominet.uk/uk/"]]] });
+    const q = new URL(url).searchParams.get("name");
+    if (url.startsWith("https://dns.google")) {
+      if (q === "taken.com" || q === "taken.se") return res(200, { Status: 0, Answer: [{ name: q, type: 2 }] });
+      if (q === "dnsdown.com") return res(500, {});
+      return res(200, { Status: 3 });
+    }
+    if (url.includes("rdap.verisign.com")) return url.endsWith("/nodns.com") || url.endsWith("/dnsdown.com") ? res(200, {}) : res(404, {});
+    return res(500, {});
+  };
+  const boot = { com: "https://rdap.verisign.com/com/v1/" };
+  ok((await checkDomain("taken.com", { fetch: fake, bootstrap: boot })).status === "taken", "a domain with name servers is taken");
+  ok((await checkDomain("brandnew.com", { fetch: fake, bootstrap: boot })).status === "free", "no DNS and 404 at the registry: free");
+  ok((await checkDomain("nodns.com", { fetch: fake, bootstrap: boot })).status === "taken", "registered without name servers is still taken");
+  ok((await checkDomain("brandnew.se", { fetch: fake, bootstrap: boot })).status === "probably free", "no RDAP for .se: no DNS means probably free, not free");
+  ok((await checkDomain("dnsdown.com", { fetch: fake, bootstrap: boot })).status === "taken" && (await checkDomain("dnsdown.se", { fetch: async () => { throw new Error("offline"); }, bootstrap: {} })).status === "unknown", "when DNS fails the registry decides; when both fail the answer is unclear");
+  const all = await checkNames(["Taken", "Brandnew"], "SE", { fetch: fake });
+  ok(all.Taken.find((r) => r.domain === "taken.se").status === "taken" && all.Brandnew.find((r) => r.domain === "brandnew.com").status === "free" && calls.filter((u) => u.includes("data.iana.org")).length === 1, "several names, one bootstrap fetch", JSON.stringify(all.Brandnew));
 }
 
 // The edge function's copies (what was deployed) match src/shopify.
