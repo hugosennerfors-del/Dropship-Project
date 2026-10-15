@@ -225,3 +225,8 @@ button.li.bb-hrow:hover { background: rgba(255, 255, 255, .6); }
   .bb-drawer, .bb-modal { animation: none; }
   .bb-prog i, .bb-frame { transition: none; }
 }
+
+/* Profit per order */
+.bb-et td, .bb-et th { padding: 5px 8px; white-space: nowrap; }
+.bb-et td:first-child { white-space: normal; min-width: 140px; }
+.bb-econ-sum.bad { border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }

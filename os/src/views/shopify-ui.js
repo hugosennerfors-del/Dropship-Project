@@ -5,9 +5,10 @@
 
 import { store, onChange } from "../state.js";
 import { esc, attr, icon, money, dateLabel } from "../ui/dom.js";
-import { validateConcept, sanitizeHtml, toHtml, variantMargin, SECTION_TYPES, PALETTE_ROLES, LIMITS } from "../shopify/concept.js";
+import { validateConcept, sanitizeHtml, toHtml, SECTION_TYPES, PALETTE_ROLES, LIMITS } from "../shopify/concept.js";
 import { buildPlan, DEFAULT_OPTIONS } from "../shopify/mapping.js";
 import { SCOPES, scopeFix } from "../shopify/documents.js";
+import { conceptEconomics, econSettings, orderEconomics } from "../shopify/economics.js";
 import {
   brandById, connectionById, jobById, isLive, storeBadge, saveBrand, startPublish, retryJob, rollbackJob, loadJob, loadShopify,
   undoPlan, newIdempotencyKey, recheckConnection, TERMINAL, IMAGE_PROVIDERS,
@@ -189,6 +190,28 @@ function productPage(c, i) {
     </div></div></section>`;
 }
 
+// -- Profit per order ------------------------------------------------------------
+// The table under "Profit per order" in the editor, and the short summary
+// in the publish dialog. Figures come from economics.js.
+export function econHtml(c) {
+  const all = conceptEconomics(c);
+  const e = all.settings, cur = currencyOf(c);
+  const m = (x) => (x === null || x === undefined ? "—" : money(x, cur));
+  const notes = [];
+  if (all.problems.length) return `<div class="callout bad">${icon("warn", 16)}<ul class="bullets small">${all.problems.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>`;
+  if (e.shipping === null) notes.push("Shipping per order is not set, so it counts as 0.");
+  if (e.adCost === null) notes.push("Add your expected ad cost per order to see the profit; until then the table shows how much an ad may cost before an order loses money.");
+  if (e.assumed.length) notes.push(`Assumed until you set them: ${e.assumed.map((k) => ({ feePct: `payment fee ${e.feePct}%`, feeFixed: `fixed fee ${m(e.feeFixed)}`, returnPct: `${e.returnPct}% returns` }[k])).join(", ")}.`);
+  const losing = all.losing.length ? `<div class="callout bad">${icon("warn", 16)}<span><b>${all.losing.length} product${all.losing.length === 1 ? " loses" : "s lose"} money${e.adCost === null ? " before any ads" : ` at ${m(e.adCost)} in ads per order`}:</b> ${esc(all.losing.join(", "))}. Raise the price, lower the cost, or spend less per order.</span></div>` : "";
+  return `${losing}${notes.length ? `<ul class="bullets xs muted">${notes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+    <div class="tbl-wrap"><table class="tbl bb-et"><thead><tr><th>Product</th><th class="r">Price</th><th class="r">Before ads</th><th class="r" data-tip="The most an ad may cost per order before the order loses money">Max ad cost</th><th class="r">Profit at your ad cost</th><th class="r" data-tip="Order value (incl. VAT) per unit of ad spend at which you break even">Break-even ROAS</th><th class="r">Price to break even</th><th class="r">Price for ${esc(String(e.targetPct))}% margin</th></tr></thead><tbody>
+    ${all.rows.map((r) => r.econ ? `<tr><td>${esc(r.title)}</td><td class="r metric">${m(r.econ.price)}</td><td class="r metric${r.econ.contribution < 0 ? " bb-neg" : ""}">${m(r.econ.contribution)}</td><td class="r metric">${r.econ.breakEvenCpa > 0 ? m(r.econ.breakEvenCpa) : "—"}</td>
+        <td class="r metric${(r.econ.profit ?? 0) < 0 ? " bb-neg" : ""}">${r.econ.profit === null ? "—" : `${m(r.econ.profit)} <small class="muted">${r.econ.marginPct}%</small>`}</td><td class="r metric">${r.econ.breakEvenRoas ?? "—"}</td>
+        <td class="r metric">${r.econ.breakEvenPrice === null ? "not possible" : m(r.econ.breakEvenPrice)}</td><td class="r metric">${r.econ.targetPrice === null ? "not possible" : m(r.econ.targetPrice)}</td></tr>`
+      : `<tr><td>${esc(r.title)}</td><td class="r metric">${r.price === null ? "—" : m(r.price)}</td><td colspan="6" class="xs muted">Add a landed cost per unit (under Products) to see the figures.</td></tr>`).join("")}
+    </tbody></table></div>`;
+}
+
 // -- Editor --------------------------------------------------------------------
 // Every generated field can be changed before publishing; saving validates
 // the whole concept and stores it as the brand's next version.
@@ -209,12 +232,12 @@ export function openEditor(brand, { onSaved } = {}) {
   const market = w.market === "SE" ? "SE" : "UK";
   const vat = market === "SE" ? 0.25 : 0.2;
 
-  const inp = (path, label, { type = "text", rows, hint, mono, list } = {}) => {
+  const inp = (path, label, { type = "text", rows, hint, mono, list, ph } = {}) => {
     const raw = getPath(w, path);
     const val = list === "lines" ? (raw || []).join("\n") : list === "csv" ? (raw || []).join(", ") : raw ?? "";
     const attrs = `data-path="${attr(path)}" data-k="${attr(path)}"${list ? ` data-list="${list}"` : ""}${type === "int" ? ' data-int="1"' : ""}`;
     const field = rows ? `<textarea ${attrs} rows="${rows}">${esc(val)}</textarea>`
-      : `<input type="${type === "int" ? "number" : "text"}" ${attrs} value="${attr(val)}"${mono ? ' class="mono"' : ""}>`;
+      : `<input type="${type === "int" ? "number" : "text"}" ${attrs} value="${attr(val)}"${mono ? ' class="mono"' : ""}${ph != null ? ` placeholder="${attr(ph)}"` : ""}>`;
     return `<label class="field"><span>${esc(label)}${hint ? `<small class="xs muted">${esc(hint)}</small>` : ""}</span>${field}</label>`;
   };
   const sec = (key, title, body) => `<details class="bb-ed-sec" data-sec="${key}"${ui.open[key] ? " open" : ""}><summary>${esc(title)}</summary><div class="bb-ed-b">${body}</div></details>`;
@@ -243,6 +266,10 @@ export function openEditor(brand, { onSaved } = {}) {
         ${sec("story", "Story and USPs", `${inp("story.about", "About the brand", { rows: 4 })}${inp("story.mission", "Mission")}${inp("story.usps", "USPs (3–5, one per line)", { rows: 4, list: "lines" })}`)}
         ${sec("products", `Products (${w.products.length})`, `${w.products.map((p, i) => productEditor(p, i)).join("")}
           ${w.products.length < LIMITS.products ? `<button class="btn sm" data-ed="add-product">${icon("plus", 12)}Product</button>` : ""}`)}
+        ${sec("econ", "Profit per order", `<p class="xs muted">Per order of one item: price after VAT, minus landed cost, shipping, payment fee and returns, then your ad cost per order. Saved with the brand.</p>
+          <div class="grid g3">${inp("economics.shipping", "Shipping per order", { mono: true, hint: `${currencyOf(w)}, what you pay`, ph: "not set" })}${inp("economics.adCost", "Ad cost per order", { mono: true, hint: `${currencyOf(w)}, expected cost per purchase`, ph: "not set" })}${inp("economics.targetPct", "Target margin %", { mono: true, hint: "of net revenue", ph: econSettings(w).targetPct })}
+            ${inp("economics.returnPct", "Returns %", { mono: true, hint: "orders refunded", ph: `${econSettings(w).returnPct} (assumed)` })}${inp("economics.feePct", "Payment fee %", { mono: true, hint: "your plan's rate", ph: `${econSettings(w).feePct} (assumed)` })}${inp("economics.feeFixed", "Fixed fee per order", { mono: true, hint: currencyOf(w), ph: `${econSettings(w).feeFixed} (assumed)` })}</div>
+          <div class="bb-econ" data-econ>${econHtml(w)}</div>`)}
         ${sec("page", `Page plan (${w.pagePlan.sections.length} sections)`, `${w.pagePlan.sections.map((s, i) => `<div class="bb-ed-card">
             <div class="row between"><select data-path="pagePlan.sections.${i}.type" data-k="st${i}" aria-label="Section type">${SECTION_TYPES.map((t) => `<option${s.type === t ? " selected" : ""}>${t}</option>`).join("")}</select>
               <span class="row"><button class="btn sm ghost" data-ed="up" data-i="${i}" aria-label="Move up"${i ? "" : " disabled"}>↑</button><button class="btn sm ghost" data-ed="down" data-i="${i}" aria-label="Move down"${i < w.pagePlan.sections.length - 1 ? "" : " disabled"}>↓</button><button class="btn sm ghost" data-ed="rm-section" data-i="${i}" aria-label="Remove section">${icon("x", 12)}</button></span></div>
@@ -269,13 +296,14 @@ export function openEditor(brand, { onSaved } = {}) {
         <button class="btn sm" data-ed="rebuild" data-i="${i}">Rebuild variants from options</button></div>
       <div class="tbl-wrap"><table class="tbl bb-vt"><thead><tr><th>Variant</th><th>Price</th><th>Compare at</th><th>SKU</th><th>Weight g</th><th class="r">Margin</th></tr></thead><tbody>
         ${(p.variants || []).map((v, j) => {
-          const mg = p.costEstimate ? variantMargin({ price: v.price, cost: p.costEstimate, vat }) : null;
+          const mg = p.costEstimate ? orderEconomics({ price: v.price, cost: p.costEstimate, settings: econSettings(w) }) : null;
+          const pct = mg ? (mg.marginPct ?? (mg.net > 0 ? Math.round((mg.contribution / mg.net) * 1000) / 10 : null)) : null;
           return `<tr><td>${esc((v.optionValues || []).join(" / ") || "Default")}</td>
             <td><input type="text" class="mono" data-path="products.${i}.variants.${j}.price" data-k="vp${i}-${j}" value="${attr(v.price ?? "")}" aria-label="Price"></td>
             <td><input type="text" class="mono" data-path="products.${i}.variants.${j}.compareAtPrice" data-k="vc${i}-${j}" value="${attr(v.compareAtPrice ?? "")}" aria-label="Compare-at price"></td>
             <td><input type="text" class="mono" data-path="products.${i}.variants.${j}.sku" data-k="vs${i}-${j}" value="${attr(v.sku ?? "")}" aria-label="SKU"></td>
             <td><input type="number" data-int="1" data-path="products.${i}.variants.${j}.weightGrams" data-k="vw${i}-${j}" value="${attr(v.weightGrams ?? "")}" aria-label="Weight in grams"></td>
-            <td class="r metric${mg && mg.contribution < 0 ? " bb-neg" : ""}" data-tip="${mg ? attr(`Per unit after ${Math.round(vat * 100)}% VAT, landed cost, 2.9% + 0.30 payment fee; before shipping and ads`) : "Add a landed cost to see the margin"}">${mg ? `${mg.marginPct}%` : "—"}</td></tr>`;
+            <td class="r metric${mg && (mg.profit ?? mg.contribution) < 0 ? " bb-neg" : ""}" data-tip="${mg ? attr(`Of net revenue after ${Math.round(vat * 100)}% VAT, landed cost, shipping, payment fee and returns${mg.profit === null ? "; before ads (set an ad cost under Profit per order)" : ", and your ad cost per order"}`) : "Add a landed cost to see the margin"}">${pct === null ? "—" : `${pct}%`}</td></tr>`;
         }).join("")}</tbody></table></div>
       <div class="grid g2">${inp(`products.${i}.costEstimate`, "Landed cost per unit", { mono: true, hint: currencyOf(w) })}${inp(`products.${i}.images`, "Image links (https, one per line)", { rows: 2, list: "lines" })}</div>
       <div class="grid g2">${inp(`products.${i}.seo.title`, "SEO title")}${inp(`products.${i}.seo.description`, "SEO description")}</div>
@@ -294,6 +322,7 @@ export function openEditor(brand, { onSaved } = {}) {
           else if (t.dataset.list === "csv") v = v.split(",").map((x) => x.trim()).filter(Boolean);
           else if (t.dataset.int) v = v === "" ? undefined : Number(v);
           setPath(w, t.dataset.path, v);
+          if (/^economics\.|\.(price|costEstimate)$/.test(t.dataset.path)) { const el = box.querySelector("[data-econ]"); if (el) el.innerHTML = econHtml(w); }
           if (t.type === "color") { const hexIn = box.querySelector(`input[type=text][data-path="${CSS.escape(t.dataset.path)}"]`); if (hexIn) hexIn.value = t.value; }
         } else if (t.dataset.items != null) {
           w.pagePlan.sections[Number(t.dataset.items)].items = t.value.split("\n").map((l) => l.trim()).filter(Boolean).map((l) => { const [a, ...b] = l.split("|"); return { title: a.trim(), body: b.join("|").trim() || a.trim() }; });
@@ -425,6 +454,7 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
           ${o.publishToOnlineStore && o.productStatus === "DRAFT" ? `<p class="xs muted bb-indent">Draft products stay hidden from shoppers even on the Online Store; choose Active to sell them now.</p>` : ""}
           <label class="bb-check bb-off"><input type="checkbox" disabled> Write a theme template <small>(not built yet; the theme is never touched)</small></label>
         </section>
+        ${econBox(c, productHandles)}
         ${plan.warnings?.length ? `<div class="callout warn">${icon("warn", 16)}<ul class="bullets small">${plan.warnings.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
         ${blockers.length ? `<div class="callout bad">${icon("warn", 16)}<ul class="bullets small">${blockers.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}
         ${missing.length ? accessHtml(conn, missing, ui) : ""}
@@ -490,6 +520,27 @@ export function openPublish(brand, { productHandles = null, onStarted } = {}) {
       });
     },
   });
+}
+
+// One line on profit per order in the publish dialog (the full table is in
+// the editor). Warns, never blocks.
+function econBox(c, productHandles) {
+  const all = conceptEconomics(c);
+  const rows = productHandles ? all.rows.filter((r) => productHandles.includes(r.handle)) : all.rows;
+  if (!rows.length) return "";
+  const e = all.settings, cur = currencyOf(c);
+  const priced = rows.filter((r) => r.econ);
+  const losing = priced.filter((r) => (r.econ.profit ?? r.econ.contribution) < 0).map((r) => r.title);
+  const missingCost = rows.filter((r) => !r.hasCost).map((r) => r.title);
+  if (!priced.length) return `<section class="bb-box bb-econ-sum"><h4>Profit per order</h4><p class="small">No product has a landed cost yet, so the profit cannot be worked out. Add costs under Edit > Products.</p></section>`;
+  const worst = priced.reduce((a, r) => ((r.econ.profit ?? r.econ.contribution) < (a.econ.profit ?? a.econ.contribution) ? r : a));
+  const line = e.adCost === null
+    ? `Before ads, an order earns ${money(Math.min(...priced.map((r) => r.econ.contribution)), cur)} to ${money(Math.max(...priced.map((r) => r.econ.contribution)), cur)}. No ad cost per order is set.`
+    : `At ${money(e.adCost, cur)} in ads per order, profit per order is ${money(Math.min(...priced.map((r) => r.econ.profit)), cur)} to ${money(Math.max(...priced.map((r) => r.econ.profit)), cur)}.`;
+  return `<section class="bb-box bb-econ-sum${losing.length ? " bad" : ""}"><h4>Profit per order</h4><p class="small">${esc(line)}</p>
+    ${losing.length ? `<p class="small bb-err">${icon("warn", 12)} ${esc(`${losing.length} of ${priced.length} lose money: ${losing.join(", ")}. Worst: ${worst.title}.`)}</p>` : ""}
+    ${missingCost.length ? `<p class="xs muted">${esc(`${missingCost.length} without a landed cost: ${missingCost.join(", ")}.`)}</p>` : ""}
+    <p class="xs muted">Shipping ${e.shipping === null ? "not set (0)" : money(e.shipping, cur)}, returns ${e.returnPct}%, payment fee ${e.feePct}% + ${money(e.feeFixed, cur)}. Change them under Edit > Profit per order.</p></section>`;
 }
 
 // Scopes the chosen publish needs and the store's app lacks: what to add,

@@ -14,6 +14,7 @@ import { createMockShop } from "../src/shopify/mockshop.js";
 import { accessToken } from "../src/shopify/auth.js";
 import { Q, scopeFix } from "../src/shopify/documents.js";
 import { SHOPIFY_API_VERSION } from "../src/shopify/version.js";
+import { econSettings, orderEconomics, conceptEconomics, econProblems } from "../src/shopify/economics.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const concept = JSON.parse(await readFile(join(root, "test/fixtures-brand-concept.json"), "utf8"));
@@ -299,6 +300,30 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   const broken = clone(concept); broken.products[0].variants[0].price = "-3";
   const r = await runJob({ job: job("j10"), concept: broken, connection: conn, client, store });
   ok(r.status === "failed" && base.jobs.get("j10").error.kind === "validation", "an invalid concept never reaches Shopify");
+}
+
+// Unit economics: VAT, landed cost, shipping, fees, returns and ad cost per order.
+{
+  const se = econSettings({ market: "SE", economics: { shipping: "49", adCost: "150" } });
+  ok(se.vat === 0.25 && se.feePct === 2.9 && se.feeFixed === 0 && se.assumed.includes("feePct") && !se.assumed.includes("shipping"), "Swedish settings: 25% VAT, assumed fees are marked as assumptions");
+  const x = orderEconomics({ price: "499.00", cost: "120.00", settings: se });
+  // net 399.20; fees 14.47; (1-0.03)*399.20 - 120 - 49 - 14.47 = 203.75
+  ok(x.net === 399.2 && x.fees === 14.47 && x.contribution === 203.75 && x.breakEvenCpa === 203.75 && x.profit === 53.75 && x.marginPct === 13.5, "contribution, break-even ad cost and profit per order", JSON.stringify(x));
+  ok(x.breakEvenRoas === 2.45, "break-even ROAS is the order value per unit of ad spend that leaves nothing", x.breakEvenRoas);
+  // Price that breaks even after 150 in ads: 319 / (0.97/1.25 - 0.029) = 427.04
+  ok(x.breakEvenPrice === 427.04 && x.targetPrice === 543.44, "the price needed to break even, and to make the target margin, after the ad cost", `${x.breakEvenPrice} ${x.targetPrice}`);
+  const check = orderEconomics({ price: x.breakEvenPrice, cost: 120, settings: se });
+  ok(Math.abs(check.profit) < 0.02, "at the break-even price the profit is zero", check.profit);
+  const noAds = orderEconomics({ price: 499, cost: 120, settings: econSettings({ market: "SE" }) });
+  ok(noAds.profit === null && noAds.marginPct === null && noAds.contribution > 0, "without an ad cost only the break-even ad cost is shown");
+  const hopeless = orderEconomics({ price: 100, cost: 10, settings: { ...se, returnPct: 80, feePct: 19, adCost: 10 } });
+  ok(hopeless.breakEvenPrice === null && hopeless.targetPrice === null, "when no price can cover the costs, no price is suggested");
+  ok(econProblems({ ...se, returnPct: 120, shipping: -1 }).length === 2, "settings out of range are reported");
+  const c = clone(concept); c.market = "SE"; c.economics = { shipping: 49, adCost: 400 };
+  const all = conceptEconomics(c);
+  ok(all.rows.length === c.products.length && all.priced >= 1 && Array.isArray(all.losing) && all.losing.length >= 1, "a concept lists every product and which lose money at the ad cost", JSON.stringify(all.losing));
+  const nocost = clone(concept); nocost.products.forEach((p) => delete p.costEstimate);
+  ok(conceptEconomics(nocost).missingCost.length === nocost.products.length && conceptEconomics(nocost).priced === 0, "products without a landed cost are listed, not guessed");
 }
 
 // The edge function's copies (what was deployed) match src/shopify.

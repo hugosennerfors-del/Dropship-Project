@@ -603,11 +603,22 @@ const browser = await chromium.launch();
   ok(/price/.test(await page.locator(".bb-editor .callout.bad").innerText()) && (await writes("brand.save")).length === 2, "an invalid edit is not saved");
   await shot("4-editor");
   await page.fill('.bb-editor [data-path="products.0.variants.0.price"]', "99.00");
+  // Profit per order: the table follows the settings as they are typed.
+  await page.locator(".bb-editor details[data-sec=econ] > summary").click();
+  ok(/Add your expected ad cost/.test(await page.locator(".bb-editor [data-econ]").innerText()), "without an ad cost the table says what is missing");
+  await page.fill('.bb-editor [data-path="economics.shipping"]', "4.50");
+  await page.fill('.bb-editor [data-path="economics.adCost"]', "900");
+  const econ = await page.locator(".bb-editor [data-econ]").innerText();
+  ok(/lose money at £900\.00 in ads per order/.test(econ) && /Price to break even/.test(econ), "a large ad cost shows which products lose money and the price that would break even", econ.slice(0, 200));
+  await page.fill('.bb-editor [data-path="economics.adCost"]', "5");
+  ok(!/lose money/.test(await page.locator(".bb-editor [data-econ]").innerText()), "the warning goes when the ad cost is affordable");
+  await shot("4b-profit");
   await page.fill('.bb-editor [data-path="tagline"]', "Warm again in two minutes");
   await page.click(".bb-editor [data-ed=save]");
   await page.waitForSelector(".bb-editor", { state: "detached" });
   const edit = (await writes("brand.save")).at(-1).payload;
   ok(edit.id === firstId && !edit.create && edit.concept.tagline === "Warm again in two minutes" && edit.concept.products[0].variants[0].price === "99.00", "the edit is saved as the brand's next version");
+  ok(edit.concept.economics?.adCost === "5" && edit.concept.economics?.shipping === "4.50", "the profit settings are saved with the brand", JSON.stringify(edit.concept.economics));
 
   // Publish dialog: safe defaults, dry run, nothing until the store is confirmed.
   await page.locator(`[data-brand="${firstId}"] [data-bb-publish]`).click();
@@ -616,6 +627,7 @@ const browser = await chromium.launch();
   ok(/SIMULATED/.test(await page.locator(".bb-publish .bb-target").innerText()), "the target store shows its kind");
   const what = await page.locator(".bb-publish .bb-box").first().innerText();
   ok(/status: draft/.test(what) && /hidden/.test(what) && /Not published to any sales channel/.test(what) && /No theme files/.test(what), "the dialog lists exactly what is created, with safe defaults", what);
+  ok(/At £5\.00 in ads per order, profit per order is/.test(await page.locator(".bb-publish .bb-econ-sum").innerText()), "the publish dialog sums up profit per order");
   await page.click(".bb-publish [data-pub=dry]");
   const dry = await page.locator(".bb-publish .bb-dry").innerText();
   ok(/"status": "DRAFT"/.test(dry) && /"isPublished": false/.test(dry) && /brand:/.test(dry), "the dry run shows the exact variables");
