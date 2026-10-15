@@ -11,7 +11,7 @@ import { SCOPES, scopeFix } from "../shopify/documents.js";
 import { conceptEconomics, econSettings, orderEconomics } from "../shopify/economics.js";
 import {
   brandById, connectionById, jobById, isLive, storeBadge, saveBrand, startPublish, retryJob, rollbackJob, loadJob, loadShopify,
-  undoPlan, newIdempotencyKey, recheckConnection, TERMINAL, IMAGE_PROVIDERS,
+  undoPlan, newIdempotencyKey, recheckConnection, regeneratePart, PARTS, TERMINAL, IMAGE_PROVIDERS,
 } from "../shopify/brands.js";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -188,6 +188,53 @@ function productPage(c, i) {
       ${p.bulletPoints?.length ? `<ul>${p.bulletPoints.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
       ${p.images?.length ? `<p class="xs">${p.images.length} image link${p.images.length === 1 ? "" : "s"} will be sent to Shopify (not shown in the preview).</p>` : ""}
     </div></div></section>`;
+}
+
+// -- Regenerate ------------------------------------------------------------------
+// Choose the whole concept or one part, with an optional wish. A part is
+// rewritten here; the whole concept goes back to the card's own flow.
+export function openRegenerate(brand, { onWhole, onDone } = {}) {
+  const ui = { part: "name", wish: "", busy: false, status: "", error: "", ctl: null };
+  const render = () => `
+    <div class="bb-mhead"><div><div class="eyebrow">${icon("spark", 13)} Regenerate · ${esc(brand.id)} v${brand.version}</div><h2>${esc(brand.concept.name)}</h2></div>
+      <button class="btn sm ghost" data-close aria-label="Close">${icon("x", 14)}</button></div>
+    <div class="bb-mbody stack">
+      <p class="small muted">Only the part you choose is rewritten; everything else stays as it is. The result is saved as version ${brand.version + 1} and earlier versions are kept. Each run counts towards today's generation limit.</p>
+      <div class="bb-parts" role="radiogroup" aria-label="What to regenerate">
+        ${Object.entries(PARTS).map(([k, d]) => `<label class="bb-check"><input type="radio" name="bb-part" value="${k}"${ui.part === k ? " checked" : ""}${ui.busy ? " disabled" : ""}> <span><b>${esc(d.label)}</b><small class="xs muted"> ${esc(d.hint)}</small></span></label>`).join("")}
+        <label class="bb-check"><input type="radio" name="bb-part" value="whole"${ui.part === "whole" ? " checked" : ""}${ui.busy ? " disabled" : ""}> <span><b>The whole concept</b><small class="xs muted"> A fresh take on the brand, with new products.</small></span></label>
+      </div>
+      <label class="field"><span>Wish <small class="xs muted">optional, e.g. "more playful", "shorter names"</small></span><textarea data-rg-wish data-k="rgw" rows="2" maxlength="400"${ui.busy ? " disabled" : ""}>${esc(ui.wish)}</textarea></label>
+      ${ui.busy ? `<div class="row"><span class="thinking"><i></i><i></i><i></i></span><span class="small">${esc(ui.status)}</span></div>` : ""}
+      ${ui.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(ui.error)}</span></div>` : ""}
+    </div>
+    <div class="bb-mfoot"><span class="xs muted">${ui.part === "copy" || ui.part === "name" ? "Handles, prices, variants and SKUs stay the same." : ""}</span>
+      <div class="row">${ui.busy ? `<button class="btn" data-rg="stop">Stop</button>` : `<button class="btn" data-close>Cancel</button><button class="btn primary" data-rg="go">${icon("spark", 13)}Regenerate</button>`}</div></div>`;
+  return openModal({
+    cls: "bb-regen-dlg", label: `Regenerate ${brand.concept.name}`, render,
+    mount: (box, { paint, close }) => {
+      box.addEventListener("change", (e) => { if (e.target.name === "bb-part") { ui.part = e.target.value; ui.error = ""; paint(); } });
+      box.addEventListener("input", (e) => { if (e.target.hasAttribute("data-rg-wish")) ui.wish = e.target.value; });
+      box.addEventListener("click", async (e) => {
+        if (e.target.closest("[data-close]")) return close();
+        const b = e.target.closest("[data-rg]");
+        if (!b) return;
+        if (b.dataset.rg === "stop") { ui.ctl?.abort(); return; }
+        if (ui.part === "whole") { close(); onWhole?.(ui.wish); return; }
+        ui.busy = true; ui.error = ""; ui.ctl = new AbortController(); paint();
+        try {
+          const r = await regeneratePart(brand, ui.part, { wish: ui.wish, signal: ui.ctl.signal, onStatus: (t) => { ui.status = t; paint(); } });
+          close();
+          toast(`${PARTS[ui.part].label}: saved as version ${r.version}.`);
+          onDone?.(r);
+        } catch (err) {
+          ui.busy = false;
+          ui.error = err?.code === "cancelled" ? "Stopped; nothing was saved." : err?.message || "Something went wrong.";
+          paint();
+        }
+      });
+    },
+  });
 }
 
 // -- Profit per order ------------------------------------------------------------

@@ -12,7 +12,7 @@ import {
   loadShopify, generateConcepts, regenerateBrand, suggestNiches, duplicateBrand, archiveBrand, importConcept, brandById,
   storeBadge, PRICE_LEVELS, TONES, PRODUCT_TYPES, IMAGE_PROVIDERS, errText,
 } from "../shopify/brands.js";
-import { openPreview, openEditor, openPublish, openJobDrawer, paletteOf, fontsOf, loadFonts, placeholderSvg, brandVars } from "./shopify-ui.js";
+import { openPreview, openEditor, openPublish, openJobDrawer, openRegenerate, paletteOf, fontsOf, loadFonts, placeholderSvg, brandVars } from "./shopify-ui.js";
 
 const ui = {
   form: { niche: "", audience: "", priceLevel: "mid", tone: "", market: null, productType: "physical", concepts: 3, products: 6 },
@@ -200,6 +200,19 @@ export function mount(root, { rerender, params }) {
     rerender();
   }
 
+  // The whole concept anew, as the brand's next version (progress on the card).
+  async function regenerateWhole(b, wish) {
+    const ctl = new AbortController();
+    ui.regen[b.id] = { ctl, status: "Claude is writing a new concept…" };
+    rerender();
+    try {
+      const r = await regenerateBrand(b, { signal: ctl.signal, wish, onStatus: (s) => { if (ui.regen[b.id]) ui.regen[b.id].status = s; rerender(); } });
+      toast(r.brandIds?.length ? "New version saved; the earlier one is kept." : (r.rejected?.[0]?.errors || ["Nothing new was saved."]).join("; "));
+    } catch (err) { toast(err?.code === "cancelled" ? "Stopped." : sampleError(err)); }
+    delete ui.regen[b.id];
+    rerender();
+  }
+
   root.addEventListener("submit", (e) => { if (e.target.closest("[data-bb-form]")) { e.preventDefault(); generate(false); } });
   root.addEventListener("input", (e) => {
     const t = e.target;
@@ -271,17 +284,7 @@ export function mount(root, { rerender, params }) {
     }
     if (t.closest("[data-bb-export]")) return exportBrand(b);
     if (t.closest("[data-bb-regen-stop]")) { ui.regen[b.id]?.ctl.abort(); return; }
-    if (t.closest("[data-bb-regen]")) {
-      const ctl = new AbortController();
-      ui.regen[b.id] = { ctl, status: "Claude is writing a new concept…" };
-      rerender();
-      try {
-        const r = await regenerateBrand(b, { signal: ctl.signal, onStatus: (s) => { if (ui.regen[b.id]) ui.regen[b.id].status = s; rerender(); } });
-        toast(r.brandIds?.length ? "New version saved; the earlier one is kept." : (r.rejected?.[0]?.errors || ["Nothing new was saved."]).join("; "));
-      } catch (err) { toast(err?.code === "cancelled" ? "Stopped." : sampleError(err)); }
-      delete ui.regen[b.id];
-      rerender();
-    }
+    if (t.closest("[data-bb-regen]")) return openRegenerate(b, { onWhole: (wish) => regenerateWhole(b, wish), onDone: () => rerender() });
   });
   return { refresh: () => { if (store.live.state === "ready" && ["idle", "waiting", "offline"].includes(store.shopify.state) && !store.shopify._tried) { store.shopify._tried = true; loadShopify(); } fontsFor(); } };
 }
