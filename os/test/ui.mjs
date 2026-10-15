@@ -631,7 +631,7 @@ const browser = await chromium.launch();
   // Publishing for shoppers needs write_publications; the dialog says where to add it and checks again.
   await page.click('.bb-publish [data-pub=preset][data-v=live]');
   const access = await page.locator(".bb-publish .bb-access").innerText();
-  ok(/write_publications/.test(access) && /Dev Dashboard/.test(access) && !/read_publications/.test(access) && await page.locator(".bb-publish [data-pub=go]").isDisabled() && /Locked.*write_publications/.test(await page.locator(".bb-publish .bb-mfoot").innerText()), "a missing scope blocks publishing and says what to add and where", access);
+  ok(/write_publications/.test(access) && /Dev Dashboard/.test(access) && /approve the new access/.test(access) && !/read_publications/.test(access) && await page.locator(".bb-publish [data-pub=go]").isDisabled() && /Locked.*write_publications/.test(await page.locator(".bb-publish .bb-mfoot").innerText()), "a missing scope blocks publishing and says what to add and where", access);
   ok(/status: active/.test(await page.locator(".bb-publish .bb-box").first().innerText()) && await page.locator(".bb-publish [data-pub=publishToOnlineStore]").isChecked(), "the quick choice makes products active and lists them on the Online Store");
   await shot("6b-publish-access");
   await page.evaluate(() => { window.__grantOnTest = ["write_publications"]; });

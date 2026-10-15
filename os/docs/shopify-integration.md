@@ -118,7 +118,7 @@ Since **1 January 2026** Shopify no longer lets a store create new "legacy custo
 
 The app does **not** request themes, files, translations, inventory or orders, because those features are not built.
 
-**Adding a scope later.** For a Dev Dashboard app: create a new version with the scope added and release it. For a store in the app's own organisation, the release is the approval (shopify.dev, "Manage access scopes"). Then press *Check access again* in the publish dialog, or *Test* under *Data > Shopify stores*. A connection test always asks Shopify for a new client-credentials token, so a newly released scope counts at once instead of after the cached token expires. Products need status **Active** as well as the Online Store listing before shoppers can see them; the dialog's *Visible to shoppers now* choice sets both.
+**Adding a scope later.** For a Dev Dashboard app: create a new version with the scope added and release it, then open the app in the store's admin and approve the new access. A store the app is already installed on keeps its old scopes until that approval ("Create apps using the Dev Dashboard" on shopify.dev; "Manage access scopes" says a release in your own organisation is enough, but a release alone left `write_publications` out on 12 October 2026). Then press *Check access again* in the publish dialog, or *Test* under *Data > Shopify stores*. A connection test always asks Shopify for a new client-credentials token, so a newly released scope counts at once instead of after the cached token expires. Products need status **Active** as well as the Online Store listing before shoppers can see them; the dialog's *Visible to shoppers now* choice sets both.
 
 ### Where secrets live
 

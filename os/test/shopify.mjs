@@ -287,7 +287,7 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   const { client, store } = await setup({ scopes: ["write_products"] });
   const r = await runJob({ job: job("j8"), concept, connection: conn, client, store });
   ok(r.status === "failed" && r.error.kind === "scopes" && /write_content/.test(r.error.message) && /check the store again/.test(r.error.message), "missing scopes are named with what they are for and how to add them", r.error?.message);
-  ok(/Dev Dashboard/.test(scopeFix("client_credentials")) && /release it/.test(scopeFix("client_credentials")) && !/Dev Dashboard/.test(scopeFix("token")), "the fix names the Dev Dashboard only for apps connected with client credentials");
+  ok(/Dev Dashboard/.test(scopeFix("client_credentials")) && /release it/.test(scopeFix("client_credentials")) && /approve the new access/.test(scopeFix("client_credentials")) && !/Dev Dashboard/.test(scopeFix("token")), "the fix names the Dev Dashboard and the approval in the store only for apps connected with client credentials");
 }
 {
   const { client, store } = await setup({ missingFields: ["PageCreateInput.isPublished"] });
