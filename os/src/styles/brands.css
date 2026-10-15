@@ -230,3 +230,12 @@ button.li.bb-hrow:hover { background: rgba(255, 255, 255, .6); }
 .bb-et td, .bb-et th { padding: 5px 8px; white-space: nowrap; }
 .bb-et td:first-child { white-space: normal; min-width: 140px; }
 .bb-econ-sum.bad { border-color: color-mix(in srgb, var(--bad) 45%, var(--border)); }
+
+/* Brand tools and logo */
+.bb-tools { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.bb-logo-stage { border: 1px solid var(--border); border-radius: var(--r-md); padding: 18px; display: grid; place-items: center; background: repeating-conic-gradient(rgba(0,0,0,.04) 0 25%, transparent 0 50%) 0 0 / 16px 16px; }
+.bb-logo-stage svg { max-width: 100%; height: auto; max-height: 220px; }
+.bb-logo-sizes { display: flex; gap: 10px; flex-wrap: wrap; }
+.bb-logo-sizes span { border-radius: var(--r-sm); padding: 10px 14px; display: grid; place-items: center; border: 1px solid var(--border); }
+.bb-logo-sizes svg { height: 34px; width: auto; }
+.bb-logo-img svg { height: 34px; width: auto; display: block; }

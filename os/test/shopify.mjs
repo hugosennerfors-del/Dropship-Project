@@ -15,6 +15,7 @@ import { accessToken } from "../src/shopify/auth.js";
 import { Q, scopeFix } from "../src/shopify/documents.js";
 import { SHOPIFY_API_VERSION } from "../src/shopify/version.js";
 import { econSettings, orderEconomics, conceptEconomics, econProblems } from "../src/shopify/economics.js";
+import { logoLayout, logoSvg, logoSettings } from "../src/shopify/logo.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const concept = JSON.parse(await readFile(join(root, "test/fixtures-brand-concept.json"), "utf8"));
@@ -324,6 +325,24 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   ok(all.rows.length === c.products.length && all.priced >= 1 && Array.isArray(all.losing) && all.losing.length >= 1, "a concept lists every product and which lose money at the ad cost", JSON.stringify(all.losing));
   const nocost = clone(concept); nocost.products.forEach((p) => delete p.costEstimate);
   ok(conceptEconomics(nocost).missingCost.length === nocost.products.length && conceptEconomics(nocost).priced === 0, "products without a landed cost are listed, not guessed");
+}
+
+// Logo: layout from name, palette and font; the SVG escapes the name.
+{
+  const measure = (text, px) => text.length * px * 0.6;
+  const c = { ...clone(concept), name: "Åsa & <Co>" };
+  const st = logoSettings(c);
+  ok(st.style === "badge" && st.shape === "circle" && !st.upper, "a brand without a saved logo gets the badge style");
+  const l = logoLayout(c, { measure });
+  const txt = l.items.filter((i) => i.t === "text");
+  ok(txt[0].text === "Å" && txt[1].text === "Åsa & <Co>" && l.w > l.h && l.bg, "the badge has the initial (Å) and the name, with the brand's background", JSON.stringify(txt.map((t) => t.text)));
+  const svg = logoSvg(l, { title: c.name });
+  ok(svg.includes("Åsa &amp; &lt;Co&gt;") && !svg.includes("<Co>") && svg.startsWith("<svg"), "the name is escaped in the SVG");
+  const stacked = logoLayout(c, { measure, style: "stacked", shape: "diamond", upper: true, transparent: true });
+  ok(stacked.h > stacked.w / 4 && stacked.bg === null && stacked.items.some((i) => i.t === "path") && stacked.items.at(-1).text === "ÅSA & <CO>", "stacked, diamond, capitals and a transparent background");
+  const word = logoLayout(c, { measure, style: "wordmark" });
+  ok(word.items.filter((i) => i.t === "text").length === 1, "the wordmark has the name only, with an accent dot");
+  ok(logoSettings({ ...c, logo: { style: "x", shape: "y" } }).style === "badge", "unknown saved settings fall back to the defaults");
 }
 
 // The edge function's copies (what was deployed) match src/shopify.

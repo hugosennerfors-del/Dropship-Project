@@ -12,7 +12,7 @@ import {
   loadShopify, generateConcepts, regenerateBrand, suggestNiches, duplicateBrand, archiveBrand, importConcept, brandById,
   storeBadge, PRICE_LEVELS, TONES, PRODUCT_TYPES, IMAGE_PROVIDERS, errText,
 } from "../shopify/brands.js";
-import { openPreview, openEditor, openPublish, openJobDrawer, openRegenerate, paletteOf, fontsOf, loadFonts, placeholderSvg, brandVars } from "./shopify-ui.js";
+import { openPreview, openEditor, openPublish, openJobDrawer, openRegenerate, openLogo, paletteOf, fontsOf, loadFonts, placeholderSvg, brandVars } from "./shopify-ui.js";
 
 const ui = {
   form: { niche: "", audience: "", priceLevel: "mid", tone: "", market: null, productType: "physical", concepts: 3, products: 6 },
@@ -135,6 +135,9 @@ function card(b, isFresh = false) {
         </div>`).join("")}</div>
       ${sel.size ? `<div class="bb-bulk"><span class="small">${sel.size} selected</span><button class="btn sm primary" data-bb-pubsel>Publish selected (${sel.size})</button><button class="btn sm ghost" data-bb-clear>Clear</button></div>` : ""}
       <div class="bb-wire" aria-label="Page plan">${(c.pagePlan?.sections || []).map((s) => `<span class="bb-w bb-w-${attr(s.type)}">${esc(SECTION_SHORT[s.type] || s.type)}</span>`).join("")}</div>
+      <div class="bb-tools" aria-label="Brand tools">
+        <button class="btn sm ghost" data-bb-logo>${icon("wand", 12)}Logo${c.logo ? " ✓" : ""}</button>
+      </div>
       ${job ? `<button class="bb-job" data-bb-job="${attr(job.id)}"><span class="bb-st bb-st-${attr(job.status)}">${esc(job.status.replace("_", " "))}</span><span class="xs muted">last publish ${dateLabel(job.createdAt)}${store.shopify.connections.find((x) => x.id === job.connectionId) ? ` · ${storeBadge(store.shopify.connections.find((x) => x.id === job.connectionId))}` : ""}</span></button>` : ""}
       ${regen ? `<div class="bb-regen"><span class="thinking"><i></i><i></i><i></i></span><span class="small">${esc(regen.status || "Regenerating…")}</span><button class="btn sm" data-bb-regen-stop>Stop</button></div>` : ""}
     </div>
@@ -263,6 +266,7 @@ export function mount(root, { rerender, params }) {
     const b = brandById(cardEl.dataset.brand);
     if (!b) return;
     if (t.closest("[data-bb-preview]")) return openPreview(b.concept);
+    if (t.closest("[data-bb-logo]")) return openLogo(b, { onSaved: () => rerender() });
     if (t.closest("[data-bb-edit]")) return openEditor(b, { onSaved: () => rerender() });
     if (t.closest("[data-bb-publish]")) return openPublish(b);
     if (t.closest("[data-bb-job]")) return openJobDrawer(t.closest("[data-bb-job]").dataset.bbJob);

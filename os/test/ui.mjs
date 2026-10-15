@@ -549,7 +549,9 @@ const browser = await chromium.launch();
       }
       return { niches: [{ niche: "Cold-water swimming gear", why: "Year-round dippers" }] };
     };
-    window.claude = { use: async (name) => (name === "mcp" ? mcp : name === "sample" ? sample : null) };
+    window.__saves = [];
+    const downloads = { save: async ({ filename, data }) => { window.__saves.push({ filename, kind: data instanceof Blob ? data.type || "blob" : typeof data, size: data instanceof Blob ? data.size : String(data).length, text: typeof data === "string" ? data : null }); return { status: "saved" }; } };
+    window.claude = { use: async (name) => (name === "mcp" ? mcp : name === "sample" ? sample : name === "downloads" ? downloads : null) };
   }, [liveFixture, conceptFixture]);
   const page = await ctx.newPage();
   const errors = [];
@@ -652,6 +654,28 @@ const browser = await chromium.launch();
   ok(copySave.note === "Regenerated: Product texts" && copySave.concept.products.every((p, i) => p.title === `New title ${i + 1}` && p.handle === before.products[i].handle && JSON.stringify(p.variants) === JSON.stringify(before.products[i].variants)) && copySave.concept.name === "Seaglow", "new product texts keep handles, variants and prices; a wrong product count is sent back to be fixed");
   const gens = (await writes("generation.start")).slice(-2).map((w) => w.payload);
   ok(gens.every((g) => g.kind === "brand" && g.force === true && g.input.part), "each part run counts towards the daily limit and is never answered from the cache");
+
+  // Logo: choose a style, download it, save it with the brand.
+  await page.locator(`[data-brand="${firstId}"] [data-bb-logo]`).click();
+  await page.waitForSelector(".bb-logo-dlg [data-lg-stage] svg");
+  await page.click(".bb-logo-dlg [data-lg-style=stacked]");
+  await page.click(".bb-logo-dlg [data-lg-shape=diamond]");
+  ok(/SEAGLOW|Seaglow/.test(await page.locator(".bb-logo-dlg [data-lg-stage] svg").innerHTML()) && await page.locator(".bb-logo-dlg [data-lg-stage] svg path").count() === 1, "the logo shows the brand name with the chosen shape");
+  await shot("4d-logo");
+  await page.click(".bb-logo-dlg [data-lg=png]");
+  await page.click(".bb-logo-dlg [data-lg=svg]");
+  await page.waitForFunction(() => window.__saves.length >= 2);
+  const logoFiles = await page.evaluate(() => window.__saves);
+  ok(logoFiles[0].filename === `${firstId}-logo.png` && logoFiles[0].kind === "image/png" && logoFiles[0].size > 1000 && logoFiles[1].filename === `${firstId}-logo.svg` && /^<svg/.test(logoFiles[1].text), "the logo downloads as a PNG (drawn on a canvas) and as an SVG", JSON.stringify(logoFiles.map((x) => [x.filename, x.kind, x.size])));
+  await page.click(".bb-logo-dlg [data-lg=save]");
+  await page.waitForSelector(".bb-logo-dlg", { state: "detached" });
+  const logoSave = (await writes("brand.save")).at(-1).payload;
+  ok(logoSave.note === "Logo chosen" && logoSave.concept.logo?.style === "stacked" && logoSave.concept.logo?.shape === "diamond" && logoSave.concept.name === "Seaglow", "the chosen logo is saved with the brand as a new version");
+  await page.locator(`[data-brand="${firstId}"] [data-bb-preview]`).click();
+  await page.waitForSelector(".bb-preview .bb-s-head");
+  ok(await page.locator(".bb-preview .bb-logo-img svg path").count() === 1, "the preview's header shows the saved logo");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".bb-preview", { state: "detached" });
 
   // Publish dialog: safe defaults, dry run, nothing until the store is confirmed.
   await page.locator(`[data-brand="${firstId}"] [data-bb-publish]`).click();

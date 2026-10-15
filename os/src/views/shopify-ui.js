@@ -9,6 +9,7 @@ import { validateConcept, sanitizeHtml, toHtml, SECTION_TYPES, PALETTE_ROLES, LI
 import { buildPlan, DEFAULT_OPTIONS } from "../shopify/mapping.js";
 import { SCOPES, scopeFix } from "../shopify/documents.js";
 import { conceptEconomics, econSettings, orderEconomics } from "../shopify/economics.js";
+import { LOGO_STYLES, LOGO_SHAPES, logoLayout, logoSvg, drawLogo, logoSettings } from "../shopify/logo.js";
 import {
   brandById, connectionById, jobById, isLive, storeBadge, saveBrand, startPublish, retryJob, rollbackJob, loadJob, loadShopify,
   undoPlan, newIdempotencyKey, recheckConnection, regeneratePart, PARTS, TERMINAL, IMAGE_PROVIDERS,
@@ -152,7 +153,7 @@ export function openPreview(concept) {
 }
 
 function pageHtml(c, ui) {
-  const head = `<header class="bb-s-head"><span class="bb-logo"><i>${esc((c.name || "?").slice(0, 1).toUpperCase())}</i>${esc(c.name)}</span>
+  const head = `<header class="bb-s-head">${c.logo ? `<span class="bb-logo bb-logo-img">${logoSvg(logoLayout(c, { measure: measureText, transparent: true }), { title: c.name })}</span>` : `<span class="bb-logo"><i>${esc((c.name || "?").slice(0, 1).toUpperCase())}</i>${esc(c.name)}</span>`}
     <nav><a href="#">Shop</a><a href="#">About</a><a href="#">FAQ</a></nav><span class="bb-cart">${icon("box", 16)}</span></header>`;
   const foot = `<footer class="bb-s-foot"><div><b>${esc(c.name)}</b><p>${esc(c.story?.mission || "")}</p></div><div class="xs">© ${new Date().getFullYear()} ${esc(c.name)} · Preview made by Plan-vy</div></footer>`;
   if (ui.product != null && c.products?.[ui.product]) return `<div class="bb-site">${head}${productPage(c, ui.product)}${foot}</div>`;
@@ -188,6 +189,92 @@ function productPage(c, i) {
       ${p.bulletPoints?.length ? `<ul>${p.bulletPoints.map((b) => `<li>${esc(b)}</li>`).join("")}</ul>` : ""}
       ${p.images?.length ? `<p class="xs">${p.images.length} image link${p.images.length === 1 ? "" : "s"} will be sent to Shopify (not shown in the preview).</p>` : ""}
     </div></div></section>`;
+}
+
+// -- Logo ------------------------------------------------------------------------
+// Text width for logo layouts, measured on a canvas with the brand's font.
+let measureCtx = null;
+export function measureText(text, px, family) {
+  measureCtx ||= document.createElement("canvas").getContext("2d");
+  measureCtx.font = `700 ${px}px ${family ? `'${family}', ` : ""}system-ui, sans-serif`;
+  return measureCtx.measureText(text).width;
+}
+
+// Pick a style, preview it, save it with the brand and download it. The
+// page uploads nothing to Shopify and never touches the theme.
+export function openLogo(brand, { onSaved } = {}) {
+  const c = brand.concept;
+  const ui = { ...logoSettings(c), transparent: false, busy: false, error: "", fontReady: false };
+  loadFonts(c);
+  const layout = (o = {}) => logoLayout(c, { measure: measureText, style: ui.style, shape: ui.shape, upper: ui.upper, ...o });
+  const render = () => {
+    const main = layout({ transparent: ui.transparent });
+    return `
+    <div class="bb-mhead"><div><div class="eyebrow">${icon("wand", 13)} Logo · ${esc(brand.id)} v${brand.version}</div><h2>${esc(c.name)}</h2></div>
+      <button class="btn sm ghost" data-close aria-label="Close">${icon("x", 14)}</button></div>
+    <div class="bb-mbody stack">
+      <div class="row"><span class="small">Style</span><div class="seg" role="group" aria-label="Style">${LOGO_STYLES.map(([k, l]) => `<button data-lg-style="${k}" aria-pressed="${ui.style === k}">${l}</button>`).join("")}</div></div>
+      <div class="row"><span class="small">Shape</span><div class="seg" role="group" aria-label="Shape">${LOGO_SHAPES.map(([k, l]) => `<button data-lg-shape="${k}" aria-pressed="${ui.shape === k}"${ui.style === "wordmark" ? " disabled" : ""}>${l}</button>`).join("")}</div></div>
+      <div class="row"><label class="bb-check"><input type="checkbox" data-lg-upper${ui.upper ? " checked" : ""}> Capital letters</label><label class="bb-check"><input type="checkbox" data-lg-transparent${ui.transparent ? " checked" : ""}> Transparent background (PNG)</label></div>
+      <div class="bb-logo-stage" data-lg-stage>${logoSvg(main, { title: `${c.name} logo` })}</div>
+      <div class="bb-logo-sizes"><span style="background:${main.colors.bg}">${logoSvg(layout({ transparent: true }), { title: "" })}</span><span style="background:${main.colors.fg}">${logoSvg(logoLayout({ ...c, identity: { ...c.identity, palette: [{ role: "primary", hex: main.colors.accent }, { role: "fg", hex: main.colors.bg }, { role: "bg", hex: main.colors.fg }, { role: "accent", hex: main.colors.accent }] } }, { measure: measureText, style: ui.style, shape: ui.shape, upper: ui.upper, transparent: true }), { title: "" })}</span></div>
+      <p class="xs muted">${ui.style === "wordmark" ? "" : `Initial in the ${esc(ui.shape)}; `}font ${esc(main.settings.font || "system font (the brand has no heading font)")}. The PNG has the font drawn in; the SVG names the font, so it shows correctly only where that font is installed. To use it in Shopify, add the PNG in your theme's settings yourself: this page does not upload files or change the theme.</p>
+      ${ui.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(ui.error)}</span></div>` : ""}
+    </div>
+    <div class="bb-mfoot"><span class="row"><button class="btn sm" data-lg="png">${icon("download", 12)}PNG</button><button class="btn sm" data-lg="svg">${icon("download", 12)}SVG</button></span>
+      <div class="row"><button class="btn" data-close>Close</button><button class="btn primary" data-lg="save"${ui.busy ? " disabled" : ""}>${ui.busy ? "Saving…" : "Save with the brand"}</button></div></div>`;
+  };
+  return openModal({
+    cls: "bb-logo-dlg", label: `Logo for ${c.name}`, render,
+    mount: (box, { paint, close }) => {
+      // Measure again once the web font has arrived.
+      const fam = logoSettings(c).font;
+      if (fam && document.fonts?.load) document.fonts.load(`700 64px '${fam}'`).then(() => { if (box.isConnected) paint(); }).catch(() => {});
+      box.addEventListener("change", (e) => {
+        if (e.target.hasAttribute("data-lg-upper")) { ui.upper = e.target.checked; paint(); }
+        if (e.target.hasAttribute("data-lg-transparent")) { ui.transparent = e.target.checked; paint(); }
+      });
+      box.addEventListener("click", async (e) => {
+        const t = e.target;
+        if (t.closest("[data-close]")) return close();
+        const st = t.closest("[data-lg-style]"); if (st) { ui.style = st.dataset.lgStyle; return paint(); }
+        const sh = t.closest("[data-lg-shape]"); if (sh) { ui.shape = sh.dataset.lgShape; return paint(); }
+        const b = t.closest("[data-lg]"); if (!b) return;
+        const file = `${brand.id}-logo`;
+        if (b.dataset.lg === "svg") return saveFile(`${file}.svg`, logoSvg(layout({ transparent: ui.transparent }), { title: `${c.name} logo` }));
+        if (b.dataset.lg === "png") {
+          if (fam && document.fonts?.load) await document.fonts.load(`700 64px '${fam}'`).catch(() => {});
+          const l = layout({ transparent: ui.transparent });
+          const scale = 1024 / l.w;
+          const cv = document.createElement("canvas");
+          cv.width = Math.round(l.w * scale); cv.height = Math.round(l.h * scale);
+          drawLogo(cv.getContext("2d"), l, scale);
+          const blob = await new Promise((res) => cv.toBlob(res, "image/png"));
+          if (!blob) { ui.error = "The PNG could not be made in this browser."; return paint(); }
+          return saveFile(`${file}.png`, blob);
+        }
+        if (b.dataset.lg === "save") {
+          ui.busy = true; ui.error = ""; paint();
+          const r = await saveBrand({ ...c, logo: { style: ui.style, shape: ui.shape, upper: ui.upper } }, { id: brand.id, note: "Logo chosen" });
+          ui.busy = false;
+          if (!r.ok) { ui.error = r.reason || (r.errors || []).join("; "); return paint(); }
+          toast(`Logo saved with the brand (version ${r.version}).`);
+          close(); onSaved?.(r);
+        }
+      });
+    },
+  });
+}
+
+async function saveFile(filename, data) {
+  let downloads = null;
+  try { downloads = window.claude?.use ? await window.claude.use("downloads") : null; } catch { downloads = null; }
+  if (!downloads) { toast("Downloads are not available in this view."); return false; }
+  try { await downloads.save({ filename, data }); toast("Saved."); return true; }
+  catch (e) {
+    toast(e?.code === "declined" ? "Download cancelled." : e?.code === "rejected_extension" || e?.code === "extension_not_enabled" ? "This view cannot save that file type; try the PNG." : "The download could not be started.");
+    return false;
+  }
 }
 
 // -- Regenerate ------------------------------------------------------------------
