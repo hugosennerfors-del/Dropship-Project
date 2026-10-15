@@ -43,6 +43,8 @@ export function buildPlan(conceptInput, optionsInput = {}) {
   if (o.includePolicies && !policies.length) return { ok: false, errors: ["policies: this brand has no policy pages yet; write them first or untick them"], steps: [], summary: null, warnings: [] };
   const unfilled = policies.filter((p) => FILL_IN.test(p.body)).map((p) => p.title);
   if (unfilled.length) return { ok: false, errors: [`policies: fill in the marked gaps first ([FYLL I] / [FILL IN]) in: ${unfilled.join(", ")}`], steps: [], summary: null, warnings: [] };
+  const pageGaps = o.includeBrand ? c.pagePlan.sections.filter((s) => FILL_IN.test([s.headline, s.body, ...(s.items || []).flatMap((it) => [it.title, it.body])].join(" "))).map((s) => s.headline || s.type) : [];
+  if (pageGaps.length) return { ok: false, errors: [`page: fill in the marked gaps first ([FYLL I] / [FILL IN]) in: ${pageGaps.join(", ")}`], steps: [], summary: null, warnings: [] };
 
   const opts = { collection: o.includeBrand, metaobject: o.includeBrand, page: o.includeBrand, addToMenu: o.addToMenu, publishToOnlineStore: o.publishToOnlineStore };
   const groups = groupsFor(opts, { images });

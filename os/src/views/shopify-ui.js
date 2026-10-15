@@ -3,7 +3,7 @@
 // job status drawer with history, and undo. Each opens over the page and
 // keeps its own small state; nothing here talks to Shopify directly.
 
-import { store, onChange } from "../state.js";
+import { store, onChange, product } from "../state.js";
 import { esc, attr, icon, money, dateLabel } from "../ui/dom.js";
 import { validateConcept, sanitizeHtml, toHtml, SECTION_TYPES, PALETTE_ROLES, LIMITS, POLICY_KEYS, FILL_IN } from "../shopify/concept.js";
 import { buildPlan, DEFAULT_OPTIONS } from "../shopify/mapping.js";
@@ -14,7 +14,9 @@ import { complianceChecks, attest, businessGaps } from "../shopify/compliance.js
 import {
   brandById, connectionById, jobById, isLive, storeBadge, saveBrand, startPublish, retryJob, rollbackJob, loadJob, loadShopify,
   undoPlan, newIdempotencyKey, recheckConnection, regeneratePart, PARTS, writePolicies, policyGaps, checkNames, trademarkLinks, TERMINAL, IMAGE_PROVIDERS,
+  faqObjections, analyseReviews, writeFaq,
 } from "../shopify/brands.js";
+import { applyFaq, faqGaps, FAQ_MAX } from "../shopify/faq.js";
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
 const FONT = /^[A-Za-z0-9 ]{2,40}$/;
@@ -367,6 +369,108 @@ export function openPolicies(brand, { onSaved } = {}) {
           if (!r.ok) { ui.error = r.reason || (r.errors || []).slice(0, 3).join("; "); return paint(); }
           const marks = policyGaps(pages);
           toast(marks.length ? `Saved as version ${r.version}; fill in the marked gaps before publishing.` : `Policy pages saved (version ${r.version}).`);
+          close(); onSaved?.(r);
+        }
+      });
+    },
+  });
+}
+
+// -- FAQ from objections -----------------------------------------------------------
+// Pick the objections buyers raise in reviews (or paste reviews to find
+// them), let Claude answer them from the brand's facts, edit the answers and
+// save them as the brand page's FAQ section.
+const SOURCE_TXT = (o) => o.source?.kind === "reviews" ? `From ${o.source.reviews ? `${o.source.reviews} reviews` : "reviews"} you pasted${o.source.at ? `, ${dateLabel(o.source.at)}` : ""}`
+  : o.source?.kind === "saved" ? "Answered in this brand's FAQ before"
+  : `Product research: ${o.source?.label || "complaints"}${o.real ? "" : " (AI estimate, not from real reviews)"}`;
+export function openFaq(brand, { onSaved } = {}) {
+  const c = brand.concept;
+  const se = c.market === "SE";
+  const mark = se ? "[FYLL I: …]" : "[FILL IN: …]";
+  const current = (c.pagePlan?.sections || []).find((s) => s.type === "faq");
+  const ui = { extraRuns: [], tick: new Map(), reviews: "", items: structuredClone(current?.items || []), busy: null, status: "", error: "", ctl: null };
+  const objections = () => faqObjections(brand, ui.extraRuns);
+  const ticked = () => objections().filter((o) => ui.tick.get(o.id) ?? o.real);
+  const ready = store.sampleState === "ready";
+  const render = () => {
+    const list = objections();
+    const gaps = faqGaps(ui.items);
+    return `
+    <div class="bb-mhead"><div><div class="eyebrow">${icon("chat", 13)} FAQ from objections · ${esc(brand.id)} v${brand.version}</div><h2>${esc(c.name)}</h2></div>
+      <button class="btn sm ghost" data-close aria-label="Close">${icon("x", 14)}</button></div>
+    <div class="bb-mbody stack">
+      <p class="small muted">Questions that answer what buyers complain about in reviews of products like yours, so shoppers get the answer before they hesitate. Claude answers from your products and store details only; anything missing is marked ${mark}, and the page cannot be published until it is filled in. The answers become the FAQ section of the brand page.</p>
+      <section class="bb-box"><h4>Objections <small class="xs muted">${ticked().length} of ${list.length} ticked</small></h4>
+        ${list.length ? `<div class="bb-fq-list">${list.map((o, i) => `<label class="bb-check bb-fq-obj"><input type="checkbox" data-fq-obj="${i}"${(ui.tick.get(o.id) ?? o.real) ? " checked" : ""}${ui.busy ? " disabled" : ""}> <span><span class="bb-fq-head"><b>${esc(o.theme)}</b>${o.mentions ? `<span class="chip">${o.mentions}×</span>` : ""}</span>${o.quote ? `<small class="bb-fq-quote">“${esc(o.quote)}”</small>` : ""}<small class="xs muted">${esc(SOURCE_TXT(o))}</small></span></label>`).join("")}</div>`
+          : `<div class="empty">No objections yet. Paste reviews of a competing product below (from Amazon, Trustpilot or a competitor's shop); the review analyst picks out what buyers complain about.</div>`}
+      </section>
+      <section class="bb-box"><h4>Find objections in reviews</h4>
+        <label class="field"><span>Reviews <small class="xs muted">paste as many as you like, up to 30,000 characters</small></span><textarea data-fq-reviews data-k="fq-rev" rows="5" placeholder="Paste customer reviews of a similar product…">${esc(ui.reviews)}</textarea></label>
+        <div class="row"><button class="btn sm" data-fq="analyse"${ui.busy || !ready || ui.reviews.trim().length < 80 ? " disabled" : ""}>${icon("search", 12)}Find objections</button>
+          <span class="xs muted">${brand.sourceProductId && product(brand.sourceProductId) ? "The analysis is also saved on the product this brand came from." : "This brand has no source product, so the analysis is kept with the FAQ only."}</span></div>
+      </section>
+      ${ui.busy ? `<div class="row"><span class="thinking"><i></i><i></i><i></i></span><span class="small">${esc(ui.status)}</span><button class="btn sm" data-fq="stop">Stop</button></div>` : ""}
+      ${ui.items.length ? `<section class="bb-box"><h4>Questions and answers <small class="xs muted">${ui.items.length} of at most ${FAQ_MAX}</small></h4>
+        ${ui.items.map((it, i) => `<div class="bb-fq-item${faqGaps([it]).length ? " bb-fq-gap" : ""}">
+          <div class="row between"><label class="field grow"><span>Question</span><input type="text" data-fq-q="${i}" data-k="fq-q${i}" value="${attr(it.title)}" maxlength="120"></label><button class="btn sm ghost" data-fq-rm="${i}" aria-label="Remove this question">${icon("x", 12)}</button></div>
+          <label class="field"><span>Answer${it.objection ? ` <small class="xs muted">answers: ${esc(it.objection)}</small>` : ""}</span><textarea data-fq-a="${i}" data-k="fq-a${i}" rows="3" maxlength="600">${esc(it.body)}</textarea></label></div>`).join("")}
+      </section>` : ""}
+      ${gaps.length && !ui.busy ? `<div class="callout warn">${icon("warn", 16)}<span>Marked gaps in: ${esc(gaps.join(" · "))}. Replace each ${mark} with the right detail before publishing.</span></div>` : ""}
+      ${ui.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(ui.error)}</span></div>` : ""}
+    </div>
+    <div class="bb-mfoot"><span class="row"><button class="btn sm" data-fq="write"${ui.busy || !ready || !ticked().length ? " disabled" : ""}>${icon("spark", 12)}${ui.items.length ? "Write again" : "Write with Claude"}</button></span>
+      <div class="row"><button class="btn" data-close>Close</button><button class="btn primary" data-fq="save"${ui.items.length && !ui.busy ? "" : " disabled"}>Save to the brand page</button></div></div>`;
+  };
+  const run = async (paint, label, status, fn) => {
+    ui.busy = label; ui.status = status; ui.error = ""; ui.ctl = new AbortController(); paint();
+    try { await fn(ui.ctl.signal); }
+    catch (err) { ui.error = err?.code === "cancelled" ? "Stopped; nothing changed." : err?.message || "Something went wrong."; }
+    ui.busy = null; paint();
+  };
+  return openModal({
+    cls: "bb-faq", label: `FAQ for ${c.name}`, render,
+    mount: (box, { paint, close }) => {
+      box.addEventListener("input", (e) => {
+        const t = e.target;
+        if (t.hasAttribute("data-fq-reviews")) {
+          const was = ui.reviews.trim().length >= 80;
+          ui.reviews = t.value;
+          if (was !== ui.reviews.trim().length >= 80) paint();
+        }
+        if (t.dataset.fqQ != null) ui.items[+t.dataset.fqQ].title = t.value;
+        if (t.dataset.fqA != null) ui.items[+t.dataset.fqA].body = t.value;
+      });
+      box.addEventListener("change", (e) => {
+        const t = e.target;
+        if (t.dataset.fqObj == null) return;
+        const o = objections()[+t.dataset.fqObj];
+        if (o) ui.tick.set(o.id, t.checked);
+        paint();
+      });
+      box.addEventListener("click", async (e) => {
+        const t = e.target;
+        if (t.closest("[data-close]")) return close();
+        const rm = t.closest("[data-fq-rm]"); if (rm) { ui.items.splice(+rm.dataset.fqRm, 1); return paint(); }
+        const b = t.closest("[data-fq]"); if (!b) return;
+        if (b.dataset.fq === "stop") { ui.ctl?.abort(); return; }
+        if (b.dataset.fq === "analyse") return run(paint, "analyse", "The review analyst is reading the reviews. This takes about half a minute.", async (signal) => {
+          const r = await analyseReviews(brand, ui.reviews, { signal });
+          if (!r.productId) ui.extraRuns.unshift(r);
+          const found = r.output?.complaints?.length || 0;
+          ui.reviews = "";
+          toast(found ? `${found} objection${found === 1 ? "" : "s"} found in ${r.output.reviewCount || "the"} reviews.` : "No complaints found in these reviews.");
+        });
+        if (b.dataset.fq === "write") return run(paint, "write", "Starting…", async (signal) => {
+          ui.items = await writeFaq(brand, ticked(), { signal, onStatus: (x) => { ui.status = x; paint(); } });
+        });
+        if (b.dataset.fq === "save") {
+          let next;
+          try { next = applyFaq(c, ui.items, { objections: ticked() }); }
+          catch (err) { ui.error = err.message; return paint(); }
+          const r = await saveBrand(next, { id: brand.id, note: "FAQ from objections" });
+          if (!r.ok) { ui.error = r.reason || (r.errors || []).slice(0, 3).join("; "); return paint(); }
+          const marks = faqGaps(ui.items);
+          toast(marks.length ? `Saved as version ${r.version}; fill in the marked gaps before publishing.` : `FAQ saved to the brand page (version ${r.version}).`);
           close(); onSaved?.(r);
         }
       });

@@ -548,6 +548,16 @@ const browser = await chromium.launch();
         const fixed = /did not pass the checks/.test(input);
         return { products: Array.from({ length: fixed ? n : n + 1 }, (_, i) => ({ title: `New title ${i + 1}`, description: "A new selling description that stays honest about what the product does.", bulletPoints: ["One", "Two", "Three"], seo: { title: `New SEO ${i + 1}`, description: "New meta description" } })) };
       }
+      if (/You analyse customer reviews/.test(input)) return {
+        reviewCount: 14, summary: "Warm and well liked, but the zip and the sizing let people down.", sentiment: { positive: 60, neutral: 10, negative: 30 }, praise: [{ theme: "Warm", mentions: 9, quote: "so warm after a swim" }],
+        complaints: [{ theme: "Zip breaks after a few weeks", mentions: 6, quote: "the zip broke after three swims" }, { theme: "Runs small", mentions: 4, quote: "order a size up" }],
+        unmetNeeds: [], productIdeas: [], marketingAngles: [],
+      };
+      if (/You write the FAQ for a small online store's brand page/.test(input)) return { items: [
+        { question: "Will the zip last?", answer: "<b>Yes:</b> the robe uses a [FILL IN: zip make and model] zip, and you can return it within 14 days if it is not right.", objection: "Zip breaks after a few weeks" },
+        { question: "How do I get it back to you?", answer: "Email us within 14 days of delivery and we will tell you where to send it.", objection: "" },
+        { question: "", answer: "An answer without a question is dropped." },
+      ] };
       if (/You write standard consumer policy pages/.test(input)) return {
         terms: { title: "Terms of purchase", body: "<h3>Seller</h3><p>Tidewarm Ltd, 1 Harbour Street, Falmouth.</p><script>x()</script>" },
         returns: { title: "Returns", body: "<p>You may cancel within 14 days of receiving the goods.</p>" },
@@ -787,6 +797,44 @@ const browser = await chromium.launch();
   const nmWrite = (await writes("brand.names")).at(-1)?.payload;
   ok(nmWrite?.names?.[0] === "Seaglow" && nmWrite.market === "UK" && /seaglow\.co\.uk\s*Free/.test(nm) && /seaglow\.com\s*Taken/.test(nm), "the name check asks for the brand's name and shows free and taken domains", nm.slice(0, 160));
   ok(await page.locator(".bb-names a[href^='https://euipo.europa.eu/']").count() === 1 && await page.locator(".bb-names a[href^='https://trademarks.ipo.gov.uk/']").count() === 1 && /Not legal advice/.test(nm), "trade mark registers are linked for a manual search, with the caveat");
+  await page.keyboard.press("Escape");
+
+  // FAQ from objections: reviews pasted, complaints found, answered from the brand's facts, saved as the page's FAQ.
+  await page.locator(`[data-brand="${firstId}"] [data-bb-faq]`).click();
+  await page.waitForSelector(".bb-faq");
+  ok(/No objections yet/.test(await page.locator(".bb-faq").innerText()) && await page.locator(".bb-faq [data-fq=write]").isDisabled(), "with no reviews analysed there is nothing to answer yet");
+  await page.fill(".bb-faq [data-fq-reviews]", "The zip broke after three swims, really disappointed. ".repeat(3) + "Lovely and warm but order a size up, it runs small.");
+  await page.click(".bb-faq [data-fq=analyse]");
+  await page.waitForSelector(".bb-faq .bb-fq-obj");
+  const revPrompt = await page.evaluate(() => window.__jsonInputs.at(-1));
+  ok(/You analyse customer reviews/.test(revPrompt) && /The zip broke after three swims/.test(revPrompt), "pasted reviews go to the review analyst");
+  ok(await page.locator(".bb-faq .bb-fq-obj input:checked").count() === 2 && /6×/.test(await page.locator(".bb-faq .bb-fq-list").innerText()) && /14 reviews you pasted/.test(await page.locator(".bb-faq .bb-fq-list").innerText()), "the complaints found are listed and ticked, with how often and where they were found");
+  await page.locator(".bb-faq .bb-fq-obj input").nth(1).uncheck();
+  ok(await page.locator(".bb-faq .bb-fq-item").count() > 0 && /Write again/.test(await page.locator(".bb-faq [data-fq=write]").innerText()), "the page's current FAQ is shown to edit or write again");
+  await page.click(".bb-faq [data-fq=write]");
+  await page.waitForFunction(() => /You write the FAQ/.test(window.__jsonInputs.at(-1) || "") && !document.querySelector(".bb-faq .thinking"), null, { timeout: 10000 });
+  const faqPrompt = await page.evaluate(() => window.__jsonInputs.at(-1));
+  ok(/<objections>/.test(faqPrompt) && /Zip breaks after a few weeks/.test(faqPrompt) && !/Runs small/.test(faqPrompt) && /Never invent/.test(faqPrompt) && /"legalName"|"contact"/.test(faqPrompt), "only the ticked objections go to Claude, with the store's facts and the rule against invented facts", faqPrompt.slice(-900));
+  ok(await page.locator(".bb-faq .bb-fq-item").count() === 2 && !/<b>/.test(await page.locator(".bb-faq [data-fq-a]").first().inputValue()) && /Marked gaps in: Will the zip last\?/.test(await page.locator(".bb-faq").innerText()), "the answers come back as plain text to edit, an empty one dropped and a gap shown", (await page.locator(".bb-faq").innerText()).slice(0, 900));
+  await shot("4e-faq");
+  await page.click(".bb-faq [data-fq=save]");
+  await page.waitForSelector(".bb-faq", { state: "detached" });
+  const faqSave = (await writes("brand.save")).at(-1).payload;
+  const faqSec = faqSave.concept.pagePlan.sections.find((s) => s.type === "faq");
+  ok(faqSave.note === "FAQ from objections" && faqSec?.items.length === 2 && faqSave.concept.faq.objections.length === 1 && faqSave.concept.faq.objections[0].theme === "Zip breaks after a few weeks" && faqSave.concept.policies?.terms, "the answers are saved as the page's FAQ with the objection they answer, and nothing else is lost");
+  await page.locator(`[data-brand="${firstId}"] [data-bb-publish]`).click();
+  await page.waitForSelector(".bb-publish");
+  ok(/fill in the marked gaps/i.test(await page.locator(".bb-publish").innerText()) && await page.locator(".bb-publish [data-pub=go]").isDisabled(), "the brand page cannot be published while its FAQ has a gap");
+  await page.keyboard.press("Escape");
+  await page.locator(`[data-brand="${firstId}"] [data-bb-faq]`).click();
+  await page.waitForSelector(".bb-faq .bb-fq-item");
+  ok(/Answered in this brand's FAQ before/.test(await page.locator(".bb-faq .bb-fq-list").innerText()), "the answered objections stay with the brand");
+  await page.fill(".bb-faq [data-fq-a='0']", "The robe has a two-way zip. If it is not right, you can return it within 14 days.");
+  await page.click(".bb-faq [data-fq=save]");
+  await page.waitForSelector(".bb-faq", { state: "detached" });
+  await page.locator(`[data-brand="${firstId}"] [data-bb-publish]`).click();
+  await page.waitForSelector(".bb-publish");
+  ok(!/fill in the marked gaps/i.test(await page.locator(".bb-publish").innerText()), "filled in, the page can be published again");
   await page.keyboard.press("Escape");
 
   // One product only.

@@ -13,7 +13,7 @@ import {
   loadShopify, generateConcepts, regenerateBrand, suggestNiches, duplicateBrand, archiveBrand, importConcept, brandById,
   storeBadge, PRICE_LEVELS, TONES, PRODUCT_TYPES, IMAGE_PROVIDERS, errText,
 } from "../shopify/brands.js";
-import { openPreview, openEditor, openPublish, openJobDrawer, openRegenerate, openLogo, openChecks, openPolicies, openNames, paletteOf, fontsOf, loadFonts, placeholderSvg, brandVars } from "./shopify-ui.js";
+import { openPreview, openEditor, openPublish, openJobDrawer, openRegenerate, openLogo, openChecks, openPolicies, openNames, openFaq, paletteOf, fontsOf, loadFonts, placeholderSvg, brandVars } from "./shopify-ui.js";
 
 const ui = {
   form: { niche: "", audience: "", priceLevel: "mid", tone: "", market: null, productType: "physical", concepts: 3, products: 6 },
@@ -140,6 +140,7 @@ function card(b, isFresh = false) {
         <button class="btn sm ghost" data-bb-names>${icon("search", 12)}Name check</button>
         <button class="btn sm ghost" data-bb-policies>${icon("data", 12)}Policies${c.policies?.terms ? " ✓" : ""}</button>
         <button class="btn sm ghost" data-bb-logo>${icon("wand", 12)}Logo${c.logo ? " ✓" : ""}</button>
+        <button class="btn sm ghost" data-bb-faq data-tip="Questions that answer what buyers complain about in reviews">${icon("chat", 12)}FAQ${c.faq?.objections?.length ? " ✓" : ""}</button>
         ${(() => { const ch = complianceChecks(c); return `<button class="btn sm ghost${ch.done ? "" : " bb-tool-open"}" data-bb-checks data-tip="${attr(ch.done ? "Store details and checks are done" : `${ch.blocking.length} check${ch.blocking.length === 1 ? "" : "s"} open before selling to shoppers`)}">${icon("shield", 12)}Checks ${ch.done ? "✓" : `${ch.items.length - ch.blocking.length}/${ch.items.length}`}</button>`; })()}
       </div>
       ${job ? `<button class="bb-job" data-bb-job="${attr(job.id)}"><span class="bb-st bb-st-${attr(job.status)}">${esc(job.status.replace("_", " "))}</span><span class="xs muted">last publish ${dateLabel(job.createdAt)}${store.shopify.connections.find((x) => x.id === job.connectionId) ? ` · ${storeBadge(store.shopify.connections.find((x) => x.id === job.connectionId))}` : ""}</span></button>` : ""}
@@ -274,6 +275,7 @@ export function mount(root, { rerender, params }) {
     if (t.closest("[data-bb-checks]")) return openChecks(b, { onSaved: () => rerender() });
     if (t.closest("[data-bb-policies]")) return openPolicies(b, { onSaved: () => rerender() });
     if (t.closest("[data-bb-names]")) return openNames(b);
+    if (t.closest("[data-bb-faq]")) return openFaq(b, { onSaved: () => rerender() });
     if (t.closest("[data-bb-edit]")) return openEditor(b, { onSaved: () => rerender() });
     if (t.closest("[data-bb-publish]")) return openPublish(b);
     if (t.closest("[data-bb-job]")) return openJobDrawer(t.closest("[data-bb-job]").dataset.bbJob);

@@ -216,6 +216,15 @@ Each brand card has these tools. Everything they save is stored with the concept
   - The owner edits the pages in the dialog; the HTML is sanitised.
   - *Policy pages* in the publish dialog creates them as Shopify pages, with handles such as `tidewarm-retur-och-angerratt`. They are checked in the preflight, updated on re-publish and hidden or deleted by undo.
   - Publishing is refused while a gap mark is left.
+- **FAQ from objections** (`faq.js`, `faqObjections`, `analyseReviews`, `writeFaq`).
+  - Objections come from:
+    - review-analyst runs on the brand's source product;
+    - reviews pasted in the dialog, analysed by the same agent (saved on the source product when there is one);
+    - objections an earlier FAQ answered;
+    - the product's complaint fields. These are ticked only when verified or estimated from evidence; AI guesses are listed but not ticked.
+  - Claude answers the ticked objections (at most eight questions) from the brand's products and store details only. Review quotes go in as delimited data. A missing fact becomes a gap mark.
+  - The answers replace the items of the page plan's FAQ section, or a new one is added before the newsletter section. The objections are saved as `concept.faq`.
+  - `buildPlan` refuses to publish the brand page while any section still has a gap mark; products alone can still be published.
 - **Name check** (`names.js`, edge action `names`, table `intel.name_checks`).
   - Up to five names; up to 30 checks an hour across the database.
   - Each name is tried as up to eight domains for the market: `.se .com .nu .shop` for Sweden, `.co.uk .com .uk .shop` for the UK.
@@ -226,7 +235,7 @@ Each brand card has these tools. Everything they save is stored with the concept
 ## Tests
 
 ```
-npm test                 unit (95), Shopify (129), build, smoke, UI in Chromium (154)
+npm test                 unit (95), Shopify (140), build, smoke, UI in Chromium (164)
 npm run test:shopify     the Shopify suite on its own
 npm run shopify:schema   contract check (simulated store, or a real one with SHOPIFY_* set)
 ```
@@ -238,7 +247,7 @@ The Shopify suite runs against `mockshop.js`. It covers:
 - the schema check, and access tokens (client credentials, renewal, errors);
 - the pipeline: happy path, idempotent re-run, re-publish updates, conflicts, cross-brand conflicts, partial failure and retry, the time budget;
 - live publish with undo and delete, currency, scope and schema failures;
-- profit per order, the logo layout, the checklist, policy pages (plan, publish, update, undo, conflict) and the name check against a fake DNS and RDAP.
+- profit per order, the logo layout, the checklist, policy pages (plan, publish, update, undo, conflict), the FAQ (objections, prompt, page section, gap block) and the name check against a fake DNS and RDAP.
 
 The UI suite drives the page with mocked Claude and n8n:
 
@@ -265,5 +274,4 @@ The deployed edge function and SQL were also exercised end to end against a simu
 | Webhooks (`products/delete`, `app/uninstalled`, compliance topics) with HMAC | Not built. |
 | Translations, Markets, blog posts, bulk operations (>50 products), JSON-LD | Not built. |
 | Automatic trade mark search (PRV, EUIPO, UK IPO) | Not built; no free search API can be used from here. The name check links to the registers instead. |
-| FAQ from competitors' reviews | Not built yet. |
 | Multiple users and roles | Not built; the database serves one owner (as the rest of Plan-vy). |

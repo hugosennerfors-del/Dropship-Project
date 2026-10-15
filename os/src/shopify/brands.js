@@ -6,7 +6,9 @@
 // n8n intake workflow (which saves no executions) into Supabase Vault;
 // only the edge function reads them.
 
-import { store, changed } from "../state.js";
+import { store, changed, product, runsFor } from "../state.js";
+import { AGENTS, runAgent } from "../agents/index.js";
+import { collectObjections, buildFaqPrompt, sanitizeFaq } from "./faq.js";
 import { liveRead, liveWrite, startWorkflow, SHOPIFY_INTAKE, MCP_FIX } from "../live.js";
 import { MARKETS } from "../core/markets.js";
 import { validateConcept, slugify, uniqueHandle, keptOnRegenerate, LIMITS, SECTION_TYPES, POLICY_KEYS, FILL_IN } from "./concept.js";
@@ -115,7 +117,8 @@ export async function saveBrand(input, { id, create = false, note = null, genera
   const concept = { ...input, products: input.products.map((p, i) => (p.handle ? p : { ...p, handle: v.value.products[i].handle })) };
   try {
     const r = await liveWrite("brand.save", { id, concept, create, note, generationId, inputHash, sourceProductId });
-    const b = { id: r.id, name: concept.name, handle: concept.handle || r.id, version: r.version, status: brandById(r.id)?.status || "draft", market: concept.market || null, concept, updatedAt: new Date().toISOString(), sourceProductId };
+    // The database keeps a brand's source product on later saves; so does the page.
+    const b = { id: r.id, name: concept.name, handle: concept.handle || r.id, version: r.version, status: brandById(r.id)?.status || "draft", market: concept.market || null, concept, updatedAt: new Date().toISOString(), sourceProductId: sourceProductId || brandById(r.id)?.sourceProductId || null };
     const sh = store.shopify;
     sh.brands = [b, ...sh.brands.filter((x) => x.id !== b.id)];
     changed("shopify");
@@ -481,6 +484,51 @@ export async function writePolicies(b, { signal, onStatus = () => {} } = {}) {
   return pages;
 }
 export const policyGaps = (pages) => POLICY_KEYS.filter((k) => pages?.[k] && FILL_IN.test(pages[k].body + pages[k].title));
+
+// -- FAQ from objections ---------------------------------------------------------
+// What buyers complain about (faq.js): review-analyst runs on the brand's
+// source product, objections saved with the brand, and the product's
+// complaint fields. `extraRuns` are analyses made in the FAQ dialog for a
+// brand without a source product.
+export function faqObjections(b, extraRuns = []) {
+  const c = b.concept;
+  const pid = b.sourceProductId;
+  const p = pid ? product(pid) : null;
+  const mk = p?.built?.[c.market === "SE" ? "SE" : "UK"]?.mk || {};
+  const runs = [...extraRuns, ...(pid ? runsFor(pid).filter((r) => r.agent === "reviews") : [])];
+  return collectObjections({ runs, mk, saved: c.faq?.objections || [] });
+}
+
+// Pasted reviews through the review analyst. With a source product the run
+// is saved on that product, as from its own page.
+export async function analyseReviews(b, text, { signal } = {}) {
+  const market = b.concept.market === "SE" ? "SE" : "UK";
+  const pid = b.sourceProductId && product(b.sourceProductId) ? b.sourceProductId : null;
+  if (pid) return runAgent("reviews", { id: pid, market, input: text, signal });
+  const res = await AGENTS.reviews.run({ id: null, market, input: text, signal });
+  return { id: null, agent: "reviews", productId: null, market, output: res.output, createdAt: new Date().toISOString() };
+}
+
+export async function writeFaq(b, objections, { signal, onStatus = () => {} } = {}) {
+  if (!store.sample) throw { code: "not_granted", message: "Claude is not available in this view." };
+  if (!objections.length) throw { code: "input", message: "Tick at least one objection to answer." };
+  let gen;
+  try { gen = await liveWrite("generation.start", { kind: "brand", input: { kind: "faq", brandId: b.id, version: b.version }, inputHash: null, model: "default (JSON, faq)", force: true }); }
+  catch (e) { throw { code: "limit", message: errText(e) }; }
+  const prompt = buildFaqPrompt(b.concept, objections);
+  onStatus("Claude is answering the objections. This takes about half a minute.");
+  let out;
+  try { out = await store.sample.json(prompt, { signal, modelTier: "default", cache: false }); }
+  catch (e) {
+    await liveWrite("generation.finish", { id: gen.id, status: "failed", error: String(e?.message || e?.code || "error").slice(0, 300), tokensIn: estTokens(prompt), estimated: true }).catch(() => {});
+    throw e;
+  }
+  const items = sanitizeFaq(out);
+  await liveWrite("generation.finish", { id: gen.id, status: items.length ? "finished" : "failed", error: items.length ? null : "No usable questions came back.", output: { brandIds: [b.id], faq: items.length }, tokensIn: estTokens(prompt), tokensOut: estTokens(JSON.stringify(out || {})), estimated: true }).catch(() => {});
+  if (!items.length) throw { code: "empty", message: "Claude's answer had no usable questions. Try again." };
+  if (store.shopify.generations) store.shopify.generations.today = gen.used;
+  return items;
+}
 
 // -- Name check -------------------------------------------------------------------
 // Domains for up to five names, looked up by the edge function (DNS, then the
