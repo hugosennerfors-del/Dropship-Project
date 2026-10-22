@@ -108,7 +108,14 @@ const browser = await chromium.launch();
             saved: { ok: true, added: 1, refreshed: 0, skipped: 0, retired: 0 } };
           return { payload: { data: { resultData: { runData: { Svar: [{ data: { main: [[{ json: svar }]] } }] } } } } };
         }
-        const result = body.op === "read" ? live : { ok: true };
+        // GetHookd: the search is queued, then read back done with two running ads.
+        if (body.op === "write" && body.action === "ads.gethookd") window.__hookd = body.payload;
+        const hookdAd = (id, brand, days, hook) => ({ adId: String(id), advertiser: brand, brandId: id, brandActiveAds: 12, title: "Warm robe", hook, startedOn: "2026-09-01", daysActive: days,
+          stillRunning: true, performance: 83, performanceTitle: "Optimized", landingDomain: "robeco.example", shareUrl: `https://app.gethookd.ai/share/ad/${id}?signature=abc` });
+        const result = body.op === "write" && body.action === "ads.gethookd" ? { ok: true, id: "11111111-aaaa-4aaa-8aaa-000000000001" }
+          : body.op === "read" && body.params?.gethookdSearch ? { ok: true, gethookdSearch: { id: body.params.gethookdSearch, status: "done", query: window.__hookd?.query,
+            ads: [hookdAd(501, "Robe Co UK", 51, "Change in seconds on any beach"), hookdAd(502, "Dry Ltd", 4, "The robe swimmers swear by")], summary: { total: 34, matched: 49, brands: 2, usedCredits: 0.02, remainingCredits: 59.96 }, finishedAt: "2026-10-22T13:40:00Z" } }
+          : body.op === "read" ? live : { ok: true };
         return { payload: { data: { resultData: { runData: { Svar: [{ data: { main: [[{ json: { ok: true, result } }]] } }] } } } } };
       },
     };
@@ -191,7 +198,7 @@ const browser = await chromium.launch();
     ok(save && save.payload.productId === "changing-robe" && save.payload.market === "UK" && save.payload.platform === "meta"
       && save.payload.url === "https://facebook.com/ads/library/?id=222" && save.payload.startedOn === "2026-09-30" && /^[0-9a-f-]{36}$/.test(save.payload.id),
     "ads: a saved ad is written to Supabase via n8n", JSON.stringify(save));
-    await page.waitForTimeout(200);
+    await page.waitForFunction(() => document.querySelectorAll("#sec-ads .ads-row").length === 2, null, { timeout: 5000 }).catch(() => {});
     ok(await page.locator("#sec-ads .ads-row").count() === 2 && /Swim Shop/.test(await page.locator("#sec-ads .list").innerText()), "ads: the new ad is listed");
     // The same link twice on one product is refused on the page.
     await page.click("[data-ads-new]");
@@ -209,12 +216,33 @@ const browser = await chromium.launch();
     ok(rmw?.payload?.id === save.payload.id, "ads: the second click removes it through n8n", JSON.stringify(rmw));
     await page.waitForTimeout(200);
     ok(await page.locator("#sec-ads .ads-row").count() === 1, "ads: the removed ad leaves the list");
+    // GetHookd: the server finds the running ads; one is saved as an ordinary competitor ad.
+    await page.click("#sec-ads [data-hookd-go]");
+    await page.waitForSelector("#sec-ads [data-hookd-ad]", { timeout: 10000 });
+    const hk = (await writes()).find((b) => b.action === "ads.gethookd");
+    ok(hk?.payload?.productId === "changing-robe" && hk.payload.market === "UK" && hk.payload.query === "dryrobe alternative" && hk.payload.limit === 10 && !JSON.stringify(hk).includes("gh_"),
+      "gethookd: the search goes to the server with the product, market and search words, and no key", JSON.stringify(hk));
+    const hsum = await page.locator("[data-hookd-sum]").innerText();
+    ok(/34 running ads in the UK match “dryrobe alternative”/.test(hsum) && /2 advertisers/.test(hsum) && /credits left: 59.96/.test(hsum) && await page.locator("#sec-ads [data-hookd-ad] .tag.ads-long").count() === 1,
+      "gethookd: the result says how many ads run, from how many advertisers, the credits left, and marks the long-running one", hsum);
+    await page.click('#sec-ads [data-hookd-save="0"]');
+    await page.waitForFunction(() => window.__calls.filter((c) => c.tool === "execute_workflow" && c.input.inputs.webhookData.body.action === "ads.save").length >= 2, null, { timeout: 8000 });
+    const hsave = (await writes()).filter((b) => b.action === "ads.save").at(-1);
+    ok(hsave.payload.url === "https://app.gethookd.ai/share/ad/501?signature=abc" && hsave.payload.platform === "meta" && hsave.payload.advertiser === "Robe Co UK" && hsave.payload.startedOn === "2026-09-01"
+      && hsave.payload.angle === "Change in seconds on any beach" && /GetHookd/.test(hsave.payload.note), "gethookd: a found ad is saved with its link, advertiser, start date and hook", JSON.stringify(hsave.payload));
+    await page.waitForTimeout(200);
+    ok(/Robe Co UK/.test(await page.locator("#sec-ads .list").first().innerText()) && await page.locator('#sec-ads [data-hookd-ad="0"] .spill').innerText() === "Saved", "gethookd: the saved ad joins the saved list and is marked saved");
+    await page.locator(`#sec-ads [data-ad="${hsave.payload.id}"] [data-ads-rm]`).click();
+    await page.locator(`#sec-ads [data-ad="${hsave.payload.id}"] [data-ads-rm]`).click();
+    await page.waitForTimeout(200);
     // Sweden: Swedish ads, the UK ones counted separately.
     await page.click('[data-market="SE"]');
     // The section is already on the page and redraws on the next frame.
     await page.waitForFunction(() => /country=SE/.test(document.querySelector('[data-ads-link="meta"]')?.getAttribute("href") || ""), null, { timeout: 5000 }).catch(() => {});
     ok(/country=SE/.test(await meta()) && /1 more saved for United Kingdom/.test(await page.locator("#sec-ads").innerText()), "ads: Sweden searches Swedish ads and points to the UK ones", await meta());
     await page.click('[data-market="UK"]');
+    // The market is remembered before the next page loads.
+    await page.waitForFunction(() => /country=GB/.test(document.querySelector('[data-ads-link="meta"]')?.getAttribute("href") || ""), null, { timeout: 5000 });
   }
   // Stores selling it and Chinese suppliers.
   {

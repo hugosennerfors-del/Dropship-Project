@@ -12,6 +12,7 @@
 //             pipeline within a time budget, re-dispatch itself to continue
 //   rollback  undo a job (soft by default; delete only what it created)
 //   names     look up whether brand names are free as domains (names.js)
+//   gethookd  search GetHookd's index of Meta ads for a product (gethookd.js)
 //
 // `sql` is a postgres.js client on SUPABASE_DB_URL; everything else is
 // injected so the logic stays plain JavaScript.
@@ -24,6 +25,7 @@ import { Q, SCOPES, SCOPES_FOR } from "./documents.js";
 import { createMockShop } from "./mockshop.js";
 import { SHOPIFY_API_VERSION } from "./version.js";
 import { checkNames } from "./names.js";
+import { searchAds } from "./gethookd.js";
 
 const CORE_SCOPES = [...new Set([...SCOPES_FOR.product, ...SCOPES_FOR.collection, ...SCOPES_FOR.metaobject, ...SCOPES_FOR.page])];
 const OPTIONAL_SCOPES = [...new Set([...SCOPES_FOR.menu, ...SCOPES_FOR.publish])];
@@ -208,6 +210,20 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
     }
   }
 
+  // -- gethookd ---------------------------------------------------------
+  async function gethookd(id) {
+    const [row] = await sql`update intel.gethookd_searches set status = 'running' where id = ${id} and status = 'queued' returning *`;
+    if (!row) return;
+    try {
+      const [k] = await sql`select decrypted_secret from vault.decrypted_secrets where name = 'gethookd_api_key'`;
+      const r = await searchAds({ key: k?.decrypted_secret, fetch: fetchImpl, query: row.query, market: row.market, limit: row.ad_limit });
+      await sql`update intel.gethookd_searches set status = 'done', results = ${sql.json(r.ads)}, summary = ${sql.json(r.summary)}, finished_at = now() where id = ${id}`;
+      log({ event: "gethookd", id, ads: r.ads.length, credits: r.summary.usedCredits });
+    } catch (e) {
+      await sql`update intel.gethookd_searches set status = 'failed', error = ${String(e?.message || e).slice(0, 300)}, finished_at = now() where id = ${id}`;
+    }
+  }
+
   async function redispatch(action, id) {
     const s = await fnSecret();
     await fetchImpl(selfUrl, { method: "POST", headers: { "Content-Type": "application/json", "x-intel-secret": s }, body: JSON.stringify({ action, id }) });
@@ -221,7 +237,7 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
     try { body = await req.json(); } catch { return json(400, { error: "invalid JSON" }); }
     const { action, id } = body || {};
     if (!/^[0-9a-f-]{36}$/.test(String(id || ""))) return json(400, { error: "invalid id" });
-    const work = { test, run, rollback, names }[action];
+    const work = { test, run, rollback, names, gethookd }[action];
     if (!work) return json(400, { error: "unknown action" });
     waitUntil(work(id).catch((e) => log({ event: action, id, crashed: String(e?.message || e).slice(0, 200), detail: redact(String(e?.stack || "")).slice(0, 400) })));
     return json(202, { accepted: true, action, id });

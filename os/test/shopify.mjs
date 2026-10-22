@@ -19,6 +19,8 @@ import { logoLayout, logoSvg, logoSettings } from "../src/shopify/logo.js";
 import { complianceChecks, attest, productGroups, businessGaps } from "../src/shopify/compliance.js";
 import { domainLabel, domainCandidates, checkDomain, checkNames } from "../src/shopify/names.js";
 import { collectObjections, buildFaqPrompt, sanitizeFaq, faqGaps, applyFaq } from "../src/shopify/faq.js";
+import { searchAds, searchArguments, savedAdInput } from "../src/shopify/gethookd.js";
+import { normaliseAd } from "../src/core/ads.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const concept = JSON.parse(await readFile(join(root, "test/fixtures-brand-concept.json"), "utf8"));
@@ -453,6 +455,43 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   const page = plan.steps.find((s) => s.kind === "page");
   ok(plan.ok && /<h3>Will the zip last\?<\/h3><p>Yes, a two-way zip\.<\/p>/.test(page.variables.page.body), "filled in, the FAQ is published on the brand page", plan.errors.join());
   ok(buildPlan(withFaq, { includeBrand: false }).ok, "products alone can still be published while the page has a gap");
+}
+
+// GetHookd: one search_ads call over MCP, read into ads the page can save.
+{
+  const row = (id, brand, extra = {}) => ({ id, title: "Warm robe", hook: "Change in seconds on any beach", platform: "facebook,instagram", countries: ["GB"], landing_page: "https://www.robeco.example/products/robe?utm=1",
+    start_date: "2026-09-01", days_active: 51, status: "active", performance_score: 83, performance_score_title: "Optimized", share_url: `https://app.gethookd.ai/share/ad/${id}?signature=abc`,
+    brand: { id: brand === "Robe Co" ? 1 : 2, name: brand, active_ads: 12 }, ...extra });
+  const answer = (json, { sse = false, status = 200 } = {}) => {
+    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text: JSON.stringify(json) }, { type: "text", text: "Robe Co — ad 1 — status: active" }, { type: "image", data: "x" }] } });
+    return { status, ok: status >= 200 && status < 300, text: async () => (sse ? `event: message\ndata: ${body}\n\n` : body) };
+  };
+  const calls = [];
+  const fake = (json, opts) => async (url, init) => { calls.push({ url, init, body: JSON.parse(init.body) }); return answer(json, opts); };
+  const good = { errors: false, data: [row(11, "Robe Co"), row(12, "Robe Co", { days_active: 3, share_url: "https://evil.example/x" }), row(13, "Dry Ltd")], meta: { total: 34, total_ads_matched: 49, as_of: "2026-10-22T13:34:38+00:00" }, used_credits: 0.03, remaining_credits: 59.95 };
+
+  const r = await searchAds({ key: "gh_test", fetch: fake(good), query: "  changing   robe ", market: "UK", limit: 50 });
+  const sent = calls.at(-1);
+  ok(sent.url === "https://app.gethookd.ai/api/mcp/v1" && sent.init.headers.Authorization === "Bearer gh_test" && sent.body.method === "tools/call" && sent.body.params.name === "search_ads",
+    "GetHookd: one tools/call to search_ads with the key as a bearer token");
+  const a = sent.body.params.arguments;
+  ok(a.query === "changing robe" && a.geo === "GB" && a.status === "active" && a.limit === 20 && a.ads_per_brand_limit === 2 && /share_url/.test(a.fields), "GetHookd: the search asks for running ads in the UK, at most 20 and 2 per advertiser", JSON.stringify(a));
+  ok(searchArguments({ query: "x y", market: "SE" }).geo === "SE", "GetHookd: Swedish searches ask for Sweden");
+  ok(r.ads.length === 3 && r.ads[0].advertiser === "Robe Co" && r.ads[0].landingDomain === "robeco.example" && r.ads[0].daysActive === 51 && r.ads[1].shareUrl === null
+    && r.summary.total === 34 && r.summary.matched === 49 && r.summary.brands === 2 && r.summary.remainingCredits === 59.95, "GetHookd: ads, a share link only from GetHookd itself, totals and credits are read", JSON.stringify(r.summary));
+  const sse = await searchAds({ key: "k", fetch: fake(good, { sse: true }), query: "robe", market: "UK" });
+  ok(sse.ads.length === 3, "GetHookd: an answer sent as server-sent events is read too");
+  const input = savedAdInput(r.ads[0]);
+  const n = normaliseAd(input, { productId: "changing-robe", market: "UK" });
+  ok(n.ad && n.ad.platform === "meta" && n.ad.url.startsWith("https://app.gethookd.ai/share/ad/11") && n.ad.startedOn === "2026-09-01" && n.ad.angle === "Change in seconds on any beach" && /Optimized \(83\)/.test(n.ad.note),
+    "GetHookd: a found ad becomes a valid saved ad with its start date, hook and score", JSON.stringify(n));
+  const fails = async (f, re) => { try { await searchAds({ key: "k", fetch: f, query: "robe", market: "UK" }); return false; } catch (e) { return re.test(e.message); } };
+  ok(await fails(fake({ status: "needs_input", errors: false }), /survey/), "GetHookd: the connect-survey gate is explained");
+  ok(await fails(fake({}, { status: 401 }), /did not accept the API key/), "GetHookd: a refused key says where to replace it");
+  ok(await fails(fake({}, { status: 402 }), /out of credits/), "GetHookd: running out of credits is explained");
+  ok(await fails(fake({ errors: true, message: "invalid_arguments: geo" }), /invalid_arguments/), "GetHookd: an API error is passed on");
+  let noKey = ""; try { await searchAds({ key: null, fetch: fake(good), query: "robe", market: "UK" }); } catch (e) { noKey = e.message; }
+  ok(/Vault as gethookd_api_key/.test(noKey), "GetHookd: a missing key never calls the API", noKey);
 }
 
 // Name check: DNS first, then the registry's RDAP where IANA lists one.

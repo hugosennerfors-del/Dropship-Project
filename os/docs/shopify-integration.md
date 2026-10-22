@@ -232,10 +232,30 @@ Each brand card has these tools. Everything they save is stored with the concept
   - Results are *taken*, *free* (the registry says it is not registered), *probably free* (no such domain in DNS; `.se` and `.nu` have no public RDAP) or *unknown*. Only a registrar can confirm.
   - Trade marks are not checked automatically: EUIPO, TMview, WIPO and the UK IPO have no free search API that can be used from here. The dialog links to their searches and copies the name.
 
+## Competitors' ads from GetHookd
+
+The product page's *Ads* tab has a **GetHookd** panel. It searches GetHookd, an index of Meta's ad library, for the ads running now for the product in the chosen market (UK → `GB`, Sweden → `SE`).
+
+- **Path.**
+  - The page sends the write action `ads.gethookd` (`productId`, `market`, `query`, `limit`) through the Intelligence-DB workflow.
+  - `intel.api_write_gethookd` checks the words (2–80 characters), caps the limit at 20 and allows 60 searches an hour across the database. It stores a row in `intel.gethookd_searches` and dispatches the edge action `gethookd`.
+  - The edge function calls GetHookd's MCP tool `search_ads` (`src/shopify/gethookd.js`). It asks for active ads only, at most two per advertiser, and only the fields it shows.
+  - The page polls `api_read({"gethookdSearch": id})`, for up to 60 seconds.
+- **The key.**
+  - The API key is in Supabase Vault as `gethookd_api_key`. The edge function reads it from there.
+  - The page, n8n and git never see it.
+  - A missing or rejected key is named in the panel, and so is an account without credits.
+- **Cost.** GetHookd bills about 0.01 credit per ad returned. The panel asks for 10, and shows the credits left after each search.
+- **Saving an ad.**
+  - *Save* turns a found ad into an ordinary competitor ad (`savedAdInput` → `normaliseAd` → `ads.save`). It keeps the advertiser, start date, hook, performance label and landing domain.
+  - The link is GetHookd's share page; the panel links nothing else.
+  - An ad already saved for the product shows as *Saved*.
+- **Survey.** GetHookd asks every new connection to answer or skip a short survey before it will search. It was skipped for this account. Otherwise the panel says so.
+
 ## Tests
 
 ```
-npm test                 unit (95), Shopify (140), build, smoke, UI in Chromium (164)
+npm test                 unit (95), Shopify (151), build, smoke, UI in Chromium (168)
 npm run test:shopify     the Shopify suite on its own
 npm run shopify:schema   contract check (simulated store, or a real one with SHOPIFY_* set)
 ```
@@ -247,7 +267,8 @@ The Shopify suite runs against `mockshop.js`. It covers:
 - the schema check, and access tokens (client credentials, renewal, errors);
 - the pipeline: happy path, idempotent re-run, re-publish updates, conflicts, cross-brand conflicts, partial failure and retry, the time budget;
 - live publish with undo and delete, currency, scope and schema failures;
-- profit per order, the logo layout, the checklist, policy pages (plan, publish, update, undo, conflict), the FAQ (objections, prompt, page section, gap block) and the name check against a fake DNS and RDAP.
+- profit per order, the logo layout, the checklist, policy pages (plan, publish, update, undo, conflict), the FAQ (objections, prompt, page section, gap block) and the name check against a fake DNS and RDAP;
+- the GetHookd search against a fake MCP server: arguments, JSON and event-stream answers, the survey, key, credit and API errors, and saving a found ad.
 
 The UI suite drives the page with mocked Claude and n8n:
 
@@ -260,7 +281,8 @@ The deployed edge function and SQL were also exercised end to end against a simu
 - connect, then publish;
 - idempotent re-run, conflict, retry;
 - soft undo, then permanent delete;
-- Dev Dashboard token exchange, and intake through n8n with no saved execution.
+- Dev Dashboard token exchange, and intake through n8n with no saved execution;
+- a GetHookd search for "changing robe" in the UK (22 October 2026): 5 running ads from 3 advertisers, 0.05 credits.
 
 **Not done: an end-to-end run against a real development store.** There is no store or token in this environment. Step 5 above is that check.
 

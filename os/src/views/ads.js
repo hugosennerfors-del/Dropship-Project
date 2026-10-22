@@ -7,11 +7,15 @@ import { esc, attr, icon } from "../ui/dom.js";
 import { MARKETS } from "../core/markets.js";
 import { AD_PLATFORMS, LONG_RUNNING_DAYS, adLibraryLinks, defaultAdQuery, normaliseAd, platformOf, runningDays, sortAds, adSignal } from "../core/ads.js";
 import { burstAt } from "../fx.js";
+import { liveRead, liveWrite, MCP_FIX } from "../live.js";
+import { savedAdInput } from "../shopify/gethookd.js";
 
 // Per product and market: search words, the form being edited (null, "new"
 // or an ad id), its draft, and the ad whose Remove was clicked once.
 const ui = {};
-const uiFor = (pid, m) => (ui[`${pid}|${m}`] ||= { query: null, editing: null, draft: {}, error: null, armed: null });
+const uiFor = (pid, m) => (ui[`${pid}|${m}`] ||= { query: null, editing: null, draft: {}, error: null, armed: null, hookd: { busy: false, status: "", error: "", result: null } });
+// One GetHookd search returns at most this many ads (about 0.01 credit each).
+const HOOKD_LIMIT = 10;
 
 const SHORT = { meta: "Meta", tiktok: "TikTok", google: "Google", youtube: "YouTube", pinterest: "Pinterest", other: "Web" };
 const today = () => new Date().toISOString().slice(0, 10);
@@ -41,6 +45,7 @@ export function adsSection(p, m) {
           <b>${esc(l.label)} ${icon("ext", 11)}</b><small>${esc(l.sub)}</small>${l.prefilled ? "" : '<span class="tag">paste the search</span>'}</a>`).join("")}</div>
         <p class="xs muted">Meta and TikTok do not let other pages show their ads, so they open on their own sites. In Meta's Ad Library each ad shows the date it started running; open its details to copy the link, then save it here.</p>
       </div></div>
+    ${hookdPanel(p, m, u, q, mine)}
     <div class="panel"><div class="panel-h"><h3>Saved ads</h3><span class="sub">${here.length ? `${sig.active} running · ${sig.long} for ${LONG_RUNNING_DAYS}+ days` : "none yet"}</span>
       ${u.editing ? "" : `<button class="btn sm" type="button" data-ads-new>${icon("plus", 13)}Save an ad</button>`}</div>
       ${u.editing ? adForm(u, here.find((a) => a.id === u.editing)) : ""}
@@ -48,6 +53,53 @@ export function adsSection(p, m) {
       ${elsewhere ? `<div class="panel-b xs muted" style="border-top:1px solid var(--border)">${elsewhere} more saved for ${esc(MARKETS[m === "UK" ? "SE" : "UK"]?.name || "the other market")}. Switch market at the top to see them.</div>` : ""}
     </div>
   </section>`;
+}
+
+// GetHookd: the Meta ads running now for the search words, found on the
+// server (the API key stays there) and saved here one by one.
+function hookdPanel(p, m, u, q, mine) {
+  const h = u.hookd;
+  const live = store.live.state === "ready";
+  const where = m === "SE" ? "Sweden" : "the UK";
+  const saved = new Set(mine.map((a) => a.url));
+  const r = h.result;
+  const sum = r?.summary || {};
+  return `<div class="panel" data-hookd><div class="panel-h"><h3>GetHookd</h3><span class="sub">Meta ads running now in ${esc(where)}</span></div>
+    <div class="panel-b stack">
+      <div class="row"><button class="btn sm primary" type="button" data-hookd-go${live && !h.busy && String(q).trim().length >= 2 ? "" : " disabled"}>${icon("search", 13)}${h.busy ? "Searching…" : `Search GetHookd for “${esc(String(q).trim().slice(0, 40))}”`}</button>
+        <span class="xs muted">${live ? `up to ${HOOKD_LIMIT} ads, at most 2 per advertiser · about 0.01 credit per ad` : "Needs the live database (n8n)."}</span></div>
+      ${h.busy ? `<div class="row"><span class="thinking"><i></i><i></i><i></i></span><span class="small">${esc(h.status)}</span></div>` : ""}
+      ${h.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(h.error)}</span></div>` : ""}
+      ${r ? `<p class="small" data-hookd-sum>${sum.total != null ? `<b>${sum.total}</b> running ad${sum.total === 1 ? "" : "s"} in ${esc(where)} match “${esc(r.query)}”${sum.matched != null && sum.matched !== sum.total ? ` (${sum.matched} before capping each advertiser at 2)` : ""}.` : `Ads for “${esc(r.query)}”.`}
+          ${r.ads.length ? `Showing ${r.ads.length} from ${sum.brands} advertiser${sum.brands === 1 ? "" : "s"}.` : "None are running now."}
+          ${sum.remainingCredits != null ? `<span class="xs muted">GetHookd credits left: ${esc(String(Math.round(sum.remainingCredits * 100) / 100))}.</span>` : ""}</p>
+        <div class="list">${r.ads.map((a, i) => hookdRow(a, i, saved.has(a.shareUrl))).join("")}</div>` : ""}
+    </div></div>`;
+}
+
+function hookdRow(a, i, isSaved) {
+  const days = a.daysActive;
+  const when = days == null ? "" : days >= LONG_RUNNING_DAYS ? `<span class="tag ads-long" title="Started ${attr(a.startedOn || "")}">${days} days</span>` : `<span class="spill" title="Started ${attr(a.startedOn || "")}">${days} day${days === 1 ? "" : "s"}</span>`;
+  const detail = [a.performanceTitle && `${a.performanceTitle}${a.performance != null ? ` ${a.performance}` : ""}`, a.brandActiveAds != null && `${a.brandActiveAds} active ads`, a.landingDomain].filter(Boolean).join(" · ");
+  return `<div class="li ads-row" data-hookd-ad="${i}">
+    <span class="ads-plat ads-meta" title="Meta (Facebook, Instagram)">Meta</span>
+    <span class="body"><b>${esc(a.advertiser || "Advertiser")}</b><small>${esc(a.hook || a.title || "")}</small><small class="xs muted">${esc(detail)}</small></span>
+    <span class="side">${when}
+      ${a.shareUrl ? `<a class="btn sm" href="${attr(a.shareUrl)}" target="_blank" rel="noopener noreferrer">Open ${icon("ext", 11)}</a>` : ""}
+      ${isSaved ? '<span class="spill">Saved</span>' : a.shareUrl ? `<button class="btn sm" type="button" data-hookd-save="${i}">${icon("plus", 12)}Save</button>` : ""}</span>
+  </div>`;
+}
+
+async function hookdSearch(productId, market, query, onStatus, { wait = 60000, every = 1500 } = {}) {
+  const w = await liveWrite("ads.gethookd", { productId, market, query, limit: HOOKD_LIMIT });
+  for (let t = 0; t < wait; t += every) {
+    await new Promise((res) => setTimeout(res, every));
+    const x = (await liveRead({ gethookdSearch: w.id }))?.gethookdSearch;
+    if (x?.status === "done") return { query: x.query, ads: x.ads || [], summary: x.summary || {}, at: x.finishedAt };
+    if (x?.status === "failed") throw new Error(x.error || "The search failed.");
+    onStatus(x?.status === "running" ? "GetHookd is searching…" : "Waiting for the server…");
+  }
+  throw new Error("GetHookd did not answer within a minute. Try again.");
 }
 
 function adRow(a, u) {
@@ -170,6 +222,27 @@ export function bindAds(root, { id, rerender }) {
     if (!t.closest("[data-ads-rm]") && u.armed) {
       u.armed = null;
       if (!t.closest("button, a, input, select, textarea, label")) { rerender(); return; }
+    }
+    if (t.closest("[data-hookd-go]")) {
+      const h = u.hookd;
+      h.busy = true; h.error = ""; h.status = "Sending the search…"; rerender();
+      try { h.result = await hookdSearch(id, m(), u.query ?? "", (x) => { h.status = x; rerender(); }); }
+      catch (err) { h.error = MCP_FIX[err?.code] || err?.message || "The search failed."; }
+      h.busy = false; rerender();
+      return;
+    }
+    const hs = t.closest("[data-hookd-save]");
+    if (hs) {
+      const ad = u.hookd.result?.ads?.[Number(hs.dataset.hookdSave)];
+      if (!ad) return;
+      const res = normaliseAd(savedAdInput(ad), { productId: id, market: m() });
+      if (res.error) { window.__toast?.(res.error); return; }
+      if (adsFor(id).some((a) => a.url === res.ad.url)) { window.__toast?.("This ad is already saved for this product."); return; }
+      hs.disabled = true;
+      const saved = await saveAd(res.ad);
+      window.__toast?.(saved.ok ? (saved.note || "Ad saved.") : saved.reason);
+      rerender();
+      return;
     }
     if (t.closest("[data-ads-new]")) { u.editing = "new"; u.draft = {}; u.error = null; rerender(); root.querySelector("#adsForm [name=url]")?.focus(); return; }
     const ed = t.closest("[data-ads-edit]");
