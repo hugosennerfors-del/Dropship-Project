@@ -109,7 +109,8 @@ export async function searchAds({ key, fetch: fetchImpl, query, market, limit })
   return readSearch(await callTool({ key, fetch: fetchImpl, name: "search_ads", args }));
 }
 
-// A found ad as the fields of a saved ad (core/ads.js normaliseAd checks them).
+// A found ad as the fields of a saved ad. The edge function saves these with
+// intel.gethookd_save_ads, which applies ads.save's limits.
 export function savedAdInput(ad) {
   const note = [
     "GetHookd",

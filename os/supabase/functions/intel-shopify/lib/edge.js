@@ -12,7 +12,8 @@
 //             pipeline within a time budget, re-dispatch itself to continue
 //   rollback  undo a job (soft by default; delete only what it created)
 //   names     look up whether brand names are free as domains (names.js)
-//   gethookd  search GetHookd's index of Meta ads for a product (gethookd.js)
+//   gethookd  search GetHookd's index of Meta ads for a product and save the
+//             ads found as the product's competitor ads (gethookd.js)
 //
 // `sql` is a postgres.js client on SUPABASE_DB_URL; everything else is
 // injected so the logic stays plain JavaScript.
@@ -25,7 +26,7 @@ import { Q, SCOPES, SCOPES_FOR } from "./documents.js";
 import { createMockShop } from "./mockshop.js";
 import { SHOPIFY_API_VERSION } from "./version.js";
 import { checkNames } from "./names.js";
-import { searchAds } from "./gethookd.js";
+import { searchAds, savedAdInput } from "./gethookd.js";
 
 const CORE_SCOPES = [...new Set([...SCOPES_FOR.product, ...SCOPES_FOR.collection, ...SCOPES_FOR.metaobject, ...SCOPES_FOR.page])];
 const OPTIONAL_SCOPES = [...new Set([...SCOPES_FOR.menu, ...SCOPES_FOR.publish])];
@@ -217,8 +218,12 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
     try {
       const [k] = await sql`select decrypted_secret from vault.decrypted_secrets where name = 'gethookd_api_key'`;
       const r = await searchAds({ key: k?.decrypted_secret, fetch: fetchImpl, query: row.query, market: row.market, limit: row.ad_limit });
-      await sql`update intel.gethookd_searches set status = 'done', results = ${sql.json(r.ads)}, summary = ${sql.json(r.summary)}, finished_at = now() where id = ${id}`;
-      log({ event: "gethookd", id, ads: r.ads.length, credits: r.summary.usedCredits });
+      // Every ad with a link becomes one of the product's saved ads; links it
+      // already has, saved or removed, are skipped.
+      const [{ saved }] = await sql`select intel.gethookd_save_ads(${id}, ${sql.json(r.ads.filter((a) => a.shareUrl).map(savedAdInput))}) as saved`;
+      const summary = { ...r.summary, added: saved?.added ?? 0, alreadySaved: saved?.known ?? 0 };
+      await sql`update intel.gethookd_searches set status = 'done', results = ${sql.json(r.ads)}, summary = ${sql.json(summary)}, finished_at = now() where id = ${id}`;
+      log({ event: "gethookd", id, ads: r.ads.length, added: summary.added, credits: r.summary.usedCredits });
     } catch (e) {
       await sql`update intel.gethookd_searches set status = 'failed', error = ${String(e?.message || e).slice(0, 300)}, finished_at = now() where id = ${id}`;
     }

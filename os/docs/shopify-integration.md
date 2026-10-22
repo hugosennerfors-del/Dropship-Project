@@ -244,22 +244,24 @@ The product page's *Ads* tab has a **GetHookd** panel. It searches GetHookd, an 
   - The page sends the write action `ads.gethookd` (`productId`, `market`, `query`, `limit`) through the Intelligence-DB workflow.
   - `intel.api_write_gethookd` checks the words (2–80 characters), caps the limit at 20 and allows 60 searches an hour across the database. It stores a row in `intel.gethookd_searches` and dispatches the edge action `gethookd`.
   - The edge function calls GetHookd's MCP tool `search_ads` (`src/shopify/gethookd.js`). It asks for active ads only, at most two per advertiser, and only the fields it shows.
-  - The page polls `api_read({"gethookdSearch": id})`, for up to 60 seconds.
+  - It then saves every ad found as one of the product's competitor ads with `intel.gethookd_save_ads`, under the same limits as `ads.save`.
+  - The page polls `api_read({"gethookdSearch": id})`, for up to 60 seconds. The answer carries the new rows as `savedAds`, and the page adds them to *Saved ads* straight away.
 - **The key.**
   - The API key is in Supabase Vault as `gethookd_api_key`. The edge function reads it from there.
   - The page, n8n and git never see it.
   - A missing or rejected key is named in the panel, and so is an account without credits.
 - **Cost.** GetHookd bills about 0.01 credit per ad returned. The panel asks for 10, and shows the credits left after each search.
-- **Saving an ad.**
-  - *Save* turns a found ad into an ordinary competitor ad (`savedAdInput` → `normaliseAd` → `ads.save`). It keeps the advertiser, start date, hook, performance label and landing domain.
-  - The link is GetHookd's share page; the panel links nothing else.
-  - An ad already saved for the product shows as *Saved*.
+- **What is saved.**
+  - Each ad becomes an ordinary saved ad (`savedAdInput`) with the advertiser, start date and hook. Its note holds the performance label, the advertiser's number of active ads and the landing domain.
+  - The link is GetHookd's share page. It carries a signature that is the same on every search, so the same ad is recognised.
+  - A link the product already has is skipped, whether it is saved or was removed, so an ad you remove does not come back with the next search.
+  - The panel says how many were new and how many were already there.
 - **Survey.** GetHookd asks every new connection to answer or skip a short survey before it will search. It was skipped for this account. Otherwise the panel says so.
 
 ## Tests
 
 ```
-npm test                 unit (95), Shopify (151), build, smoke, UI in Chromium (168)
+npm test                 unit (95), Shopify (151), build, smoke, UI in Chromium (169)
 npm run test:shopify     the Shopify suite on its own
 npm run shopify:schema   contract check (simulated store, or a real one with SHOPIFY_* set)
 ```
@@ -287,6 +289,7 @@ The deployed edge function and SQL were also exercised end to end against a simu
 - soft undo, then permanent delete;
 - Dev Dashboard token exchange, and intake through n8n with no saved execution;
 - a GetHookd search for "changing robe" in the UK (22 October 2026): 5 running ads from 3 advertisers, 0.05 credits. Then the same search, written and read back through the n8n workflow;
+- a search that saves what it finds, through n8n: 10 ads from 5 advertisers saved on the product, 0.1 credits. In a rolled-back transaction, a second save skipped every link, a removed ad was not saved again and a non-GetHookd link was refused;
 - a name check through the n8n workflow.
 
 **Not done: an end-to-end run against a real development store.** There is no store or token in this environment. Step 5 above is that check.
