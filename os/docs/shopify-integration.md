@@ -35,8 +35,12 @@ Supabase (schema intel)
 Edge Function "intel-shopify"  (the only code that reads a token or talks to Shopify)
   ├─ test      connection check: shop, plan, currency, scopes, API versions, introspection
   ├─ run       claims the job (lease), runs the pipeline within 100 s, re-dispatches itself to continue
-  └─ rollback  undo (soft by default)
+  ├─ rollback  undo (soft by default)
+  ├─ names     domain lookups for the name check
+  └─ gethookd  competitors' running Meta ads from GetHookd (key from Vault)
 ```
+
+**A new write action needs two places.** `intel.api_write` routes and validates it. The code node *Förbered anrop* in the n8n workflow **Plan-vy · Intelligence-DB** must also list it in `ACTIONS`; anything not listed is refused as "Okänd åtgärd". That workflow is not in this repository, and the UI tests mock n8n, so the tests cannot catch a missing entry. `brand.names` and `ads.gethookd` were added there on 22 October 2026.
 
 Code: `src/shopify/` is shared by the page, the edge function and the tests.
 
@@ -282,7 +286,8 @@ The deployed edge function and SQL were also exercised end to end against a simu
 - idempotent re-run, conflict, retry;
 - soft undo, then permanent delete;
 - Dev Dashboard token exchange, and intake through n8n with no saved execution;
-- a GetHookd search for "changing robe" in the UK (22 October 2026): 5 running ads from 3 advertisers, 0.05 credits.
+- a GetHookd search for "changing robe" in the UK (22 October 2026): 5 running ads from 3 advertisers, 0.05 credits. Then the same search, written and read back through the n8n workflow;
+- a name check through the n8n workflow.
 
 **Not done: an end-to-end run against a real development store.** There is no store or token in this environment. Step 5 above is that check.
 
