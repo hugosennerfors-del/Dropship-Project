@@ -569,6 +569,8 @@ button.li { border: 0; border-bottom: 1px solid var(--border); background: none;
 .ads-plat.ads-meta { background: rgba(24, 119, 242, .12); color: #1a5bb8; }
 .ads-plat.ads-tiktok { background: rgba(17, 17, 17, .08); color: #111; }
 .tag.ads-long { background: var(--good-soft); color: var(--good); border-color: color-mix(in srgb, var(--good) 30%, transparent); }
+.tag.ads-new { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
+.ads-row.ads-fresh { box-shadow: inset 3px 0 0 var(--accent); }
 .ads-row .side { flex-wrap: wrap; justify-content: flex-end; }
 .ads-form { display: grid; gap: 12px; border-bottom: 1px solid var(--border); }
 .ads-form .field input, .ads-form .field select, .ads-form .field textarea { width: 100%; }

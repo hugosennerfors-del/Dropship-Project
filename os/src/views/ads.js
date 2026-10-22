@@ -13,7 +13,8 @@ import { liveRead, liveWrite, MCP_FIX } from "../live.js";
 // Per product and market: search words, the form being edited (null, "new"
 // or an ad id), its draft, and the ad whose Remove was clicked once.
 const ui = {};
-const uiFor = (pid, m) => (ui[`${pid}|${m}`] ||= { query: null, editing: null, draft: {}, error: null, armed: null, hookd: { busy: false, status: "", error: "", result: null } });
+// `hookd.fresh` holds the ids the last GetHookd search added, marked "new".
+const uiFor = (pid, m) => (ui[`${pid}|${m}`] ||= { query: null, editing: null, draft: {}, error: null, armed: null, hookd: { busy: false, status: "", error: "", result: null, fresh: [] } });
 // One GetHookd search returns at most this many ads (about 0.01 credit each).
 const HOOKD_LIMIT = 10;
 
@@ -74,7 +75,7 @@ function hookdPanel(m, u, q) {
       ${h.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(h.error)}</span></div>` : ""}
       ${r ? `<p class="small" data-hookd-sum>${sum.total != null ? `<b>${sum.total}</b> running ad${sum.total === 1 ? "" : "s"} in ${esc(where)} match “${esc(r.query)}”${sum.matched != null && sum.matched !== sum.total ? ` (${sum.matched} before capping each advertiser at 2)` : ""}.` : `Ads for “${esc(r.query)}”.`}
           ${!r.ads.length ? "None are running now."
-            : `Found ${r.ads.length} from ${sum.brands} advertiser${sum.brands === 1 ? "" : "s"}: <b>${added} new</b> saved below${known ? `, ${known} already in the list or removed earlier` : ""}.`}
+            : `Found ${r.ads.length} from ${sum.brands} advertiser${sum.brands === 1 ? "" : "s"}: <b>${added} new</b> saved under Saved ads below${added ? ", marked new" : ""}${known ? `; ${known} already in the list or removed earlier` : ""}.`}
           ${sum.remainingCredits != null ? `<span class="xs muted">GetHookd credits left: ${esc(String(Math.round(sum.remainingCredits * 100) / 100))}.</span>` : ""}</p>` : ""}
       <p class="xs muted">Each saved ad opens on GetHookd. An ad you remove from the list is not saved again by a later search.</p>
     </div></div>`;
@@ -102,10 +103,11 @@ function adRow(a, u) {
   try { host = new URL(a.url).hostname.replace(/^www\./, ""); } catch { /* shown as is */ }
   const detail = [a.angle && `“${a.angle}”`, a.note].filter(Boolean).join(" · ");
   const armed = u.armed === a.id;
-  return `<div class="li ads-row" data-ad="${attr(a.id)}">
+  const fresh = u.hookd.fresh.includes(a.id);
+  return `<div class="li ads-row${fresh ? " ads-fresh" : ""}" data-ad="${attr(a.id)}">
     <span class="ads-plat ads-${attr(a.platform)}" title="${attr(AD_PLATFORMS[a.platform] || a.platform)}">${esc(SHORT[a.platform] || a.platform)}</span>
     <span class="body"><b>${esc(a.advertiser || host || "Ad")}</b><small>${esc(detail || host)}</small></span>
-    <span class="side">${when}
+    <span class="side">${fresh ? '<span class="tag ads-new" title="Added by the last GetHookd search">new</span>' : ""}${when}
       <a class="btn sm" href="${attr(a.url)}" target="_blank" rel="noopener noreferrer">Open ${icon("ext", 11)}</a>
       <button class="btn sm ghost" type="button" data-ads-edit="${attr(a.id)}">Edit</button>
       <button class="btn sm ${armed ? "bb-btn-danger" : "ghost"}" type="button" data-ads-rm="${attr(a.id)}">${armed ? "Remove?" : "Remove"}</button></span>
@@ -220,10 +222,14 @@ export function bindAds(root, { id, rerender }) {
       try {
         h.result = await hookdSearch(id, m(), u.query ?? "", (x) => { h.status = x; rerender(); });
         fresh = h.result.savedAds;
+        h.fresh = fresh.map((a) => a.id);
         addSavedAds(fresh);
+        // An empty "Save an ad" form would push the new ads out of sight.
+        if (fresh.length && u.editing === "new" && !String(u.draft?.url || "").trim()) { u.editing = null; u.draft = {}; u.error = null; }
       } catch (err) { h.error = MCP_FIX[err?.code] || err?.message || "The search failed."; }
       h.busy = false; rerender();
-      if (fresh.length) burstAt(root.querySelector(`[data-ad="${fresh[0].id}"]`), 60);
+      const first = fresh.length ? root.querySelector("#sec-ads .ads-row.ads-fresh") : null;
+      if (first) { first.scrollIntoView?.({ block: "nearest" }); burstAt(first, 60); }
       return;
     }
     if (t.closest("[data-ads-new]")) { u.editing = "new"; u.draft = {}; u.error = null; rerender(); root.querySelector("#adsForm [name=url]")?.focus(); return; }

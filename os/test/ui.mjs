@@ -225,13 +225,15 @@ const browser = await chromium.launch();
     await page.waitForTimeout(200);
     ok(await page.locator("#sec-ads .ads-row").count() === 1, "ads: the removed ad leaves the list");
     // GetHookd: the server finds the running ads and saves them; they join the saved list.
+    // An empty "Save an ad" form is open, as if the owner meant to paste one by hand.
+    await page.click("[data-ads-new]");
     await page.click("#sec-ads [data-hookd-go]");
     await page.waitForSelector("#sec-ads [data-hookd-sum]", { timeout: 10000 });
     const hk = (await writes()).find((b) => b.action === "ads.gethookd");
     ok(hk?.payload?.productId === "changing-robe" && hk.payload.market === "UK" && hk.payload.query === "dryrobe alternative" && hk.payload.limit === 10 && !JSON.stringify(hk).includes("gh_"),
       "gethookd: the search goes to the server with the product, market and search words, and no key", JSON.stringify(hk));
     const hsum = await page.locator("[data-hookd-sum]").innerText();
-    ok(/34 running ads in the UK match “dryrobe alternative”/.test(hsum) && /2 advertisers/.test(hsum) && /2 new saved below/.test(hsum) && /credits left: 59.96/.test(hsum),
+    ok(/34 running ads in the UK match “dryrobe alternative”/.test(hsum) && /2 advertisers/.test(hsum) && /2 new saved under Saved ads/.test(hsum) && /credits left: 59.96/.test(hsum),
       "gethookd: the result says how many ads run, from how many advertisers, how many were saved, and the credits left", hsum);
     await page.waitForFunction(() => document.querySelectorAll("#sec-ads .ads-row").length === 3, null, { timeout: 5000 }).catch(() => {});
     const listed = await page.locator("#sec-ads .list").first().innerText();
@@ -239,6 +241,10 @@ const browser = await chromium.launch();
     ok(await page.locator("#sec-ads .ads-row").count() === 3 && /Robe Co UK/.test(listed) && /Dry Ltd/.test(listed) && hookdLink === "https://app.gethookd.ai/share/ad/501?signature=abc",
       "gethookd: the ads found are listed under saved ads, each with its GetHookd link", listed);
     ok(await page.locator('#sec-ads [data-ad="22222222-bbbb-4bbb-8bbb-000000000501"] .tag.ads-long').count() === 1, "gethookd: a saved ad that has run long is marked");
+    ok(await page.locator("#adsForm").count() === 0 && await page.locator("#sec-ads .ads-row.ads-fresh .tag.ads-new").count() === 2
+      && await page.locator("#sec-ads .ads-row.ads-fresh").first().isVisible(),
+      "gethookd: the empty form closes, and the new ads are in view and marked new");
+    if (process.env.SHOTS) await page.locator("#sec-ads").screenshot({ path: `${process.env.SHOTS}/ads-gethookd.png` });
     ok(!(await writes()).some((b) => b.action === "ads.save" && /gethookd/.test(b.payload?.url || "")) && await page.locator("#sec-ads [data-hookd-save], #sec-ads [data-hookd-ad]").count() === 0,
       "gethookd: the server saves them; the page sends no saves of its own and lists them once");
     // Sweden: Swedish ads, the UK ones counted separately.
