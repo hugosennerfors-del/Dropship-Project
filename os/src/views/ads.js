@@ -3,18 +3,21 @@
 // GetHookd search that saves the ads it finds, and the saved ads with how
 // long each has been running.
 
-import { store, adsFor, saveAd, removeAd, addSavedAds, loadPref, savePref } from "../state.js";
-import { esc, attr, icon } from "../ui/dom.js";
+import { store, adsFor, saveAd, removeAd, addSavedAds, upsertSavedAds, loadPref, savePref } from "../state.js";
+import { esc, attr, icon, money, int } from "../ui/dom.js";
 import { MARKETS } from "../core/markets.js";
 import { AD_PLATFORMS, LONG_RUNNING_DAYS, adLibraryLinks, defaultAdQuery, normaliseAd, platformOf, runningDays, sortAds, adSignal } from "../core/ads.js";
+import { ESTIMATE_RANGE, assumptions, estimateAd, estimateByAdvertiser } from "../core/adrevenue.js";
 import { burstAt } from "../fx.js";
 import { liveRead, liveWrite, MCP_FIX } from "../live.js";
 
 // Per product and market: search words, the form being edited (null, "new"
 // or an ad id), its draft, and the ad whose Remove was clicked once.
 const ui = {};
-// `hookd.fresh` holds the ids the last GetHookd search added, marked "new".
-const uiFor = (pid, m) => (ui[`${pid}|${m}`] ||= { query: null, editing: null, draft: {}, error: null, armed: null, hookd: { busy: false, status: "", error: "", result: null, fresh: [] } });
+// `hookd.fresh` holds the ids the last GetHookd search added, marked "new";
+// `est` is the revenue estimate's "Update numbers" run.
+const uiFor = (pid, m) => (ui[`${pid}|${m}`] ||= { query: null, editing: null, draft: {}, error: null, armed: null, hookd: { busy: false, status: "", error: "", result: null, fresh: [] },
+  est: { busy: false, status: "", error: "", summary: null, traffic: false } });
 // One GetHookd search returns at most this many ads (about 0.01 credit each).
 const HOOKD_LIMIT = 10;
 
@@ -47,10 +50,11 @@ export function adsSection(p, m) {
         <p class="xs muted">Meta and TikTok do not let other pages show their ads, so they open on their own sites. In Meta's Ad Library each ad shows the date it started running; open its details to copy the link, then save it here.</p>
       </div></div>
     ${hookdPanel(m, u, q)}
+    ${estPanel(m, u, here)}
     <div class="panel"><div class="panel-h"><h3>Saved ads</h3><span class="sub">${here.length ? `${sig.active} running · ${sig.long} for ${LONG_RUNNING_DAYS}+ days` : "none yet"}</span>
       ${u.editing ? "" : `<button class="btn sm" type="button" data-ads-new>${icon("plus", 13)}Save an ad</button>`}</div>
       ${u.editing ? adForm(u, here.find((a) => a.id === u.editing)) : ""}
-      <div class="list">${here.map((a) => adRow(a, u)).join("") || (u.editing ? "" : '<div class="empty">No ads saved for this market yet.</div>')}</div>
+      <div class="list">${here.map((a) => adRow(a, u, m)).join("") || (u.editing ? "" : '<div class="empty">No ads saved for this market yet.</div>')}</div>
       ${elsewhere ? `<div class="panel-b xs muted" style="border-top:1px solid var(--border)">${elsewhere} more saved for ${esc(MARKETS[m === "UK" ? "SE" : "UK"]?.name || "the other market")}. Switch market at the top to see them.</div>` : ""}
     </div>
   </section>`;
@@ -93,7 +97,95 @@ async function hookdSearch(productId, market, query, onStatus, { wait = 60000, e
   throw new Error("GetHookd did not answer within a minute. Try again.");
 }
 
-function adRow(a, u) {
+// -- What their ads bring in (core/adrevenue.js) -------------------------
+// The owner's assumptions, kept per viewer.
+const estPrefs = () => assumptions(loadPref().adEstimate || {});
+const SLIDERS = [
+  ["ctr", "Click rate", (v) => `${v.toFixed(1)}%`, "of the people who see the ad, the share who click"],
+  ["cvr", "Conversion", (v) => `${v.toFixed(1)}%`, "of the visitors, the share who buy"],
+  ["frequency", "Views per person", (v) => `${v.toFixed(1)}×`, "how many times each person reached saw the ad"],
+  ["markup", "Price ÷ supplier price", (v) => `${v.toFixed(1)}×`, "the store's price over what it pays its supplier"],
+];
+const isHookd = (a) => /^https:\/\/app\.gethookd\.ai\//.test(a.url || "");
+const cur = (x, c, digits = 0) => money(x, c || "GBP", { digits });
+
+function estPanel(m, u, ads) {
+  const a = estPrefs(), e = u.est, cfg = MARKETS[m] || MARKETS.UK;
+  const live = store.live.state === "ready";
+  const s = e.summary;
+  return `<div class="panel" data-est><div class="panel-h"><h3>What their ads bring in</h3><span class="sub">an estimate from Meta's EU reach and the stores' own prices</span></div>
+    <div class="panel-b stack">
+      <div class="est-sliders">${SLIDERS.map(([k, label, show, hint]) => `<label class="est-sl" title="${attr(hint)}"><span>${esc(label)} <b data-est-val="${k}">${esc(show(a[k]))}</b></span>
+        <input type="range" data-est-in="${k}" min="${ESTIMATE_RANGE[k].min}" max="${ESTIMATE_RANGE[k].max}" step="${ESTIMATE_RANGE[k].step}" value="${a[k]}" aria-label="${attr(label)}"></label>`).join("")}</div>
+      <div class="row est-run">
+        <button class="btn sm" type="button" data-est-refresh${live && !e.busy && ads.some(isHookd) ? "" : " disabled"}>${icon("spark", 13)}${e.busy ? "Updating…" : "Update numbers"}</button>
+        <label class="row xs est-traffic"><input type="checkbox" data-est-traffic${e.traffic ? " checked" : ""}>Store traffic too (about 0.1 GetHookd credit per store)</label>
+      </div>
+      ${e.busy ? `<div class="row"><span class="thinking"><i></i><i></i><i></i></span><span class="small">${esc(e.status)}</span></div>` : ""}
+      ${e.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(e.error)}</span></div>` : ""}
+      ${s ? `<p class="xs muted" data-est-sum>Updated ${s.updated} of ${s.ads} ads and ${s.priced} prices${s.storesRead ? `, read ${s.storesRead} store${s.storesRead === 1 ? "" : "s"}' traffic (${s.usedCredits} credits)` : ""}.${s.failed?.length ? ` Not read: ${esc(s.failed[0])}` : ""}</p>` : ""}
+      <div data-est-out>${estOut(ads, a, m)}</div>
+      <p class="xs muted">How: Meta publishes reach only for the part of an ad shown in the EU. An ad shown in the UK and Ireland has its Irish reach scaled up by population; an ad shown only in the UK has no reach to start from. Reach × views per person × click rate × conversion = sales, × the store's price = revenue. What is left takes off the supplier price (price ÷ the slider) and card fees; ad cost uses the market's CPM of ${esc(money(cfg.cpm, cfg.currency))} per 1,000 views.</p>
+    </div></div>`;
+}
+
+function estOut(ads, a, m) {
+  const mine = ads.filter(isHookd);
+  if (!mine.length) return '<div class="empty">Search GetHookd above: the ads it saves carry the reach and price this needs. Ads saved by hand have none.</div>';
+  const groups = estimateByAdvertiser(mine, a, m);
+  const rows = groups.map((g) => {
+    const c = g.currency;
+    const head = `<td><b>${esc(g.advertiser || "Advertiser")}</b><small class="xs muted" style="display:block">${g.ads} ad${g.ads === 1 ? "" : "s"}${g.longest ? `, longest ${g.longest} days` : ""}</small></td>
+      <td class="r">${g.price != null ? esc(cur(g.price, c, 2)) : "—"}</td>`;
+    const store = g.storeEstimate ? `<tr class="est-store"><td colspan="7" class="xs muted">Whole store: ${esc(int(g.storeEstimate.visits))} visits in ${esc(g.store.month || "the latest month")} → about ${esc(int(g.storeEstimate.sales))} sales${g.storeEstimate.revenue != null ? ` ≈ ${esc(cur(g.storeEstimate.revenue, c))}` : ""} a month (GetHookd's traffic estimate, every product)</td></tr>` : "";
+    if (!g.estimated) {
+      return `<tr data-est-row>${head}<td colspan="5" class="xs muted">${g.outsideEu ? "Shown only outside the EU: Meta publishes no reach for these ads." : "No numbers yet: press Update numbers."}</td></tr>${store}`;
+    }
+    const mo = g.month, ok = g.money;
+    const after = ok ? mo.profitAfterAds : null;
+    return `<tr data-est-row>${head}
+      <td class="r"><b>${esc(int(mo.sales))}</b>${g.lowerBound ? " +" : ""}</td>
+      <td class="r">${ok ? esc(cur(mo.revenue, c)) : "—"}</td>
+      <td class="r">${ok ? esc(cur(mo.profitBeforeAds, c)) : "—"}</td>
+      <td class="r">${ok ? esc(cur(mo.adCost, c)) : "—"}</td>
+      <td class="r${after != null && after < 0 ? " neg" : ""}">${after != null ? esc(cur(after, c)) : "—"}</td></tr>${store}`;
+  }).join("");
+  return `<div class="tbl-wrap"><table class="tbl est-tbl"><thead><tr><th>Advertiser</th><th class="r">Price</th><th class="r">Sales a month</th><th class="r">Revenue</th><th class="r">After supplier and fees</th><th class="r">Ad cost</th><th class="r">After ads</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+// One saved ad's line in the list.
+function estAdLine(ad, a, m) {
+  if (!isHookd(ad)) return "";
+  const e = estimateAd(ad, a, m);
+  if (!e.ok) return e.reason === "outside-eu" ? "Shown only outside the EU: no reach from Meta" : "";
+  return `≈ ${int(e.reach)}${e.lowerBound ? "+" : ""} people reached → ${int(e.month.sales)} sales${e.month.revenue != null ? ` ≈ ${cur(e.month.revenue, e.currency)}` : ""} a month`;
+}
+
+function paintEstimates(root, productId, m) {
+  const a = estPrefs();
+  const ads = sortAds(adsFor(productId).filter((x) => x.market === m));
+  const out = root.querySelector("#sec-ads [data-est-out]");
+  if (out) out.innerHTML = estOut(ads, a, m);
+  for (const el of root.querySelectorAll("#sec-ads [data-est-ad]")) {
+    const ad = ads.find((x) => x.id === el.dataset.estAd);
+    el.textContent = ad ? estAdLine(ad, a, m) : "";
+  }
+}
+
+async function estRefresh(productId, market, traffic, onStatus, { wait = 90000, every = 1500 } = {}) {
+  const w = await liveWrite("ads.enrich", { productId, market, traffic });
+  for (let t = 0; t < wait; t += every) {
+    await new Promise((res) => setTimeout(res, every));
+    const x = (await liveRead({ adStatsRun: w.id }))?.adStatsRun;
+    if (x?.status === "done") return x;
+    if (x?.status === "failed") throw new Error(x.error || "The update failed.");
+    onStatus(x?.status === "running" ? "Reading the ads and the stores' prices…" : "Waiting for the server…");
+  }
+  throw new Error("The update took more than a minute and a half. Try again.");
+}
+
+function adRow(a, u, m) {
   const days = runningDays(a);
   const when = a.stillRunning === false ? '<span class="spill">stopped</span>'
     : days == null ? '<span class="spill">start date not saved</span>'
@@ -106,7 +198,7 @@ function adRow(a, u) {
   const fresh = u.hookd.fresh.includes(a.id);
   return `<div class="li ads-row${fresh ? " ads-fresh" : ""}" data-ad="${attr(a.id)}">
     <span class="ads-plat ads-${attr(a.platform)}" title="${attr(AD_PLATFORMS[a.platform] || a.platform)}">${esc(SHORT[a.platform] || a.platform)}</span>
-    <span class="body"><b>${esc(a.advertiser || host || "Ad")}</b><small>${esc(detail || host)}</small></span>
+    <span class="body"><b>${esc(a.advertiser || host || "Ad")}</b><small>${esc(detail || host)}</small>${isHookd(a) ? `<small class="est-ad" data-est-ad="${attr(a.id)}">${esc(estAdLine(a, estPrefs(), m))}</small>` : ""}</span>
     <span class="side">${fresh ? '<span class="tag ads-new" title="Added by the last GetHookd search">new</span>' : ""}${when}
       <a class="btn sm" href="${attr(a.url)}" target="_blank" rel="noopener noreferrer">Open ${icon("ext", 11)}</a>
       <button class="btn sm ghost" type="button" data-ads-edit="${attr(a.id)}">Edit</button>
@@ -158,6 +250,17 @@ export function bindAds(root, { id, rerender }) {
       savePref({ adQueries: Object.fromEntries(Object.entries({ ...pref, [id]: u.query }).slice(-50)) });
       return;
     }
+    // A slider repaints the numbers in place, so the drag is not interrupted.
+    const k = e.target.dataset?.estIn;
+    if (k) {
+      const a = assumptions({ ...estPrefs(), [k]: Number(e.target.value) });
+      savePref({ adEstimate: a });
+      const show = SLIDERS.find((s) => s[0] === k)[2];
+      const val = root.querySelector(`#sec-ads [data-est-val="${k}"]`);
+      if (val) val.textContent = show(a[k]);
+      paintEstimates(root, id, m());
+      return;
+    }
     const form = e.target.closest("#adsForm");
     if (!form) return;
     if (e.target.name === "url") {
@@ -168,6 +271,7 @@ export function bindAds(root, { id, rerender }) {
     u.draft = formData(form);
   });
   root.addEventListener("change", (e) => {
+    if (inAds(e.target) && e.target.matches?.("[data-est-traffic]")) { uiFor(id, m()).est.traffic = e.target.checked; return; }
     const form = inAds(e.target) && e.target.closest("#adsForm");
     if (!form) return;
     if (e.target.name === "platform") e.target.dataset.auto = "0";
@@ -230,6 +334,17 @@ export function bindAds(root, { id, rerender }) {
       h.busy = false; rerender();
       const first = fresh.length ? root.querySelector("#sec-ads .ads-row.ads-fresh") : null;
       if (first) { first.scrollIntoView?.({ block: "nearest" }); burstAt(first, 60); }
+      return;
+    }
+    if (t.closest("[data-est-refresh]")) {
+      const est = u.est;
+      est.busy = true; est.error = ""; est.status = "Sending…"; rerender();
+      try {
+        const run = await estRefresh(id, m(), est.traffic, (x) => { est.status = x; rerender(); });
+        upsertSavedAds(run.ads || []);
+        est.summary = run.summary || null;
+      } catch (err) { est.error = MCP_FIX[err?.code] || err?.message || "The update failed."; }
+      est.busy = false; rerender();
       return;
     }
     if (t.closest("[data-ads-new]")) { u.editing = "new"; u.draft = {}; u.error = null; rerender(); root.querySelector("#adsForm [name=url]")?.focus(); return; }

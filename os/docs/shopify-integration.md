@@ -40,7 +40,7 @@ Edge Function "intel-shopify"  (the only code that reads a token or talks to Sho
   └─ gethookd  competitors' running Meta ads from GetHookd (key from Vault)
 ```
 
-**A new write action needs two places.** `intel.api_write` routes and validates it. The code node *Förbered anrop* in the n8n workflow **Plan-vy · Intelligence-DB** must also list it in `ACTIONS`; anything not listed is refused as "Okänd åtgärd". That workflow is not in this repository, and the UI tests mock n8n, so the tests cannot catch a missing entry. `brand.names` and `ads.gethookd` were added there on 22 October 2026.
+**A new write action needs two places.** `intel.api_write` routes and validates it. The code node *Förbered anrop* in the n8n workflow **Plan-vy · Intelligence-DB** must also list it in `ACTIONS`; anything not listed is refused as "Okänd åtgärd". That workflow is not in this repository, and the UI tests mock n8n, so the tests cannot catch a missing entry. `brand.names` and `ads.gethookd` were added there on 22 October 2026, and `ads.enrich` on 25 October.
 
 Code: `src/shopify/` is shared by the page, the edge function and the tests.
 
@@ -258,10 +258,33 @@ The product page's *Ads* tab has a **GetHookd** panel. It searches GetHookd, an 
   - The panel says how many were new and how many were already there.
 - **Survey.** GetHookd asks every new connection to answer or skip a short survey before it will search. It was skipped for this account. Otherwise the panel says so.
 
+### What their ads bring in
+
+The *Ads* section estimates what competitors' saved GetHookd ads sell (`src/core/adrevenue.js`).
+
+- **Reach.**
+  - Meta publishes reach only for the part of an ad shown in the EU, under the Digital Services Act. For the UK and the US it publishes neither reach nor spend.
+  - An ad shown in the EU and elsewhere (often the UK and Ireland) has its EU reach scaled up by the population of every country it runs in.
+  - An ad shown only in the UK has no reach to start from and gets no estimate; the panel says so.
+- **Funnel.**
+  - Reach × views per person × click rate × conversion = sales. Sales × the store's price = revenue. Per month means × 30 ÷ the days the ad had run when it was checked.
+  - The owner sets the four assumptions with sliders. Defaults: 1 % click rate, 2 % conversion, 2 views per person, price 3 × the supplier price. They are kept per viewer.
+- **Money.**
+  - After supplier and fees: the price less price ÷ markup, less the market's card fees.
+  - Ad cost: impressions × the market's Meta CPM (`markets.js`). After ads: the two together.
+  - A price in another currency is shown in that currency, without an ad cost.
+- **Data.**
+  - A GetHookd search saves each ad with `metrics`: countries, EU reach, spend range, days running, landing page and GetHookd's store id.
+  - It also saves the price the store asks. `storeprice.js` reads the Shopify product's public `/products/<handle>.js` (the cheapest available variant) and `/cart.js` (the currency), on the ad's own https host only.
+- **Update numbers** (write action `ads.enrich`, edge action `adstats`, table `intel.ad_stats_runs`).
+  - Reads each of the product's saved GetHookd ads again with `get_ad`, which is free. Then it reads the prices again; a price that cannot be read keeps the one found before.
+  - With *Store traffic too*, it reads GetHookd's monthly visits for each store: about 0.1 credit per store, at most 5 a run, and each store at most once a week. The panel then shows a whole-store figure (visits × conversion × price), which covers every product the store sells.
+  - Limits: 30 runs an hour across the database.
+
 ## Tests
 
 ```
-npm test                 unit (95), Shopify (151), build, smoke, UI in Chromium (169)
+npm test                 unit (108), Shopify (165), build, smoke, UI in Chromium (175)
 npm run test:shopify     the Shopify suite on its own
 npm run shopify:schema   contract check (simulated store, or a real one with SHOPIFY_* set)
 ```
@@ -274,7 +297,8 @@ The Shopify suite runs against `mockshop.js`. It covers:
 - the pipeline: happy path, idempotent re-run, re-publish updates, conflicts, cross-brand conflicts, partial failure and retry, the time budget;
 - live publish with undo and delete, currency, scope and schema failures;
 - profit per order, the logo layout, the checklist, policy pages (plan, publish, update, undo, conflict), the FAQ (objections, prompt, page section, gap block) and the name check against a fake DNS and RDAP;
-- the GetHookd search against a fake MCP server: arguments, JSON and event-stream answers, the survey, key, credit and API errors, and saving a found ad.
+- the GetHookd search against a fake MCP server: arguments, JSON and event-stream answers, the survey, key, credit and API errors, and saving a found ad;
+- what the revenue estimate reads: EU reach and countries, `get_ad`, store traffic, and store prices from a fake Shopify store (only https product pages on a named host, one request per product and per store).
 
 The UI suite drives the page with mocked Claude and n8n:
 
@@ -290,7 +314,8 @@ The deployed edge function and SQL were also exercised end to end against a simu
 - Dev Dashboard token exchange, and intake through n8n with no saved execution;
 - a GetHookd search for "changing robe" in the UK (22 October 2026): 5 running ads from 3 advertisers, 0.05 credits. Then the same search, written and read back through the n8n workflow;
 - a search that saves what it finds, through n8n: 10 ads from 5 advertisers saved on the product, 0.1 credits. In a rolled-back transaction, a second save skipped every link, a removed ad was not saved again and a non-GetHookd link was refused;
-- a name check through the n8n workflow.
+- a name check through the n8n workflow;
+- *Update numbers* for the cordless cleaning brush (25 October 2026): 5 ads read again, 5 prices read from the stores (£15.99, £28.99, £29.99), 3 stores' traffic for 0.3 credits, in 5.5 seconds.
 
 **Not done: an end-to-end run against a real development store.** There is no store or token in this environment. Step 5 above is that check.
 

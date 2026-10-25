@@ -274,6 +274,16 @@ const ads = savedList("ads");
 export const adsFor = (productId) => store.ads.filter((a) => a.productId === productId);
 export const saveAd = (ad) => ads.save(ad);
 export const removeAd = (id) => ads.remove(id);
+// Ads the server updated (the revenue estimate's numbers): each replaces
+// the row with its id, or is added.
+export function upsertSavedAds(rows) {
+  const byId = new Map((rows || []).filter((a) => a?.id && a.productId).map((a) => [a.id, a]));
+  if (!byId.size) return 0;
+  store.ads = [...[...byId.values()].filter((a) => !store.ads.some((x) => x.id === a.id)), ...store.ads.map((x) => byId.get(x.id) || x)];
+  changed("ads");
+  return byId.size;
+}
+
 // Ads the server saved itself (a GetHookd search), as rows from the database.
 export function addSavedAds(rows) {
   const fresh = (rows || []).filter((a) => a?.id && a.productId && !store.ads.some((x) => x.id === a.id));

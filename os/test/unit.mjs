@@ -156,6 +156,40 @@ const near = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
   ok(/No ads saved/.test(A.adSignal([], today).text), "no ads: says how to find them");
 }
 
+// What competitors' ads bring in: EU reach scaled to every country, then the funnel.
+{
+  const R = await import("../src/core/adrevenue.js");
+  const metrics = (extra) => ({ source: "gethookd", countries: ["GB", "IE"], euReach: 4311, daysActive: 41, checkedAt: "2026-10-25", price: 28.99, currency: "GBP", ...extra });
+  const r = R.reachOf(metrics());
+  ok(near(r.reach, 4311 * (69.3 + 5.4) / 5.4, 1) && !r.lowerBound, "Irish reach scales to the UK and Ireland by population", JSON.stringify(r));
+  ok(R.reachOf(metrics({ countries: ["SE"], euReach: 1000 })).reach === 1000 && R.reachOf(metrics({ countries: ["SE"] })).scale === 1, "an ad shown only in the EU keeps its reach");
+  ok(R.reachOf(metrics({ countries: [] })).lowerBound && R.reachOf(metrics({ countries: ["GB", "IE", "ZZ"] })).lowerBound, "unreported or unknown countries make the reach a floor");
+  const e = R.estimateAd({ startedOn: "2026-09-15", metrics: metrics() }, R.ESTIMATE_DEFAULTS, "UK");
+  const reach = Math.round(4311 * (69.3 + 5.4) / 5.4), month = 30 / 41;
+  const sales = reach * 2 * 0.01 * 0.02;
+  ok(e.ok && near(e.month.sales, sales * month, 0.01) && near(e.month.revenue, sales * 28.99 * month, 0.05), "views × click rate × conversion × price, per month", JSON.stringify(e.month));
+  const margin = 28.99 - 28.99 / 3 - (28.99 * 0.019 + 0.2);
+  ok(near(e.marginPerSale, margin, 0.001) && near(e.supplier, 28.99 / 3, 0.001), "margin per sale: price less supplier price at 3× and card fees");
+  ok(near(e.month.adCost, (reach * 2 / 1000) * 11.81 * month, 0.05) && near(e.month.profitAfterAds, e.month.profitBeforeAds - e.month.adCost, 0.01), "ad cost at the market's CPM");
+  const strong = R.estimateAd({ metrics: metrics() }, { ctr: 2, cvr: 3, frequency: 2, markup: 3 }, "UK");
+  ok(near(strong.month.sales / e.month.sales, 3, 0.001), "doubling the click rate and 1.5× conversion triples the sales");
+  ok(R.estimateAd({ metrics: metrics({ countries: ["GB"], euReach: null }) }).reason === "outside-eu", "a UK-only ad has no measured reach");
+  ok(R.estimateAd({ url: "https://www.facebook.com/ads/library/?id=1" }).reason === "no-data", "an ad pasted by hand has nothing to estimate from");
+  const other = R.estimateAd({ metrics: metrics({ currency: "EUR" }) }, R.ESTIMATE_DEFAULTS, "UK");
+  ok(other.ok && other.month.adCost === null && other.month.revenue > 0, "a price in another currency is shown in it, without a UK ad cost");
+  const as = R.assumptions({ ctr: 99, cvr: "x", frequency: 0, markup: 4 });
+  ok(as.ctr === 5 && as.cvr === 2 && as.frequency === 1 && as.markup === 4, "assumptions are kept inside the sliders' range", JSON.stringify(as));
+  ok(near(R.estimateStore(9107, 28.99).revenue, 9107 * 0.02 * 28.99, 0.01), "a store from its monthly visits");
+  const groups = R.estimateByAdvertiser([
+    { advertiser: "Celteria", metrics: metrics() },
+    { advertiser: "Celteria", metrics: metrics({ euReach: 658 }) },
+    { advertiser: "Gbbpy UK", metrics: metrics({ countries: ["GB"], euReach: null, price: 15.99, store: { visits: 1154, month: "2026-06", checkedAt: "2026-10-25" } }) },
+    { advertiser: "Gbbpy UK", url: "https://www.facebook.com/ads/library/?id=2" },
+  ], R.ESTIMATE_DEFAULTS, "UK");
+  ok(groups[0].advertiser === "Celteria" && groups[0].estimated === 2 && groups[0].price === 28.99 && groups[1].outsideEu === 1 && groups[1].noData === 1
+    && near(groups[1].storeEstimate.sales, 1154 * 0.02, 0.001), "per advertiser: estimated ads summed, the rest counted, store traffic used", JSON.stringify(groups.map((g) => [g.advertiser, g.estimated, g.outsideEu, g.noData])));
+}
+
 // Stores selling a product and its suppliers.
 {
   const S = await import("../src/core/sourcing.js");

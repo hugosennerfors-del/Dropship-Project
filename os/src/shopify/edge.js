@@ -13,7 +13,11 @@
 //   rollback  undo a job (soft by default; delete only what it created)
 //   names     look up whether brand names are free as domains (names.js)
 //   gethookd  search GetHookd's index of Meta ads for a product and save the
-//             ads found as the product's competitor ads (gethookd.js)
+//             ads found as the product's competitor ads (gethookd.js), with
+//             the price each store asks (storeprice.js)
+//   adstats   fresh numbers for a product's saved GetHookd ads: each ad
+//             again (free), the stores' prices and, when asked, the stores'
+//             monthly visits (about 0.1 GetHookd credit per store)
 //
 // `sql` is a postgres.js client on SUPABASE_DB_URL; everything else is
 // injected so the logic stays plain JavaScript.
@@ -26,7 +30,8 @@ import { Q, SCOPES, SCOPES_FOR } from "./documents.js";
 import { createMockShop } from "./mockshop.js";
 import { SHOPIFY_API_VERSION } from "./version.js";
 import { checkNames } from "./names.js";
-import { searchAds, savedAdInput } from "./gethookd.js";
+import { searchAds, savedAdInput, getAd, getShopTraffic, hookdAdId, adMetrics } from "./gethookd.js";
+import { storePrices } from "./storeprice.js";
 
 const CORE_SCOPES = [...new Set([...SCOPES_FOR.product, ...SCOPES_FOR.collection, ...SCOPES_FOR.metaobject, ...SCOPES_FOR.page])];
 const OPTIONAL_SCOPES = [...new Set([...SCOPES_FOR.menu, ...SCOPES_FOR.publish])];
@@ -218,14 +223,73 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
     try {
       const [k] = await sql`select decrypted_secret from vault.decrypted_secrets where name = 'gethookd_api_key'`;
       const r = await searchAds({ key: k?.decrypted_secret, fetch: fetchImpl, query: row.query, market: row.market, limit: row.ad_limit });
+      const found = r.ads.filter((a) => a.shareUrl);
+      const today = new Date().toISOString().slice(0, 10);
+      // The price each store asks, for the revenue estimate. A store that
+      // does not answer only leaves its price out.
+      const priceOf = await storePrices({ fetch: fetchImpl, landingPages: found.map((a) => a.landingPage).filter(Boolean) }).catch(() => () => null);
       // Every ad with a link becomes one of the product's saved ads; links it
       // already has, saved or removed, are skipped.
-      const [{ saved }] = await sql`select intel.gethookd_save_ads(${id}, ${sql.json(r.ads.filter((a) => a.shareUrl).map(savedAdInput))}) as saved`;
+      const [{ saved }] = await sql`select intel.gethookd_save_ads(${id}, ${sql.json(found.map((a) => savedAdInput(a, { today, price: priceOf(a.landingPage) })))}) as saved`;
       const summary = { ...r.summary, added: saved?.added ?? 0, alreadySaved: saved?.known ?? 0 };
       await sql`update intel.gethookd_searches set status = 'done', results = ${sql.json(r.ads)}, summary = ${sql.json(summary)}, finished_at = now() where id = ${id}`;
       log({ event: "gethookd", id, ads: r.ads.length, added: summary.added, credits: r.summary.usedCredits });
     } catch (e) {
       await sql`update intel.gethookd_searches set status = 'failed', error = ${String(e?.message || e).slice(0, 300)}, finished_at = now() where id = ${id}`;
+    }
+  }
+
+  // -- adstats ----------------------------------------------------------
+  async function adstats(id) {
+    const [row] = await sql`update intel.ad_stats_runs set status = 'running' where id = ${id} and status = 'queued' returning *`;
+    if (!row) return;
+    try {
+      const [k] = await sql`select decrypted_secret from vault.decrypted_secrets where name = 'gethookd_api_key'`;
+      const key = k?.decrypted_secret;
+      const today = new Date().toISOString().slice(0, 10);
+      const rows = await sql`select id, url, metrics from intel.product_ads where product_id = ${row.product_id} and removed_at is null
+        and url like 'https://app.gethookd.ai/share/ad/%' order by created_at desc limit 40`;
+      const fresh = new Map(), failed = [];
+      for (let i = 0; i < rows.length; i += 4) {
+        await Promise.all(rows.slice(i, i + 4).map(async (x) => {
+          const adId = x.metrics?.adId || hookdAdId(x.url);
+          if (!adId) return;
+          try { fresh.set(x.id, await getAd({ key, fetch: fetchImpl, adId })); } catch (e) { failed.push(String(e?.message || e).slice(0, 120)); }
+        }));
+      }
+      const priceOf = await storePrices({ fetch: fetchImpl, landingPages: [...fresh.values()].map((a) => a.landingPage).filter(Boolean) });
+      // Store traffic: what earlier runs found, and with `traffic` a new
+      // reading for stores not read in the last 7 days, at most 5 a run.
+      const stores = new Map();
+      for (const x of rows) if (x.metrics?.store?.shopId) stores.set(x.metrics.store.shopId, x.metrics.store);
+      let usedCredits = 0, storesRead = 0;
+      if (row.traffic) {
+        const age = (s) => (Date.now() - Date.parse(`${s?.checkedAt}T00:00:00Z`)) / 86400000;
+        const due = [...new Set([...fresh.values()].map((a) => a.shopId).filter(Boolean))].filter((s) => !(age(stores.get(s)) < 7)).slice(0, 5);
+        for (const s of due) {
+          try { const t = await getShopTraffic({ key, fetch: fetchImpl, shopId: s, today }); stores.set(s, t.store); usedCredits += t.usedCredits || 0; storesRead++; }
+          catch (e) { failed.push(String(e?.message || e).slice(0, 120)); }
+        }
+      }
+      let updated = 0, priced = 0;
+      for (const x of rows) {
+        const ad = fresh.get(x.id);
+        if (!ad) continue;
+        const p = priceOf(ad.landingPage);
+        const ok = p && !p.error;
+        // A price that cannot be read now keeps the one found before.
+        const kept = !ok && x.metrics?.price != null ? { price: x.metrics.price, compareAt: x.metrics.compareAt ?? null, currency: x.metrics.currency ?? null, title: x.metrics.productTitle ?? null } : null;
+        const m = adMetrics(ad, { today, price: ok ? p : kept, store: ad.shopId ? stores.get(ad.shopId) || null : null });
+        if (kept) m.priceCheckedAt = x.metrics.priceCheckedAt ?? null;
+        if (ok) priced++;
+        await sql`update intel.product_ads set metrics = ${sql.json(m)}, still_running = ${ad.stillRunning}, updated_at = now() where id = ${x.id} and product_id = ${row.product_id}`;
+        updated++;
+      }
+      const summary = { ads: rows.length, updated, priced, storesRead, usedCredits: Math.round(usedCredits * 100) / 100, failed: failed.slice(0, 5) };
+      await sql`update intel.ad_stats_runs set status = 'done', summary = ${sql.json(summary)}, finished_at = now() where id = ${id}`;
+      log({ event: "adstats", id, ...summary });
+    } catch (e) {
+      await sql`update intel.ad_stats_runs set status = 'failed', error = ${String(e?.message || e).slice(0, 300)}, finished_at = now() where id = ${id}`;
     }
   }
 
@@ -242,7 +306,7 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
     try { body = await req.json(); } catch { return json(400, { error: "invalid JSON" }); }
     const { action, id } = body || {};
     if (!/^[0-9a-f-]{36}$/.test(String(id || ""))) return json(400, { error: "invalid id" });
-    const work = { test, run, rollback, names, gethookd }[action];
+    const work = { test, run, rollback, names, gethookd, adstats }[action];
     if (!work) return json(400, { error: "unknown action" });
     waitUntil(work(id).catch((e) => log({ event: action, id, crashed: String(e?.message || e).slice(0, 200), detail: redact(String(e?.stack || "")).slice(0, 400) })));
     return json(202, { accepted: true, action, id });

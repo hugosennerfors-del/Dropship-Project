@@ -19,7 +19,8 @@ import { logoLayout, logoSvg, logoSettings } from "../src/shopify/logo.js";
 import { complianceChecks, attest, productGroups, businessGaps } from "../src/shopify/compliance.js";
 import { domainLabel, domainCandidates, checkDomain, checkNames } from "../src/shopify/names.js";
 import { collectObjections, buildFaqPrompt, sanitizeFaq, faqGaps, applyFaq } from "../src/shopify/faq.js";
-import { searchAds, searchArguments, savedAdInput } from "../src/shopify/gethookd.js";
+import { searchAds, searchArguments, savedAdInput, getAd, getShopTraffic, hookdAdId } from "../src/shopify/gethookd.js";
+import { productJsUrl, readProduct, storePrice, storePrices } from "../src/shopify/storeprice.js";
 import { normaliseAd } from "../src/core/ads.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -492,6 +493,46 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   ok(await fails(fake({ errors: true, message: "invalid_arguments: geo" }), /invalid_arguments/), "GetHookd: an API error is passed on");
   let noKey = ""; try { await searchAds({ key: null, fetch: fake(good), query: "robe", market: "UK" }); } catch (e) { noKey = e.message; }
   ok(/Vault as gethookd_api_key/.test(noKey), "GetHookd: a missing key never calls the API", noKey);
+
+  // What the revenue estimate needs: countries, EU reach, the store and its price.
+  const eu = await searchAds({ key: "k", fetch: fake({ ...good, data: [row(21, "Robe Co", { countries: ["gb", "IE", "bad"], eu_total_reach: 3653, ad_spend_range_score_title: "0 - $500" })] }), query: "robe", market: "UK" });
+  const a0 = eu.ads[0];
+  ok(a0.euReach === 3653 && a0.countries.join() === "GB,IE" && a0.spendRange === "0 - $500" && a0.landingPage === "https://www.robeco.example/products/robe?utm=1" && a0.shopId === null,
+    "GetHookd: EU reach, countries, spend range and landing page are read", JSON.stringify(a0));
+  const withPrice = savedAdInput(a0, { today: "2026-10-25", price: { price: 28.99, compareAt: 57.99, currency: "GBP", title: "Robe" } });
+  ok(withPrice.metrics.source === "gethookd" && withPrice.metrics.adId === "21" && withPrice.metrics.euReach === 3653 && withPrice.metrics.daysActive === 51
+    && withPrice.metrics.price === 28.99 && withPrice.metrics.currency === "GBP" && withPrice.metrics.priceCheckedAt === "2026-10-25", "GetHookd: a saved ad carries what the estimate reads", JSON.stringify(withPrice.metrics));
+  ok(savedAdInput(a0, { today: "2026-10-25", price: { error: "no-price" } }).metrics.price === undefined, "GetHookd: a store without a price leaves the price out");
+  ok(hookdAdId("https://app.gethookd.ai/share/ad/120930758?signature=abc") === "120930758" && hookdAdId("https://app.gethookd.ai/share/ad/12x") === null && hookdAdId("https://evil.example/share/ad/1") === null, "GetHookd: the ad id comes from the share link only");
+  const one = await getAd({ key: "k", fetch: fake({ errors: false, data: row(31, "Robe Co", { status: "inactive", eu_total_reach: 10 }) }), adId: "31" });
+  ok(calls.at(-1).body.params.name === "get_ad" && calls.at(-1).body.params.arguments.ad_id === 31 && one.stillRunning === false && one.euReach === 10, "GetHookd: one ad read again with get_ad (free)");
+  const traffic = await getShopTraffic({ key: "k", fetch: fake({ errors: false, data: { points: [{ date: "2026-08-01", monthly_visits: 5744 }, { date: "2026-09-01", monthly_visits: 9107 }] }, used_credits: 0.1 }), shopId: 56302, today: "2026-10-25" });
+  ok(calls.at(-1).body.params.name === "get_shop_traffic" && traffic.store.visits === 9107 && traffic.store.month === "2026-09" && traffic.usedCredits === 0.1, "GetHookd: a store's latest monthly visits", JSON.stringify(traffic));
+}
+
+// A competitor's price, from the Shopify store its ad links to.
+{
+  const at = productJsUrl("https://celteria.com/products/8dgfdf-electric-clean?variant=1&utm=x");
+  ok(at.url === "https://celteria.com/products/8dgfdf-electric-clean.js" && at.cartUrl === "https://celteria.com/cart.js", "price: the product's .js address on the ad's own host");
+  ok(productJsUrl("https://shop.example/en-gb/collections/all/products/brush") .url === "https://shop.example/products/brush.js", "price: a product under a collection or locale path");
+  ok(["http://shop.example/products/a", "https://127.0.0.1/products/a", "https://localhost/products/a", "https://shop.example:8443/products/a", "https://shop.example/pages/about", "not a url"]
+    .every((u) => productJsUrl(u) === null), "price: only https product pages on a named host are read");
+  const p = readProduct({ title: " 8-in-1  Brush ", variants: [{ price: 3499, compare_at_price: 7999, available: true }, { price: 2999, compare_at_price: 6999, available: true }, { price: 1999, available: false }] });
+  ok(p.price === 29.99 && p.compareAt === 69.99 && p.maxPrice === 34.99 && p.title === "8-in-1 Brush" && p.variants === 3, "price: the cheapest variant a buyer can order", JSON.stringify(p));
+  ok(readProduct({ variants: [{ price: 1599, compare_at_price: null }] }).compareAt === null && readProduct({ variants: [] }) === null, "price: no compare-at price, no variants");
+  const seen = [];
+  const shop = async (url) => {
+    seen.push(url);
+    const body = url.endsWith("/cart.js") ? { currency: "GBP" } : url.includes("/products/brush.js") ? { title: "Brush", variants: [{ price: 2899, compare_at_price: 5799 }] } : null;
+    return { ok: !!body, status: body ? 200 : 404, text: async () => JSON.stringify(body) };
+  };
+  const sp = await storePrice({ fetch: shop, landingPage: "https://celteria.com/products/brush?utm=1" });
+  ok(sp.price === 28.99 && sp.compareAt === 57.99 && sp.currency === "GBP" && sp.host === "celteria.com", "price: product and currency read from the store", JSON.stringify(sp));
+  ok((await storePrice({ fetch: shop, landingPage: "https://celteria.com/products/gone" })).error === "product 404", "price: a product the store does not have");
+  seen.length = 0;
+  const priceOf = await storePrices({ fetch: shop, landingPages: ["https://celteria.com/products/brush?a=1", "https://celteria.com/products/brush?a=2", "https://www.vx-3.example/pages/robe"] });
+  ok(seen.filter((u) => u.endsWith("brush.js")).length === 1 && seen.filter((u) => u.endsWith("cart.js")).length === 1 && priceOf("https://celteria.com/products/brush?b=3").price === 28.99
+    && priceOf("https://www.vx-3.example/pages/robe") === null, "price: one request per product and per store, whatever the query string", JSON.stringify(seen));
 }
 
 // Name check: DNS first, then the registry's RDAP where IANA lists one.

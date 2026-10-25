@@ -10,7 +10,7 @@
 
 export const GETHOOKD_MCP = "https://app.gethookd.ai/api/mcp/v1";
 export const HOOKD_MAX = 20;
-export const HOOKD_FIELDS = "id,brand,title,hook,platform,countries,start_date,days_active,status,performance_score,performance_score_title,landing_page,shop_id,share_url";
+export const HOOKD_FIELDS = "id,brand,title,hook,platform,countries,start_date,days_active,status,performance_score,performance_score_title,landing_page,shop_id,share_url,eu_total_reach,ad_spend_range_score_title";
 const COUNTRY = { UK: "GB", SE: "SE" };
 
 export class HookdError extends Error {
@@ -68,9 +68,14 @@ export async function callTool({ key, fetch: fetchImpl, name, args }) {
 
 export function normaliseHookdAd(r) {
   if (!r || typeof r !== "object" || !r.id) return null;
-  let landingDomain = null;
-  try { landingDomain = r.landing_page ? new URL(r.landing_page).hostname.replace(/^www\./, "") : null; } catch { landingDomain = null; }
+  let landingDomain = null, landingPage = null;
+  try {
+    const u = r.landing_page ? new URL(r.landing_page) : null;
+    landingDomain = u ? u.hostname.replace(/^www\./, "") : null;
+    landingPage = u && u.protocol === "https:" && String(r.landing_page).length <= 500 ? u.href : null;
+  } catch { landingDomain = null; }
   const share = /^https:\/\/app\.gethookd\.ai\//.test(String(r.share_url || "")) ? String(r.share_url) : null;
+  const countries = Array.isArray(r.countries) ? [...new Set(r.countries.map((c) => String(c).toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c)))].slice(0, 40) : [];
   return {
     adId: String(r.id),
     advertiser: str(r.brand?.name, 200),
@@ -85,6 +90,12 @@ export function normaliseHookdAd(r) {
     performanceTitle: str(r.performance_score_title, 40),
     landingDomain,
     shareUrl: share,
+    landingPage,
+    shopId: num(r.shop_id),
+    countries,
+    // Meta publishes reach only for the part of an ad shown in the EU.
+    euReach: num(r.eu_total_reach),
+    spendRange: str(r.ad_spend_range_score_title, 40),
   };
 }
 
@@ -109,9 +120,22 @@ export async function searchAds({ key, fetch: fetchImpl, query, market, limit })
   return readSearch(await callTool({ key, fetch: fetchImpl, name: "search_ads", args }));
 }
 
+// What the revenue estimate (core/adrevenue.js) reads from a saved ad:
+// where it runs, its EU reach, how long it had run when checked, and the
+// price on the store it links to (storeprice.js) when that was found.
+export function adMetrics(ad, { today, price = null, store = null } = {}) {
+  return {
+    source: "gethookd", adId: ad.adId, countries: ad.countries || [], euReach: ad.euReach ?? null, spendRange: ad.spendRange ?? null,
+    performance: ad.performance ?? null, performanceTitle: ad.performanceTitle ?? null, daysActive: ad.daysActive ?? null,
+    checkedAt: today, landingPage: ad.landingPage ?? null, shopId: ad.shopId ?? null,
+    ...(price && !price.error ? { price: price.price, compareAt: price.compareAt, currency: price.currency, productTitle: price.title, priceCheckedAt: today } : {}),
+    ...(store ? { store } : {}),
+  };
+}
+
 // A found ad as the fields of a saved ad. The edge function saves these with
 // intel.gethookd_save_ads, which applies ads.save's limits.
-export function savedAdInput(ad) {
+export function savedAdInput(ad, { today = new Date().toISOString().slice(0, 10), price = null } = {}) {
   const note = [
     "GetHookd",
     ad.performanceTitle ? `performance ${ad.performanceTitle}${ad.performance != null ? ` (${ad.performance})` : ""}` : null,
@@ -119,5 +143,30 @@ export function savedAdInput(ad) {
     ad.landingDomain ? `lands on ${ad.landingDomain}` : null,
     ad.title,
   ].filter(Boolean).join(" \u00b7 ").slice(0, 1000);
-  return { url: ad.shareUrl, platform: "meta", advertiser: ad.advertiser, startedOn: ad.startedOn, stillRunning: ad.stillRunning, angle: (ad.hook || ad.title || "").slice(0, 300), note };
+  return { url: ad.shareUrl, platform: "meta", advertiser: ad.advertiser, startedOn: ad.startedOn, stillRunning: ad.stillRunning, angle: (ad.hook || ad.title || "").slice(0, 300), note,
+    metrics: adMetrics(ad, { today, price }) };
+}
+
+// GetHookd's id for a saved ad, from its share link.
+export const hookdAdId = (url) => (String(url || "").match(/^https:\/\/app\.gethookd\.ai\/share\/ad\/(\d{1,15})(?:[?#]|$)/) || [])[1] || null;
+
+// One ad, fresh: get_ad is free. Returns the same shape as a search row.
+export async function getAd({ key, fetch: fetchImpl, adId }) {
+  const json = await callTool({ key, fetch: fetchImpl, name: "get_ad", args: { ad_id: Number(adId) } });
+  if (json?.errors) throw new HookdError("api", str(json.message || json.error?.message || json.code, 300) || "GetHookd could not read the ad.");
+  const ad = normaliseHookdAd(json?.data);
+  if (!ad) throw new HookdError("format", "GetHookd returned no ad.");
+  return ad;
+}
+
+// A store's estimated monthly visits (about 0.1 credit per store).
+export async function getShopTraffic({ key, fetch: fetchImpl, shopId, today }) {
+  const json = await callTool({ key, fetch: fetchImpl, name: "get_shop_traffic", args: { shop_id: Number(shopId), window: 90 } });
+  if (json?.errors) throw new HookdError("api", str(json.message || json.error?.message || json.code, 300) || "GetHookd could not read the store's traffic.");
+  const points = (Array.isArray(json?.data?.points) ? json.data.points : []).filter((p) => num(p?.monthly_visits) != null && /^\d{4}-\d{2}/.test(String(p?.date || "")));
+  const last = points.at(-1);
+  return {
+    store: last ? { shopId: Number(shopId), visits: num(last.monthly_visits), month: String(last.date).slice(0, 7), checkedAt: today } : { shopId: Number(shopId), visits: null, month: null, checkedAt: today },
+    usedCredits: num(json?.used_credits), remainingCredits: num(json?.remaining_credits),
+  };
 }

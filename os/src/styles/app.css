@@ -571,6 +571,16 @@ button.li { border: 0; border-bottom: 1px solid var(--border); background: none;
 .tag.ads-long { background: var(--good-soft); color: var(--good); border-color: color-mix(in srgb, var(--good) 30%, transparent); }
 .tag.ads-new { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 30%, transparent); }
 .ads-row.ads-fresh { box-shadow: inset 3px 0 0 var(--accent); }
+.est-sliders { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 165px), 1fr)); gap: 10px 18px; }
+.est-sl { display: grid; gap: 4px; font-size: var(--t-sm); color: var(--fg-2); }
+.est-sl b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.est-run { flex-wrap: wrap; gap: 10px; }
+.est-traffic { gap: 6px; color: var(--fg-3); }
+.est-tbl td.r, .est-tbl th.r { font-variant-numeric: tabular-nums; }
+.est-tbl td.neg { color: var(--bad); }
+.est-tbl tr.est-store td { padding-top: 0; }
+.est-tbl tbody tr[data-est-row]:has(+ tr.est-store) td { border-bottom: 0; }
+.ads-row .est-ad { color: var(--accent); }
 .ads-row .side { flex-wrap: wrap; justify-content: flex-end; }
 .ads-form { display: grid; gap: 12px; border-bottom: 1px solid var(--border); }
 .ads-form .field input, .ads-form .field select, .ads-form .field textarea { width: 100%; }

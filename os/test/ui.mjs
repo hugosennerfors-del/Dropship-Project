@@ -113,10 +113,21 @@ const browser = await chromium.launch();
         if (body.op === "write" && body.action === "ads.gethookd") window.__hookd = body.payload;
         const hookdAd = (id, brand, days, hook) => ({ adId: String(id), advertiser: brand, brandId: id, brandActiveAds: 12, title: "Warm robe", hook, startedOn: "2026-09-01", daysActive: days,
           stillRunning: true, performance: 83, performanceTitle: "Optimized", landingDomain: "robeco.example", shareUrl: `https://app.gethookd.ai/share/ad/${id}?signature=abc` });
+        // 501 runs in the UK and Ireland (Meta reports its Irish reach); 502 only in the UK.
+        const metricsOf = (id, store) => ({ source: "gethookd", adId: String(id), countries: id === 501 ? ["GB", "IE"] : ["GB"], euReach: id === 501 ? 1000 : null, daysActive: 51,
+          checkedAt: "2026-10-22", price: 39.99, currency: "GBP", shopId: 70 + id, ...(store ? { store: { shopId: 70 + id, visits: 12000, month: "2026-09", checkedAt: "2026-10-22" } } : {}) });
         const savedRow = (id, brand, startedOn, hook) => ({ id: `22222222-bbbb-4bbb-8bbb-000000000${id}`, productId: window.__hookd?.productId, market: window.__hookd?.market, platform: "meta",
-          url: `https://app.gethookd.ai/share/ad/${id}?signature=abc`, advertiser: brand, startedOn, stillRunning: true, angle: hook, note: "GetHookd · performance Optimized (83)", createdAt: "2026-10-22T13:40:00Z", updatedAt: "2026-10-22T13:40:00Z" });
+          url: `https://app.gethookd.ai/share/ad/${id}?signature=abc`, advertiser: brand, startedOn, stillRunning: true, angle: hook, note: "GetHookd · performance Optimized (83)",
+          metrics: metricsOf(id), createdAt: "2026-10-22T13:40:00Z", updatedAt: "2026-10-22T13:40:00Z" });
         let result = body.op === "read" ? live : { ok: true };
         if (body.op === "write" && body.action === "ads.gethookd") result = { ok: true, id: "11111111-aaaa-4aaa-8aaa-000000000001" };
+        // "Update numbers": the same ads, now with the stores' traffic.
+        if (body.op === "write" && body.action === "ads.enrich") { window.__enrich = body.payload; result = { ok: true, id: "33333333-cccc-4ccc-8ccc-000000000001" }; }
+        if (body.op === "read" && body.params?.adStatsRun) {
+          live.ads = live.ads.map((a) => (/gethookd/.test(a.url) ? { ...a, metrics: metricsOf(Number(a.url.match(/ad\/(\d+)/)[1]), true) } : a));
+          result = { ok: true, adStatsRun: { id: body.params.adStatsRun, status: "done", summary: { ads: 2, updated: 2, priced: 2, storesRead: 2, usedCredits: 0.2, failed: [] },
+            ads: live.ads.filter((a) => a.productId === window.__enrich?.productId) } };
+        }
         if (body.op === "read" && body.params?.gethookdSearch) {
           const savedAds = [savedRow(501, "Robe Co UK", "2026-09-01", "Change in seconds on any beach"), savedRow(502, "Dry Ltd", "2026-10-18", "The robe swimmers swear by")];
           live.ads = [...savedAds.filter((a) => !live.ads.some((x) => x.id === a.id)), ...live.ads];
@@ -245,6 +256,27 @@ const browser = await chromium.launch();
       && await page.locator("#sec-ads .ads-row.ads-fresh").first().isVisible(),
       "gethookd: the empty form closes, and the new ads are in view and marked new");
     if (process.env.SHOTS) await page.locator("#sec-ads").screenshot({ path: `${process.env.SHOTS}/ads-gethookd.png` });
+    // What their ads bring in: Irish reach scaled to the UK and Ireland, then the funnel.
+    const estRows = () => page.locator("#sec-ads [data-est-out] tr[data-est-row]").allInnerTexts();
+    let est = await estRows();
+    ok(est.length === 2 && /Robe Co UK/.test(est[0]) && /£39\.99/.test(est[0]) && /£130/.test(est[0]) && /Dry Ltd/.test(est[1]) && /only outside the EU/.test(est[1]),
+      "estimate: the ad with EU reach is worked out per month at the store's price; the UK-only one says why it is not", JSON.stringify(est));
+    const line = await page.locator('#sec-ads [data-est-ad="22222222-bbbb-4bbb-8bbb-000000000501"]').innerText();
+    ok(/13,833 people reached → 3 sales ≈ £130 a month/.test(line), "estimate: each saved ad shows its own line", line);
+    await page.locator('#sec-ads [data-est-in="ctr"]').fill("2");
+    est = await estRows();
+    ok(/£260/.test(est[0]) && await page.locator('#sec-ads [data-est-val="ctr"]').innerText() === "2.0%" && await page.locator('#sec-ads [data-est-in="ctr"]').count() === 1,
+      "estimate: doubling the click rate doubles the revenue, in place", JSON.stringify(est));
+    await page.locator('#sec-ads [data-est-in="ctr"]').fill("1");
+    await page.check("#sec-ads [data-est-traffic]");
+    await page.click("#sec-ads [data-est-refresh]");
+    await page.waitForSelector("#sec-ads [data-est-sum]", { timeout: 10000 });
+    const en = await page.evaluate(() => window.__enrich);
+    ok(en?.productId === "changing-robe" && en.market === "UK" && en.traffic === true, "estimate: Update numbers asks the server, with store traffic when ticked", JSON.stringify(en));
+    const storeLine = await page.locator("#sec-ads [data-est-out] tr.est-store").first().innerText();
+    ok(/Updated 2 of 2 ads and 2 prices, read 2 stores' traffic \(0\.2 credits\)/.test(await page.locator("[data-est-sum]").innerText()) && /Whole store: 12,000 visits in 2026-09 → about 240 sales ≈ £9,598 a month/.test(storeLine),
+      "estimate: the stores' traffic gives a whole-store figure", storeLine);
+    if (process.env.SHOTS) await page.locator("#sec-ads [data-est]").screenshot({ path: `${process.env.SHOTS}/ads-estimate.png` });
     ok(!(await writes()).some((b) => b.action === "ads.save" && /gethookd/.test(b.payload?.url || "")) && await page.locator("#sec-ads [data-hookd-save], #sec-ads [data-hookd-ad]").count() === 0,
       "gethookd: the server saves them; the page sends no saves of its own and lists them once");
     // Sweden: Swedish ads, the UK ones counted separately.
