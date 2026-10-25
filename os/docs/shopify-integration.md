@@ -276,15 +276,17 @@ The *Ads* section estimates what competitors' saved GetHookd ads sell (`src/core
 - **Data.**
   - A GetHookd search saves each ad with `metrics`: countries, EU reach, spend range, days running, landing page and GetHookd's store id.
   - It also saves the price the store asks. `storeprice.js` reads the Shopify product's public `/products/<handle>.js` (the cheapest available variant) and `/cart.js` (the currency), on the ad's own https host only.
+  - An ad that links to a collection (`/collections/<handle>`, not `/collections/all`) is priced from `/collections/<handle>/products.json`: the first product in the store's own order, with the range of the first ten in its title. The table marks it *first in collection*. A median would be pulled down by cheaper sizes, such as children's robes in a robe collection.
 - **Update numbers** (write action `ads.enrich`, edge action `adstats`, table `intel.ad_stats_runs`).
   - Reads each of the product's saved GetHookd ads again with `get_ad`, which is free. Then it reads the prices again; a price that cannot be read keeps the one found before.
   - With *Store traffic too*, it reads GetHookd's monthly visits for each store: about 0.1 credit per store, at most 5 a run, and each store at most once a week. The panel then shows a whole-store figure (visits × conversion × price), which covers every product the store sells.
   - Limits: 30 runs an hour across the database.
+  - GetHookd answers 429 when too many calls arrive at once (two runs at the same time did it). `callTool` then waits for Retry-After (at most 5 s) or 1, 2 and 4 s, and tries again at most 3 times. An ad it still cannot read keeps its earlier numbers.
 
 ## Tests
 
 ```
-npm test                 unit (108), Shopify (165), build, smoke, UI in Chromium (175)
+npm test                 unit (108), Shopify (169), build, smoke, UI in Chromium (175)
 npm run test:shopify     the Shopify suite on its own
 npm run shopify:schema   contract check (simulated store, or a real one with SHOPIFY_* set)
 ```

@@ -136,7 +136,7 @@ function estOut(ads, a, m) {
   const rows = groups.map((g) => {
     const c = g.currency;
     const head = `<td><b>${esc(g.advertiser || "Advertiser")}</b><small class="xs muted" style="display:block">${g.ads} ad${g.ads === 1 ? "" : "s"}${g.longest ? `, longest ${g.longest} days` : ""}</small></td>
-      <td class="r">${g.price != null ? esc(cur(g.price, c, 2)) : "—"}</td>`;
+      <td class="r">${g.price != null ? `${esc(cur(g.price, c, 2))}${g.priceFrom === "collection" ? '<small class="xs muted" style="display:block" title="The ad links to a collection: the price of its first product, in the store\'s own order">first in collection</small>' : ""}` : "—"}</td>`;
     const store = g.storeEstimate ? `<tr class="est-store"><td colspan="7" class="xs muted">Whole store: ${esc(int(g.storeEstimate.visits))} visits in ${esc(g.store.month || "the latest month")} → about ${esc(int(g.storeEstimate.sales))} sales${g.storeEstimate.revenue != null ? ` ≈ ${esc(cur(g.storeEstimate.revenue, c))}` : ""} a month (GetHookd's traffic estimate, every product)</td></tr>` : "";
     if (!g.estimated) {
       return `<tr data-est-row>${head}<td colspan="5" class="xs muted">${g.outsideEu ? "Shown only outside the EU: Meta publishes no reach for these ads." : "No numbers yet: press Update numbers."}</td></tr>${store}`;

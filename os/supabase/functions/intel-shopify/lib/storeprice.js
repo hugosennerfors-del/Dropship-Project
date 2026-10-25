@@ -1,29 +1,56 @@
 // The price a competitor's store asks for the product its ad links to.
 //
 // Shopify stores answer /products/<handle>.js with the product and its
-// variants (prices in the store's minor unit, so 1599 is 15.99) and
-// /cart.js with the currency the store sells in. Only those two public JSON
-// addresses are read, on the ad's own https host; anything that is not a
-// Shopify product page gives no price. The lowest price of an available
-// variant is the one a buyer of one unit pays.
+// variants (prices in the store's minor unit, so 1599 is 15.99),
+// /collections/<handle>/products.json with a collection's products (prices
+// as decimals) and /cart.js with the currency the store sells in. Only
+// those public JSON addresses are read, on the ad's own https host;
+// anything that is not a Shopify product or collection page gives no
+// price. For a product, the lowest price of an available variant is the
+// one a buyer of one unit pays. For a collection, its first product's
+// price stands for it: a collection lists products in the store's own
+// order, which puts what it promotes first, whereas a median is pulled
+// down by cheaper sizes (a robe collection with children's robes).
 //
 // `fetch` is injected: the edge function passes the real one, tests a fake.
 
 const HOST = /^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
+// Letters and digits in any script, combining marks and signs such as \u00ae and \u2122
+// (a handle like "retropia\u00ae-retro-flash"); encodeURIComponent escapes them.
+const HANDLE = /^[\p{L}\p{N}\p{M}\p{So}._-]{1,255}$/u;
 const MAX_BYTES = 2_000_000;
+const COLLECTION_PRODUCTS = 10;
 
-// The product's .js address and the store's cart.js, or null.
+// Where the price is read for a landing page, and the store's cart.js, or null.
 export function productJsUrl(landingPage) {
   let u;
   try { u = new URL(String(landingPage || "")); } catch { return null; }
   if (u.protocol !== "https:" || u.port || u.username || !HOST.test(u.hostname)) return null;
-  const m = u.pathname.match(/\/products\/([^/?#]+)/);
-  if (!m) return null;
-  let handle;
-  try { handle = decodeURIComponent(m[1]).replace(/\.(js|json)$/, ""); } catch { return null; }
-  if (!/^[\p{L}\p{N}._-]{1,255}$/u.test(handle)) return null;
   const host = u.hostname.toLowerCase();
-  return { host, handle, url: `https://${host}/products/${encodeURIComponent(handle)}.js`, cartUrl: `https://${host}/cart.js` };
+  const handleOf = (m) => { try { const h = decodeURIComponent(m[1]).replace(/\.(js|json)$/, ""); return HANDLE.test(h) ? h : null; } catch { return null; } };
+  const cartUrl = `https://${host}/cart.js`;
+  const p = u.pathname.match(/\/products\/([^/?#]+)/);
+  if (p) {
+    const handle = handleOf(p);
+    return handle ? { kind: "product", host, handle, url: `https://${host}/products/${encodeURIComponent(handle)}.js`, cartUrl } : null;
+  }
+  const c = u.pathname.match(/\/collections\/([^/?#]+)\/?$/);
+  const handle = c && handleOf(c);
+  return handle && handle !== "all" ? { kind: "collection", host, handle, url: `https://${host}/collections/${encodeURIComponent(handle)}/products.json?limit=${COLLECTION_PRODUCTS}`, cartUrl } : null;
+}
+
+// { title, price, compareAt, maxPrice, variants } for a collection: its
+// first product's lowest available price, with the range in the title.
+export function readCollection(j, handle) {
+  const lows = (Array.isArray(j?.products) ? j.products : []).map((p) => {
+    const vs = (Array.isArray(p?.variants) ? p.variants : []).filter((v) => Number.isFinite(Number(v?.price)) && Number(v.price) > 0);
+    const pool = vs.filter((v) => v.available !== false);
+    return (pool.length ? pool : vs).reduce((min, v) => Math.min(min, Number(v.price)), Infinity);
+  }).filter(Number.isFinite);
+  if (!lows.length) return null;
+  const lo = Math.min(...lows), hi = Math.max(...lows);
+  return { title: `Collection \u201c${handle}\u201d: first of ${lows.length} product${lows.length === 1 ? "" : "s"}${lo !== hi ? ` (${lo}\u2013${hi})` : ""}`,
+    price: Math.round(lows[0] * 100) / 100, compareAt: null, maxPrice: hi, variants: lows.length, from: "collection" };
 }
 
 async function getJson(fetchImpl, url, timeoutMs) {
@@ -55,6 +82,7 @@ export function readProduct(p) {
     compareAt: Number.isFinite(compare) && compare > Number(cheapest.price) ? cents(compare) : null,
     maxPrice: cents(Math.max(...pool.map((v) => Number(v.price)))),
     variants: variants.length,
+    from: "product",
   };
 }
 
@@ -62,8 +90,8 @@ export async function storePrice({ fetch: fetchImpl, landingPage, timeoutMs = 80
   const at = productJsUrl(landingPage);
   if (!at) return { error: "not-a-product-page" };
   const r = await getJson(fetchImpl, at.url, timeoutMs);
-  if (!r.json) return { error: `product ${r.status}` };
-  const product = readProduct(r.json);
+  if (!r.json) return { error: `${at.kind} ${r.status}` };
+  const product = at.kind === "collection" ? readCollection(r.json, at.handle) : readProduct(r.json);
   if (!product) return { error: "no-price" };
   // One cart.js per store; `currencies` caches it across the ads of a search.
   if (!currencies.has(at.host)) {

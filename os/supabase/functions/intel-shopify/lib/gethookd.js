@@ -33,19 +33,27 @@ export function searchArguments({ query, market, limit = 10 }) {
 }
 
 // One tool call. Returns the JSON block of the answer (GetHookd sends one
-// JSON text block, then a text card and images per ad).
-export async function callTool({ key, fetch: fetchImpl, name, args }) {
+// JSON text block, then a text card and images per ad). A 429 (too many
+// calls at once) is tried again after a pause, at most `retries` times: a
+// refused call has not been run, so nothing is billed twice.
+export async function callTool({ key, fetch: fetchImpl, name, args, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), retries = 3, random = Math.random }) {
   if (!key) throw new HookdError("config", "GetHookd is not connected: save the API key in Supabase Vault as gethookd_api_key.");
   let res;
-  try {
-    res = await fetchImpl(GETHOOKD_MCP, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
-      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
-    });
-  } catch (e) {
-    throw new HookdError("network", `GetHookd could not be reached (${String(e?.message || e).slice(0, 120)}).`);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await fetchImpl(GETHOOKD_MCP, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", Accept: "application/json, text/event-stream" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
+      });
+    } catch (e) {
+      throw new HookdError("network", `GetHookd could not be reached (${String(e?.message || e).slice(0, 120)}).`);
+    }
+    if (res.status !== 429 || attempt >= retries) break;
+    const after = Number(res.headers?.get?.("retry-after"));
+    await sleep(after > 0 ? Math.min(5, after) * 1000 : 1000 * 2 ** attempt * (0.75 + random() * 0.5));
   }
+  if (res.status === 429) throw new HookdError("busy", "GetHookd answered 429 (too many calls at once) several times; try again in a minute.");
   if (res.status === 401) throw new HookdError("auth", "GetHookd did not accept the API key. Create a new key in GetHookd and save it in Supabase Vault as gethookd_api_key.");
   if (res.status === 402) throw new HookdError("credits", "The GetHookd account has run out of credits.");
   if (res.status === 403) throw new HookdError("scope", "The GetHookd key is not allowed to search ads.");
@@ -128,7 +136,7 @@ export function adMetrics(ad, { today, price = null, store = null } = {}) {
     source: "gethookd", adId: ad.adId, countries: ad.countries || [], euReach: ad.euReach ?? null, spendRange: ad.spendRange ?? null,
     performance: ad.performance ?? null, performanceTitle: ad.performanceTitle ?? null, daysActive: ad.daysActive ?? null,
     checkedAt: today, landingPage: ad.landingPage ?? null, shopId: ad.shopId ?? null,
-    ...(price && !price.error ? { price: price.price, compareAt: price.compareAt, currency: price.currency, productTitle: price.title, priceCheckedAt: today } : {}),
+    ...(price && !price.error ? { price: price.price, compareAt: price.compareAt, currency: price.currency, productTitle: price.title, priceFrom: price.from || "product", priceCheckedAt: today } : {}),
     ...(store ? { store } : {}),
   };
 }

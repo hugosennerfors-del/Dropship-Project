@@ -19,8 +19,8 @@ import { logoLayout, logoSvg, logoSettings } from "../src/shopify/logo.js";
 import { complianceChecks, attest, productGroups, businessGaps } from "../src/shopify/compliance.js";
 import { domainLabel, domainCandidates, checkDomain, checkNames } from "../src/shopify/names.js";
 import { collectObjections, buildFaqPrompt, sanitizeFaq, faqGaps, applyFaq } from "../src/shopify/faq.js";
-import { searchAds, searchArguments, savedAdInput, getAd, getShopTraffic, hookdAdId } from "../src/shopify/gethookd.js";
-import { productJsUrl, readProduct, storePrice, storePrices } from "../src/shopify/storeprice.js";
+import { searchAds, searchArguments, savedAdInput, getAd, getShopTraffic, hookdAdId, callTool } from "../src/shopify/gethookd.js";
+import { productJsUrl, readProduct, readCollection, storePrice, storePrices } from "../src/shopify/storeprice.js";
 import { normaliseAd } from "../src/core/ads.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -508,6 +508,14 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   ok(calls.at(-1).body.params.name === "get_ad" && calls.at(-1).body.params.arguments.ad_id === 31 && one.stillRunning === false && one.euReach === 10, "GetHookd: one ad read again with get_ad (free)");
   const traffic = await getShopTraffic({ key: "k", fetch: fake({ errors: false, data: { points: [{ date: "2026-08-01", monthly_visits: 5744 }, { date: "2026-09-01", monthly_visits: 9107 }] }, used_credits: 0.1 }), shopId: 56302, today: "2026-10-25" });
   ok(calls.at(-1).body.params.name === "get_shop_traffic" && traffic.store.visits === 9107 && traffic.store.month === "2026-09" && traffic.usedCredits === 0.1, "GetHookd: a store's latest monthly visits", JSON.stringify(traffic));
+
+  // Too many calls at once: paused and tried again, then a clear error.
+  const waits = [];
+  const busyThen = (n) => { let left = n; return async (url, init) => (left-- > 0 ? { status: 429, ok: false, headers: { get: (h) => (h === "retry-after" && left === n - 1 ? "30" : null) }, text: async () => "" } : fake({ errors: false, data: row(41, "Robe Co") })(url, init)); };
+  const again = await callTool({ key: "k", fetch: busyThen(2), name: "get_ad", args: { ad_id: 41 }, sleep: async (ms) => { waits.push(ms); }, random: () => 0.5 });
+  ok(again.data.id === 41 && waits.join() === "5000,2000", "GetHookd: a 429 is tried again after Retry-After (at most 5 s) or a growing pause", waits.join());
+  let busy = ""; try { await callTool({ key: "k", fetch: busyThen(9), name: "get_ad", args: {}, sleep: async () => {} }); } catch (e) { busy = e.kind; }
+  ok(busy === "busy", "GetHookd: still refused after 3 retries, the call fails as busy");
 }
 
 // A competitor's price, from the Shopify store its ad links to.
@@ -515,8 +523,15 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   const at = productJsUrl("https://celteria.com/products/8dgfdf-electric-clean?variant=1&utm=x");
   ok(at.url === "https://celteria.com/products/8dgfdf-electric-clean.js" && at.cartUrl === "https://celteria.com/cart.js", "price: the product's .js address on the ad's own host");
   ok(productJsUrl("https://shop.example/en-gb/collections/all/products/brush") .url === "https://shop.example/products/brush.js", "price: a product under a collection or locale path");
-  ok(["http://shop.example/products/a", "https://127.0.0.1/products/a", "https://localhost/products/a", "https://shop.example:8443/products/a", "https://shop.example/pages/about", "not a url"]
-    .every((u) => productJsUrl(u) === null), "price: only https product pages on a named host are read");
+  ok(["http://shop.example/products/a", "https://127.0.0.1/products/a", "https://localhost/products/a", "https://shop.example:8443/products/a", "https://shop.example/pages/about", "https://shop.example/collections/all", "not a url"]
+    .every((u) => productJsUrl(u) === null), "price: only https product and collection pages on a named host are read");
+  ok(productJsUrl("https://retro.example/products/retropia%C2%AE-retro-flash").url === "https://retro.example/products/retropia%C2%AE-retro-flash.js"
+    && productJsUrl("https://retro.example/products/a%3Cb") === null,"price: a handle with ® is read, one with < is not");
+  const col = productJsUrl("https://red.example/collections/pro-change-robe-evo?utm=1");
+  ok(col.kind === "collection" && col.url === "https://red.example/collections/pro-change-robe-evo/products.json?limit=10", "price: a collection page reads the collection's products", JSON.stringify(col));
+  const first = readCollection({ products: [{ variants: [{ price: "159.95" }] }, { variants: [{ price: "64.95" }] }, { variants: [{ price: "64.95" }] }, { variants: [{ price: "189.00", available: false }, { price: "159.95" }] }] }, "robes");
+  ok(first.price === 159.95 && first.from === "collection" && first.variants === 4 && /first of 4 products \(64\.95–159\.95\)/.test(first.title),
+    "price: a collection stands at its first product's price, not one pulled down by cheaper sizes", JSON.stringify(first));
   const p = readProduct({ title: " 8-in-1  Brush ", variants: [{ price: 3499, compare_at_price: 7999, available: true }, { price: 2999, compare_at_price: 6999, available: true }, { price: 1999, available: false }] });
   ok(p.price === 29.99 && p.compareAt === 69.99 && p.maxPrice === 34.99 && p.title === "8-in-1 Brush" && p.variants === 3, "price: the cheapest variant a buyer can order", JSON.stringify(p));
   ok(readProduct({ variants: [{ price: 1599, compare_at_price: null }] }).compareAt === null && readProduct({ variants: [] }) === null, "price: no compare-at price, no variants");

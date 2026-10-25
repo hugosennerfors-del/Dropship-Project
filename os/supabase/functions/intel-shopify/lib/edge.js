@@ -278,7 +278,7 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
         const p = priceOf(ad.landingPage);
         const ok = p && !p.error;
         // A price that cannot be read now keeps the one found before.
-        const kept = !ok && x.metrics?.price != null ? { price: x.metrics.price, compareAt: x.metrics.compareAt ?? null, currency: x.metrics.currency ?? null, title: x.metrics.productTitle ?? null } : null;
+        const kept = !ok && x.metrics?.price != null ? { price: x.metrics.price, compareAt: x.metrics.compareAt ?? null, currency: x.metrics.currency ?? null, title: x.metrics.productTitle ?? null, from: x.metrics.priceFrom } : null;
         const m = adMetrics(ad, { today, price: ok ? p : kept, store: ad.shopId ? stores.get(ad.shopId) || null : null });
         if (kept) m.priceCheckedAt = x.metrics.priceCheckedAt ?? null;
         if (ok) priced++;
