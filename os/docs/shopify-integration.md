@@ -40,7 +40,7 @@ Edge Function "intel-shopify"  (the only code that reads a token or talks to Sho
   └─ gethookd  competitors' running Meta ads from GetHookd (key from Vault)
 ```
 
-**A new write action needs two places.** `intel.api_write` routes and validates it. The code node *Förbered anrop* in the n8n workflow **Plan-vy · Intelligence-DB** must also list it in `ACTIONS`; anything not listed is refused as "Okänd åtgärd". That workflow is not in this repository, and the UI tests mock n8n, so the tests cannot catch a missing entry. `brand.names` and `ads.gethookd` were added there on 22 October 2026, and `ads.enrich` on 25 October.
+**A new write action needs two places.** `intel.api_write` routes and validates it. The code node *Förbered anrop* in the n8n workflow **Plan-vy · Intelligence-DB** must also list it in `ACTIONS`; anything not listed is refused as "Okänd åtgärd". That workflow is not in this repository, and the UI tests mock n8n, so the tests cannot catch a missing entry. `brand.names` and `ads.gethookd` were added there on 22 October 2026, `ads.enrich` on 25 October, and `ads.clone`, `ads.clone.save`, `ads.clone.retry` and `ads.clone.remove` on 26 October.
 
 Code: `src/shopify/` is shared by the page, the edge function and the tests.
 
@@ -284,10 +284,35 @@ The *Ads* section estimates what competitors' saved GetHookd ads sell (`src/core
   - Limits: 30 runs an hour across the database.
   - GetHookd answers 429 when too many calls arrive at once (two runs at the same time did it). `callTool` then waits for Retry-After (at most 5 s) or 1, 2 and 4 s, and tries again at most 3 times. An ad it still cannot read keeps its earlier numbers.
 
+### Copy an ad
+
+A saved GetHookd ad has a **Copy** button. It makes our own version of the ad for review on the page; nothing is published (`src/shopify/clone.js`, migration `20261026220000_intel_ad_clones.sql`).
+
+- **The form** sets the image model, the format (1:1, 9:16 or 3:4; GetHookd refuses 4:5) and 1 to 4 images, and shows the most it can cost before anything is spent.
+- **Images.** GetHookd's `create_clone_ad` makes new images from the ad's image, or a video's poster frame.
+  - Cost: one public-API unit (0.01 credit) now, plus the model's credits for each image delivered. Nano Banana 2 costs 1 credit an image; Nano Banana Pro and GPT Image 2 cost 2 (`list_clone_ad_models`, 26 October 2026). Images that do not arrive are not charged.
+  - The edge function (action `clone`) works in steps, each under a lease:
+    1. Read the original with `get_ad` (free) and keep its words and thumbnail.
+    2. Check the model is still offered (free), then start the copy.
+    3. Poll `get_clone_ad` every 15 s; each poll costs one unit (0.01 credit). A failed read is tried again at the next poll.
+    4. Download each image and keep a JPEG of at most 480 px, one per invocation.
+  - The page cannot load images from other sites, and GetHookd's links expire after about a day. So the small copies are kept in `intel.ad_clones.images` as base64, made with ImageScript's Deno build (`deno.land/x/imagescript@1.3.0`, TypeScript and WebAssembly; the npm build loads native addons). *Full size* links to GetHookd's image while its link lasts.
+- **Text.** *Write our text with Claude* (the page's `sample` capability, `runAdCopy` in `src/agents/index.js`) writes:
+  - 3 hooks, a primary text, a headline, a description, a button and a 15-second video script;
+  - what it kept from the original, what it changed, and what to check before use.
+  - It gets the original's hook, body, button and spoken words. It is told not to reuse the competitor's sentences, names or offer, and not to claim anything the product data does not back.
+  - The text is saved at once. The owner edits it and saves it as approved or rejected.
+- **Actions.**
+  - `ads.clone` starts a copy (at most 6 an hour and 20 a day, one at a time per ad).
+  - `ads.clone.save` saves the text and the review.
+  - `ads.clone.retry` looks again at a copy that stopped after GetHookd started it; it costs polls only, never a new copy.
+  - `ads.clone.remove` hides a copy from the page; GetHookd keeps it.
+- **Reads.** `{adClones: productId}` lists a product's copies without images; `{adClone: id}` returns one with its images.
+
 ## Tests
 
 ```
-npm test                 unit (108), Shopify (169), build, smoke, UI in Chromium (175)
+npm test                 unit (113), Shopify (185), build, smoke, UI in Chromium (186)
 npm run test:shopify     the Shopify suite on its own
 npm run shopify:schema   contract check (simulated store, or a real one with SHOPIFY_* set)
 ```
@@ -319,6 +344,7 @@ The deployed edge function and SQL were also exercised end to end against a simu
 - a search that saves what it finds, through n8n: 10 ads from 5 advertisers saved on the product, 0.1 credits. In a rolled-back transaction, a second save skipped every link, a removed ad was not saved again and a non-GetHookd link was refused;
 - a name check through the n8n workflow;
 - *Update numbers* for the cordless cleaning brush (25 October 2026): 5 ads read again, 5 prices read from the stores (£15.99, £28.99, £29.99), 3 stores' traffic for 0.3 credits, in 5.5 seconds.
+- *Copy ad*, the image step only (26 October 2026, edge v15): a 2.8 MB PNG from an earlier GetHookd copy became a 270 × 480 JPEG of 39 KB in 2.4 seconds, and both reads returned it. No credits were spent. The steps that start a copy and poll it have not run against GetHookd yet; the functions they call are tested against a fake MCP server.
 
 **Not done: an end-to-end run against a real development store.** There is no store or token in this environment. Step 5 above is that check.
 

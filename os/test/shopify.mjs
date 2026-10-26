@@ -20,6 +20,8 @@ import { complianceChecks, attest, productGroups, businessGaps } from "../src/sh
 import { domainLabel, domainCandidates, checkDomain, checkNames } from "../src/shopify/names.js";
 import { collectObjections, buildFaqPrompt, sanitizeFaq, faqGaps, applyFaq } from "../src/shopify/faq.js";
 import { searchAds, searchArguments, savedAdInput, getAd, getShopTraffic, hookdAdId, callTool } from "../src/shopify/gethookd.js";
+import { cloneArguments, cloneCost, readStart, readClone, readSource, fetchImage, checkModel } from "../src/shopify/clone.js";
+import { sanitizeAdCopy } from "../src/agents/index.js";
 import { productJsUrl, readProduct, readCollection, storePrice, storePrices } from "../src/shopify/storeprice.js";
 import { normaliseAd } from "../src/core/ads.js";
 
@@ -516,6 +518,41 @@ const job = (id, options = {}, brand = "tidewarm") => { JOB_BRAND[id] = brand; r
   ok(again.data.id === 41 && waits.join() === "5000,2000", "GetHookd: a 429 is tried again after Retry-After (at most 5 s) or a growing pause", waits.join());
   let busy = ""; try { await callTool({ key: "k", fetch: busyThen(9), name: "get_ad", args: {}, sleep: async () => {} }); } catch (e) { busy = e.kind; }
   ok(busy === "busy", "GetHookd: still refused after 3 retries, the call fails as busy");
+
+  // Copying an ad: create_clone_ad, then get_clone_ad until the images exist.
+  const args = cloneArguments({ adId: "181071146", model: "nano-banana-2", aspect: "9:16", variations: 2, market: "SE" });
+  ok(args.ad_id === 181071146 && args.model_slug === "nano-banana-2" && args.aspect_ratio === "Portrait (9:16)" && args.variations_count === 2 && args.language === "Swedish",
+    "copy: the ad, model, GetHookd's own aspect label and the language name are sent", JSON.stringify(args));
+  const bad = (x) => { try { cloneArguments({ adId: 1, model: "nano-banana-2", aspect: "1:1", variations: 1, market: "UK", ...x }); return false; } catch (e) { return e.kind === "input"; } };
+  ok(bad({ aspect: "4:5" }) && bad({ variations: 5 }) && bad({ variations: 0 }) && bad({ model: "dall-e" }) && bad({ adId: "x" }), "copy: 4:5, more than 4 images, an unknown model or no ad id are refused before any call");
+  ok(cloneCost("nano-banana-2", 2) === 2.01 && cloneCost("nano-banana-pro", 3) === 6.01 && cloneCost("x", 1) === null, "copy: the most it costs is one unit now and the model's credits per image");
+  const started = readStart({ errors: false, data: { id: 20931, prompts: [] }, billing: { immediate_used_credits: 0.01, total_expected_used_credits: 2.01 }, remaining_credits: 67.8 });
+  ok(started.cloneId === 20931 && started.billing.now === 0.01 && started.billing.atMost === 2.01 && started.billing.remaining === 67.8, "copy: the generation id and the billing GetHookd reports", JSON.stringify(started));
+  const media = (id, role, url = `https://static-gp.gethookd.ai/media/generated-images/1/AI-${id}.png?Expires=1&Signature=x`) => ({ id, role, url });
+  const waiting = readClone({ errors: false, data: { prompts: [{ status: "in_progress", media: [media(1, "reference")] }] } });
+  ok(waiting.status === "in_progress" && waiting.images.length === 0, "copy: in progress while a prompt is");
+  const doneC = readClone({ errors: false, data: { prompts: [{ status: "completed", missing_variations: 1, media: [media(1, "reference"), media(2, "generated"), media(3, "generated", "https://evil.example/x.png")] }] }, remaining_credits: 66.8 });
+  ok(doneC.status === "completed" && doneC.images.length === 1 && doneC.images[0].mediaId === 2 && doneC.missing === 1 && doneC.remaining === 66.8,
+    "copy: only generated images on GetHookd's host are kept, and missing ones are counted", JSON.stringify(doneC));
+  const failedC = readClone({ errors: false, data: { prompts: [{ status: "failed", error: "Safety filter", media: [] }] } });
+  ok(failedC.status === "failed" && failedC.error === "Safety filter", "copy: a failed generation carries GetHookd's reason");
+  const src = readSource({ errors: false, data: { brand: { name: "Callie Gifts" }, hook: "Wait, it has my name on it?", body: "Cute  tote", cta_text: "Shop now", link_description: "Gift",
+    transcripts: [{ content: "Wait, it has my name on it?" }], asset_type: "carousel", primary_image_url: "https://app.gethookd.ai/api/v1/media/1/2/download?variant=thumbnail&signature=x" } });
+  ok(src.advertiser === "Callie Gifts" && src.body === "Cute tote" && src.cta === "Shop now" && src.transcript === "Wait, it has my name on it?" && /variant=thumbnail/.test(src.imageUrl),
+    "copy: the original's words and GetHookd's thumbnail are read", JSON.stringify(src));
+  ok(readSource({ data: { primary_image_url: "https://evil.example/a.jpg" } }).imageUrl === null, "copy: an image link off GetHookd is dropped");
+  let host = ""; try { await fetchImage({ fetch: async () => ({ ok: true }), url: "https://169.254.169.254/x" }); } catch (e) { host = e.kind; }
+  ok(host === "input", "copy: images are downloaded from GetHookd's hosts only");
+  const big = await fetchImage({ fetch: async () => ({ ok: true, headers: { get: () => "99" }, arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer }), url: "https://static-gp.gethookd.ai/a.png" });
+  ok(big.length === 3, "copy: an image from GetHookd is downloaded");
+  let gone = ""; try { await fetchImage({ fetch: async () => ({ ok: false, status: 403 }), url: "https://static-gp.gethookd.ai/a.png" }); } catch (e) { gone = e.message; }
+  ok(/expired/.test(gone), "copy: an expired image link is explained", gone);
+  const models = await checkModel({ key: "k", fetch: fake({ errors: false, data: [{ id: 1, slug: "nano-banana-2", credits_per_variation: 1 }] }), model: "nano-banana-2" });
+  ok(calls.at(-1).body.params.name === "list_clone_ad_models" && models.credits === 1, "copy: the model is checked against GetHookd's live list (free)");
+  let dropped = ""; try { await checkModel({ key: "k", fetch: fake({ errors: false, data: [] }), model: "gpt-image" }); } catch (e) { dropped = e.message; }
+  ok(/no longer offers/.test(dropped), "copy: a model GetHookd dropped is refused before any credits are spent");
+  const sc = sanitizeAdCopy({ hooks: ["a", "b", "c", "d"], primaryText: "x".repeat(2000), cta: "Buy now!!", videoScript: "not a list" });
+  ok(sc.hooks.length === 3 && sc.primaryText.length === 900 && sc.cta === "Shop now" && sc.videoScript.length === 0, "copy: Claude's text is cut to size and the button kept to Meta's labels", JSON.stringify(sc).slice(0, 200));
 }
 
 // A competitor's price, from the Shopify store its ad links to.

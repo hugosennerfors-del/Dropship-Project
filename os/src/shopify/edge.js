@@ -18,6 +18,8 @@
 //   adstats   fresh numbers for a product's saved GetHookd ads: each ad
 //             again (free), the stores' prices and, when asked, the stores'
 //             monthly visits (about 0.1 GetHookd credit per store)
+//   clone     copy a saved GetHookd ad with GetHookd's image models
+//             (clone.js) and keep small copies of the images for review
 //
 // `sql` is a postgres.js client on SUPABASE_DB_URL; everything else is
 // injected so the logic stays plain JavaScript.
@@ -32,6 +34,7 @@ import { SHOPIFY_API_VERSION } from "./version.js";
 import { checkNames } from "./names.js";
 import { searchAds, savedAdInput, getAd, getShopTraffic, hookdAdId, adMetrics } from "./gethookd.js";
 import { storePrices } from "./storeprice.js";
+import { cloneArguments, checkModel, startClone, getClone, getSource, fetchImage } from "./clone.js";
 
 const CORE_SCOPES = [...new Set([...SCOPES_FOR.product, ...SCOPES_FOR.collection, ...SCOPES_FOR.metaobject, ...SCOPES_FOR.page])];
 const OPTIONAL_SCOPES = [...new Set([...SCOPES_FOR.menu, ...SCOPES_FOR.publish])];
@@ -45,7 +48,10 @@ function sameSecret(a, b) {
   return d === 0;
 }
 
-export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetch, waitUntil = (p) => p, budgetMs = 100000, log = (o) => console.log(JSON.stringify(o)) }) {
+// `thumb(bytes)` turns an image into a small JPEG ({ mime, data (base64),
+// width, height }); without it a copied ad keeps only GetHookd's links.
+export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetch, waitUntil = (p) => p, budgetMs = 100000, log = (o) => console.log(JSON.stringify(o)),
+  thumb = null, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
   const fnSecret = async () => (await sql`select decrypted_secret from vault.decrypted_secrets where name = 'intel_fn_secret'`)[0]?.decrypted_secret;
 
   // -- Persistence port for the pipeline --------------------------------
@@ -293,6 +299,85 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
     }
   }
 
+  // -- clone ------------------------------------------------------------
+  // One invocation does one step and hands on to the next, under a lease so
+  // a step never runs twice at once:
+  //   queued      read the original ad (free), keep a small copy of its
+  //               image, check the model (free), start the copy (credits)
+  //   generating  poll get_clone_ad every 15 s, for up to 2 minutes a call
+  //   thumbs      one image per call: download it and keep a small JPEG
+  //               (decoding a large PNG takes most of a call's CPU time)
+  const CLONE_POLLS = 40;
+  async function clone(id) {
+    const [row] = await sql`update intel.ad_clones set lease_until = now() + interval '170 seconds', invocations = invocations + 1, updated_at = now()
+      where id = ${id} and status in ('queued', 'generating', 'thumbs') and (lease_until is null or lease_until < now()) and removed_at is null returning *`;
+    if (!row) return;
+    const failWith = async (e) => {
+      await sql`update intel.ad_clones set status = 'failed', error = ${String(e?.message || e).slice(0, 300)}, lease_until = null, finished_at = now(), updated_at = now() where id = ${id}`;
+      log({ event: "clone", id, status: "failed", error: String(e?.message || e).slice(0, 200) });
+    };
+    if (row.invocations > 60) return failWith("The copy took too many steps and was stopped.");
+    const smallCopy = async (url) => {
+      if (!thumb || !url) return null;
+      try { return await thumb(await fetchImage({ fetch: fetchImpl, url })); } catch (e) { log({ event: "clone", id, thumb: String(e?.message || e).slice(0, 120) }); return null; }
+    };
+    try {
+      const [k] = await sql`select decrypted_secret from vault.decrypted_secrets where name = 'gethookd_api_key'`;
+      const key = k?.decrypted_secret;
+      if (row.status === "queued") {
+        const args = cloneArguments({ adId: row.hookd_ad_id, model: row.model, aspect: row.aspect, variations: row.variations, market: row.market });
+        const source = await getSource({ key, fetch: fetchImpl, adId: row.hookd_ad_id });
+        const image = await smallCopy(source.imageUrl);
+        await checkModel({ key, fetch: fetchImpl, model: row.model });
+        // The source is saved before the credits are spent.
+        await sql`update intel.ad_clones set source = ${sql.json({ ...source, imageUrl: null, image })}, updated_at = now() where id = ${id}`;
+        const started = await startClone({ key, fetch: fetchImpl, args });
+        await sql`update intel.ad_clones set status = 'generating', clone_id = ${started.cloneId}, billing = ${sql.json(started.billing)}, lease_until = null, updated_at = now() where id = ${id}`;
+        log({ event: "clone", id, started: started.cloneId, billing: started.billing });
+        await redispatch("clone", id);
+        return;
+      }
+      if (row.status === "generating") {
+        let polls = row.polls;
+        for (const t0 = Date.now(); Date.now() - t0 < 120000 && polls < CLONE_POLLS; ) {
+          await sleep(polls === 0 ? 30000 : 15000);
+          polls++;
+          let r;
+          // The generation goes on at GetHookd whatever happens here, so a
+          // failed read is tried again at the next poll.
+          try { r = await getClone({ key, fetch: fetchImpl, cloneId: row.clone_id }); }
+          catch (e) { if (["network", "busy", "http"].includes(e?.kind)) continue; throw e; }
+          if (r.status === "failed") { await sql`update intel.ad_clones set polls = ${polls} where id = ${id}`; return failWith(r.error); }
+          if (r.status === "completed") {
+            if (!r.images.length) { await sql`update intel.ad_clones set polls = ${polls} where id = ${id}`; return failWith("GetHookd finished without any images."); }
+            await sql`update intel.ad_clones set status = 'thumbs', polls = ${polls}, missing = ${r.missing}, remaining_credits = ${r.remaining},
+              images = ${sql.json(r.images.map((x) => ({ ...x, image: null })))}, lease_until = null, updated_at = now() where id = ${id}`;
+            await redispatch("clone", id);
+            return;
+          }
+        }
+        await sql`update intel.ad_clones set polls = ${polls}, lease_until = null, updated_at = now() where id = ${id}`;
+        if (polls >= CLONE_POLLS) return failWith("GetHookd had not finished the images after about 10 minutes. Press Check again later.");
+        await redispatch("clone", id);
+        return;
+      }
+      // thumbs
+      const images = Array.isArray(row.images) ? row.images : [];
+      const next = images.findIndex((x) => x && x.image === null);
+      if (next >= 0) {
+        const image = await smallCopy(images[next].url);
+        images[next] = { ...images[next], image: image || false };
+      }
+      const done = images.every((x) => x.image !== null);
+      await sql`update intel.ad_clones set images = ${sql.json(images)}, lease_until = null, updated_at = now(),
+        status = ${done ? "done" : "thumbs"}, finished_at = ${done ? sql`now()` : null} where id = ${id}`;
+      if (done) log({ event: "clone", id, status: "done", images: images.length, copied: images.filter((x) => x.image).length });
+      else await redispatch("clone", id);
+    } catch (e) {
+      await failWith(e);
+    }
+  }
+
   async function redispatch(action, id) {
     const s = await fnSecret();
     await fetchImpl(selfUrl, { method: "POST", headers: { "Content-Type": "application/json", "x-intel-secret": s }, body: JSON.stringify({ action, id }) });
@@ -306,7 +391,7 @@ export function createHandler({ sql, selfUrl, fetch: fetchImpl = globalThis.fetc
     try { body = await req.json(); } catch { return json(400, { error: "invalid JSON" }); }
     const { action, id } = body || {};
     if (!/^[0-9a-f-]{36}$/.test(String(id || ""))) return json(400, { error: "invalid id" });
-    const work = { test, run, rollback, names, gethookd, adstats }[action];
+    const work = { test, run, rollback, names, gethookd, adstats, clone }[action];
     if (!work) return json(400, { error: "unknown action" });
     waitUntil(work(id).catch((e) => log({ event: action, id, crashed: String(e?.message || e).slice(0, 200), detail: redact(String(e?.stack || "")).slice(0, 400) })));
     return json(202, { accepted: true, action, id });

@@ -10,14 +10,18 @@ import { AD_PLATFORMS, LONG_RUNNING_DAYS, adLibraryLinks, adMatcher, hookdQuery,
 import { ESTIMATE_RANGE, assumptions, estimateAd, estimateByAdvertiser } from "../core/adrevenue.js";
 import { burstAt } from "../fx.js";
 import { liveRead, liveWrite, MCP_FIX } from "../live.js";
+import { CLONE_MODELS, CLONE_ASPECTS, CLONE_MAX_VARIATIONS, cloneCost } from "../shopify/clone.js";
+import { runAdCopy } from "../agents/index.js";
 
 // Per product and market: search words, the form being edited (null, "new"
 // or an ad id), its draft, and the ad whose Remove was clicked once.
 const ui = {};
 // `hookd.fresh` holds the ids the last GetHookd search added, marked "new";
 // `est` is the revenue estimate's "Update numbers" run.
+// `clone` is the "Copy ad" form open under one saved ad.
 const uiFor = (pid, m) => (ui[`${pid}|${m}`] ||= { query: null, editing: null, draft: {}, error: null, armed: null, hookd: { busy: false, status: "", error: "", result: null, fresh: [] },
-  est: { busy: false, status: "", error: "", summary: null, traffic: false } });
+  est: { busy: false, status: "", error: "", summary: null, traffic: false },
+  clone: { open: null, model: CLONE_MODELS[0].slug, aspect: "1:1", variations: 2, busy: false, error: "" } });
 // One GetHookd search returns at most this many ads (about 0.01 credit each).
 const HOOKD_LIMIT = 10;
 
@@ -57,7 +61,154 @@ export function adsSection(p, m) {
       <div class="list" data-ads-list>${here.map((a) => adRow(a, u, m)).join("") || (u.editing ? "" : '<div class="empty">No ads saved for this market yet.</div>')}</div>
       ${elsewhere ? `<div class="panel-b xs muted" style="border-top:1px solid var(--border)">${elsewhere} more saved for ${esc(MARKETS[m === "UK" ? "SE" : "UK"]?.name || "the other market")}. Switch market at the top to see them.</div>` : ""}
     </div>
+    ${clonePanel(p.id, m)}
   </section>`;
+}
+
+// -- Copied ads (shopify/clone.js) ----------------------------------------
+// Per product: the copies listed by the server (without images), each
+// copy's images once fetched, the text being edited, Claude's runs, and the
+// copy whose Remove was clicked once.
+const clones = {};
+const clonesFor = (pid) => (clones[pid] ||= { list: null, loading: false, error: "", detail: {}, drafts: {}, writing: {}, saving: {}, armed: null, watching: false, rerender: null });
+const PENDING = ["queued", "generating", "thumbs"];
+const CLONE_STATUS = { queued: "Starting…", generating: "GetHookd is making the images…", thumbs: "Saving the images…", done: "Ready to review", failed: "Stopped" };
+const REVIEW = { new: "Not reviewed", approved: "Approved", rejected: "Rejected" };
+const modelOf = (slug) => CLONE_MODELS.find((x) => x.slug === slug) || CLONE_MODELS[0];
+
+// The list, once per product page while the live database is there.
+function ensureClones(pid) {
+  const c = clonesFor(pid);
+  if (c.list || c.loading || c.error || store.live.state !== "ready") return;
+  c.loading = true;
+  setTimeout(() => loadClones(pid), 0);
+}
+async function loadClones(pid) {
+  const c = clonesFor(pid);
+  c.loading = true;
+  try {
+    const list = (await liveRead({ adClones: pid }))?.adClones;
+    c.list = Array.isArray(list) ? list : [];
+    c.error = "";
+    // Images for the copies that are ready and not fetched yet, newest first.
+    for (const x of c.list.filter((x) => x.status === "done" && !c.detail[x.id]).slice(0, 6)) {
+      const d = (await liveRead({ adClone: x.id }))?.adClone;
+      if (d) c.detail[x.id] = d;
+    }
+  } catch (err) { c.error = MCP_FIX[err?.code] || err?.message || "The copied ads could not be read."; }
+  c.loading = false;
+  c.rerender?.();
+  if (c.list?.some((x) => PENDING.includes(x.status))) watchClones(pid);
+}
+// While a copy is being made, look every 6 seconds (for at most 15 minutes).
+async function watchClones(pid) {
+  const c = clonesFor(pid);
+  if (c.watching) return;
+  c.watching = true;
+  for (const t0 = Date.now(); Date.now() - t0 < 15 * 60000; ) {
+    await new Promise((res) => setTimeout(res, 6000));
+    const before = JSON.stringify((c.list || []).map((x) => [x.id, x.status]));
+    await loadClones(pid);
+    if (JSON.stringify((c.list || []).map((x) => [x.id, x.status])) !== before) c.rerender?.();
+    if (!c.list?.some((x) => PENDING.includes(x.status))) break;
+  }
+  c.watching = false;
+}
+
+// The form under a saved ad: model, format, how many images, and the most
+// it can cost, before anything is spent.
+function cloneForm(a, u) {
+  const f = u.clone;
+  const cost = cloneCost(f.model, f.variations);
+  return `<div class="panel-b clone-form" data-clone-form="${attr(a.id)}">
+    <p class="small"><b>Copy this ad with GetHookd.</b> GetHookd's image model makes new images in the style of this ad (a video is copied from its first frame). Claude then writes our own text for it. Nothing is published: you review it under Copied ads.</p>
+    <div class="clone-opts">
+      <label class="field"><span>Image model</span><select id="clone-model" data-clone-in="model">${CLONE_MODELS.map((x) => `<option value="${attr(x.slug)}"${x.slug === f.model ? " selected" : ""}>${esc(x.name)} · ${x.credits} credit${x.credits === 1 ? "" : "s"} an image</option>`).join("")}</select></label>
+      <label class="field"><span>Format</span><select id="clone-aspect" data-clone-in="aspect">${Object.keys(CLONE_ASPECTS).map((k) => `<option value="${k}"${k === f.aspect ? " selected" : ""}>${k === "1:1" ? "1:1 square, feed" : k === "9:16" ? "9:16 stories and reels" : "3:4 portrait, feed"}</option>`).join("")}</select></label>
+      <label class="field"><span>Images</span><select id="clone-n" data-clone-in="variations">${Array.from({ length: CLONE_MAX_VARIATIONS }, (_, i) => i + 1).map((n) => `<option value="${n}"${n === f.variations ? " selected" : ""}>${n}</option>`).join("")}</select></label>
+    </div>
+    ${f.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(f.error)}</span></div>` : ""}
+    <div class="row"><button class="btn sm primary" type="button" data-clone-go="${attr(a.id)}"${f.busy ? " disabled" : ""}>${icon("spark", 13)}${f.busy ? "Starting…" : `Copy for at most ${esc(String(cost))} credits`}</button>
+      <button class="btn sm ghost" type="button" data-clone-cancel>Cancel</button>
+      <span class="xs muted">Charged only for images GetHookd delivers. Takes about a minute.</span></div>
+  </div>`;
+}
+
+function clonePanel(pid, m) {
+  const c = clonesFor(pid);
+  ensureClones(pid);
+  const live = store.live.state === "ready";
+  const mine = (c.list || []).filter((x) => x.market === m);
+  return `<div class="panel" data-clones><div class="panel-h"><h3>Copied ads</h3><span class="sub">GetHookd's images and Claude's text, for you to review</span></div>
+    ${!live ? '<div class="empty">Needs the live database (n8n).</div>'
+      : c.error ? `<div class="panel-b"><div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(c.error)}</span></div></div>`
+      : c.list == null ? '<div class="empty">Reading the copied ads…</div>'
+      : !mine.length ? '<div class="empty">None yet. Press Copy on an ad from GetHookd under Saved ads.</div>'
+      : `<div class="clone-list">${mine.map((x) => cloneCard(x, c, m)).join("")}</div>`}
+  </div>`;
+}
+
+function cloneCard(x, c, m) {
+  const d = c.detail[x.id] || x;
+  const src = d.source || {};
+  const pending = PENDING.includes(x.status);
+  const imgs = (d.images || []);
+  const ratio = x.aspect === "9:16" ? "9 / 16" : x.aspect === "3:4" ? "3 / 4" : "1 / 1";
+  const pic = (im, label, href) => `<figure class="clone-fig" style="--ar:${ratio}">${im?.data ? `<img src="data:${attr(im.mime || "image/jpeg")};base64,${attr(im.data)}" alt="${attr(label)}" loading="lazy">` : `<span class="clone-ph">${esc(pending ? "…" : "no preview")}</span>`}
+    <figcaption>${esc(label)}${href ? ` · <a href="${attr(href)}" target="_blank" rel="noopener noreferrer" title="GetHookd's link works for about a day">full size ${icon("ext", 10)}</a>` : ""}</figcaption></figure>`;
+  const copy = c.drafts[x.id] || d.copy || null;
+  const w = c.writing[x.id];
+  const cost = x.billing?.atMost ?? cloneCost(x.model, x.variations);
+  return `<article class="clone-card" data-clone="${attr(x.id)}">
+    <header class="clone-h">
+      <div class="body"><b>${esc(src.advertiser || "GetHookd ad")}</b>${src.hook || src.title ? `<small>“${esc(src.hook || src.title)}”</small>` : ""}</div>
+      <div class="side"><span class="spill clone-st-${attr(x.status)}">${pending ? '<span class="thinking"><i></i><i></i><i></i></span>' : ""}${esc(CLONE_STATUS[x.status] || x.status)}</span>
+        ${x.status === "done" ? `<span class="tag clone-rv-${attr(d.review || "new")}">${esc(REVIEW[d.review || "new"])}</span>` : ""}
+        <a class="btn sm ghost" href="https://app.gethookd.ai/share/ad/${attr(x.hookdAdId)}" target="_blank" rel="noopener noreferrer" title="The original ad on GetHookd">Original ${icon("ext", 11)}</a></div>
+    </header>
+    <p class="xs muted">${esc(modelOf(x.model).name)} · ${esc(x.aspect)} · ${x.variations} image${x.variations === 1 ? "" : "s"} · at most ${esc(String(cost))} credits · ${esc(String(x.createdAt || "").slice(0, 10))}${x.missing ? ` · ${x.missing} image${x.missing === 1 ? "" : "s"} did not arrive (not charged)` : ""}${x.remainingCredits != null ? ` · credits left ${esc(String(x.remainingCredits))}` : ""}</p>
+    ${x.status === "failed" ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(x.error || "The copy stopped.")}</span>${x.cloneId ? `<button class="btn sm" type="button" data-clone-retry="${attr(x.id)}">Check again</button>` : ""}</div>` : ""}
+    <div class="clone-imgs">${pic(src.image, "Original", null)}${(x.status === "done" ? imgs : imgs.length ? imgs : Array.from({ length: x.variations }, () => null)).map((im, i) => pic(im?.image || null, `Copy ${i + 1}`, im?.url)).join("")}</div>
+    ${x.status === "done" ? cloneText(x, copy, w, c) : ""}
+  </article>`;
+}
+
+// Our text for the copy: written by Claude from the original's words and
+// the product data, edited here, saved with the review.
+function cloneText(x, copy, w, c) {
+  const can = store.sampleState === "ready";
+  const field = (k, label, v, rows = 1, max = 300) => `<label class="field"><span>${esc(label)}</span>${rows > 1
+    ? `<textarea id="clone-${attr(x.id)}-${k}" data-copy-in="${attr(x.id)}" data-k="${k}" rows="${rows}" maxlength="${max}">${esc(v || "")}</textarea>`
+    : `<input id="clone-${attr(x.id)}-${k}" type="text" data-copy-in="${attr(x.id)}" data-k="${k}" maxlength="${max}" value="${attr(v || "")}">`}</label>`;
+  const armed = c.armed === x.id;
+  return `<div class="clone-text">
+    ${!copy ? `<div class="row"><button class="btn sm primary" type="button" data-copy-write="${attr(x.id)}"${can && !w?.busy ? "" : " disabled"}>${icon("wand", 13)}${w?.busy ? "Claude is writing…" : "Write our text with Claude"}</button>
+        <span class="xs muted">${can ? "Same angle as the original, new words, no claims the product data does not back." : "Claude is not available in this view."}</span></div>`
+      : `<div class="grid g2">
+        ${field("hook1", "Hook 1", copy.hooks?.[0], 1, 120)}${field("hook2", "Hook 2", copy.hooks?.[1], 1, 120)}
+        ${field("hook3", "Hook 3", copy.hooks?.[2], 1, 120)}${field("headline", "Headline", copy.headline, 1, 60)}
+        <div class="ads-wide">${field("primaryText", "Primary text", copy.primaryText, 5, 900)}</div>
+        ${field("description", "Description", copy.description, 1, 60)}${field("cta", "Button", copy.cta, 1, 30)}
+        <div class="ads-wide">${field("videoScript", "15-second video, one shot a line", (copy.videoScript || []).join("\n"), 5, 1200)}</div>
+      </div>
+      ${copy.angle || copy.changedFromOriginal ? `<p class="xs muted">${copy.angle ? `<b>Kept:</b> ${esc(copy.angle)} ` : ""}${copy.changedFromOriginal ? `<b>Changed:</b> ${esc(copy.changedFromOriginal)}` : ""}</p>` : ""}
+      ${copy.checkBeforeUse?.length ? `<p class="xs muted"><b>Check before use:</b> ${esc(copy.checkBeforeUse.join(" · "))}</p>` : ""}`}
+    ${w?.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(w.error)}</span></div>` : ""}
+    <div class="row clone-actions">
+      ${copy ? `<button class="btn sm" type="button" data-copy-save="${attr(x.id)}" data-rv="approved"${c.saving[x.id] ? " disabled" : ""}>${icon("check", 13)}Approve and save</button>
+        <button class="btn sm ghost" type="button" data-copy-save="${attr(x.id)}" data-rv="rejected"${c.saving[x.id] ? " disabled" : ""}>Reject</button>
+        <button class="btn sm ghost" type="button" data-copy-save="${attr(x.id)}" data-rv="keep"${c.saving[x.id] ? " disabled" : ""}>Save text</button>
+        <button class="btn sm ghost" type="button" data-copy-write="${attr(x.id)}"${can && !w?.busy ? "" : " disabled"}>${w?.busy ? "Writing…" : "Write again"}</button>` : ""}
+      <button class="btn sm ${armed ? "bb-btn-danger" : "ghost"}" type="button" data-clone-rm="${attr(x.id)}">${armed ? "Remove?" : "Remove"}</button>
+    </div>
+  </div>`;
+}
+
+// The form's fields back into the shape Claude wrote.
+function readCopy(root, cid, base) {
+  const v = (k) => root.querySelector(`[data-copy-in="${cid}"][data-k="${k}"]`)?.value ?? "";
+  return { ...base, hooks: [v("hook1"), v("hook2"), v("hook3")].map((s) => s.trim()).filter(Boolean), headline: v("headline").trim(), primaryText: v("primaryText").trim(),
+    description: v("description").trim(), cta: v("cta").trim(), videoScript: v("videoScript").split("\n").map((s) => s.trim()).filter(Boolean) };
 }
 
 // GetHookd: the Meta ads running now for the search words. The server finds
@@ -248,9 +399,10 @@ function adRow(a, u, m) {
     <span class="body">${storeLink(a.advertiser || host || "Ad", isHookd(a) ? hookdShopUrl(a.metrics?.shopId) : null)}<small>${esc(detail || host)}</small>${isHookd(a) ? `<small class="est-ad" data-est-ad="${attr(a.id)}">${esc(estAdLine(a, estPrefs(), m))}</small>` : ""}</span>
     <span class="side">${off ? `<span class="spill" title="Its text, product and address never name it, so the store probably sells something else">not “${esc(off)}”</span>` : ""}${fresh ? '<span class="tag cad-new" title="Added by the last GetHookd search">new</span>' : ""}${when}
       <a class="btn sm" href="${attr(a.url)}" target="_blank" rel="noopener noreferrer">Open ${icon("ext", 11)}</a>
+      ${isHookd(a) ? `<button class="btn sm${u.clone.open === a.id ? " primary" : ""}" type="button" data-clone-open="${attr(a.id)}" title="Make our own version of this ad with GetHookd's images and Claude's text">${icon("spark", 12)}Copy</button>` : ""}
       <button class="btn sm ghost" type="button" data-ads-edit="${attr(a.id)}">Edit</button>
       <button class="btn sm ${armed ? "bb-btn-danger" : "ghost"}" type="button" data-ads-rm="${attr(a.id)}">${armed ? "Remove?" : "Remove"}</button></span>
-  </div>`;
+  </div>${u.clone.open === a.id ? cloneForm(a, u) : ""}`;
 }
 
 function adForm(u, ad) {
@@ -285,6 +437,8 @@ const formData = (form) => {
 export function bindAds(root, { id, rerender }) {
   const inAds = (el) => el?.closest?.("#sec-ads");
   const m = () => store.market;
+  const cl = clonesFor(id);
+  cl.rerender = rerender;
 
   root.addEventListener("input", (e) => {
     if (!inAds(e.target)) return;
@@ -297,6 +451,9 @@ export function bindAds(root, { id, rerender }) {
       savePref({ adQueries: Object.fromEntries(Object.entries({ ...pref, [id]: u.query }).slice(-50)) });
       return;
     }
+    // Edited text is kept as typed, so a repaint does not lose it.
+    const cid = e.target.dataset?.copyIn;
+    if (cid) { cl.drafts[cid] = readCopy(root, cid, cl.drafts[cid] || cl.detail[cid]?.copy || {}); return; }
     // A slider repaints the numbers in place, so the drag is not interrupted.
     const k = e.target.dataset?.estIn;
     if (k) {
@@ -319,6 +476,14 @@ export function bindAds(root, { id, rerender }) {
   });
   root.addEventListener("change", (e) => {
     if (inAds(e.target) && e.target.matches?.("[data-est-traffic]")) { uiFor(id, m()).est.traffic = e.target.checked; return; }
+    const ck = inAds(e.target) && e.target.dataset?.cloneIn;
+    if (ck) {
+      const f = uiFor(id, m()).clone;
+      f[ck] = ck === "variations" ? Number(e.target.value) : e.target.value;
+      f.error = "";
+      rerender();
+      return;
+    }
     const form = inAds(e.target) && e.target.closest("#adsForm");
     if (!form) return;
     if (e.target.name === "platform") e.target.dataset.auto = "0";
@@ -395,6 +560,76 @@ export function bindAds(root, { id, rerender }) {
         est.summary = run.summary || null;
       } catch (err) { est.error = MCP_FIX[err?.code] || err?.message || "The update failed."; }
       est.busy = false; rerender();
+      return;
+    }
+    if (cl.armed && !t.closest("[data-clone-rm]")) cl.armed = null;
+    const op = t.closest("[data-clone-open]");
+    if (op) { u.clone.open = u.clone.open === op.dataset.cloneOpen ? null : op.dataset.cloneOpen; u.clone.error = ""; rerender(); return; }
+    if (t.closest("[data-clone-cancel]")) { u.clone.open = null; u.clone.error = ""; rerender(); return; }
+    const go = t.closest("[data-clone-go]");
+    if (go) {
+      const f = u.clone;
+      f.busy = true; f.error = ""; rerender();
+      try {
+        await liveWrite("ads.clone", { productId: id, market: m(), adId: go.dataset.cloneGo, model: f.model, aspect: f.aspect, variations: f.variations });
+        f.open = null;
+        window.__toast?.("Copy started. It shows under Copied ads in about a minute.");
+        await loadClones(id);
+        watchClones(id);
+      } catch (err) { f.error = MCP_FIX[err?.code] || err?.message || "The copy could not be started."; }
+      f.busy = false; rerender();
+      root.querySelector("#sec-ads [data-clones]")?.scrollIntoView?.({ block: "nearest" });
+      return;
+    }
+    const rt = t.closest("[data-clone-retry]");
+    if (rt) {
+      rt.disabled = true;
+      try { await liveWrite("ads.clone.retry", { id: rt.dataset.cloneRetry }); await loadClones(id); watchClones(id); }
+      catch (err) { window.__toast?.(MCP_FIX[err?.code] || err?.message || "Could not check again."); }
+      rerender();
+      return;
+    }
+    const wr = t.closest("[data-copy-write]");
+    if (wr) {
+      const cid = wr.dataset.copyWrite;
+      const w = (cl.writing[cid] = { busy: true, error: "" });
+      rerender();
+      try {
+        const copy = await runAdCopy({ id, market: cl.detail[cid]?.market || m(), source: cl.detail[cid]?.source || {} });
+        cl.drafts[cid] = copy;
+        // Saved straight away, so the text is not lost; the review stays as it was.
+        await liveWrite("ads.clone.save", { id: cid, copy });
+        if (cl.detail[cid]) cl.detail[cid].copy = copy;
+        delete cl.drafts[cid];
+      } catch (err) { w.error = err?.code === "not_granted" ? "Claude is not allowed for this page." : MCP_FIX[err?.code] || err?.message || "Claude could not write the text."; }
+      w.busy = false; rerender();
+      return;
+    }
+    const sv = t.closest("[data-copy-save]");
+    if (sv) {
+      const cid = sv.dataset.copySave, rv = sv.dataset.rv;
+      const copy = readCopy(root, cid, cl.drafts[cid] || cl.detail[cid]?.copy || {});
+      cl.saving[cid] = true; rerender();
+      try {
+        await liveWrite("ads.clone.save", { id: cid, copy, ...(rv === "keep" ? {} : { review: rv }) });
+        if (cl.detail[cid]) { cl.detail[cid].copy = copy; if (rv !== "keep") cl.detail[cid].review = rv; }
+        delete cl.drafts[cid];
+        window.__toast?.(rv === "approved" ? "Approved and saved." : rv === "rejected" ? "Marked as rejected." : "Text saved.");
+      } catch (err) { window.__toast?.(MCP_FIX[err?.code] || err?.message || "Could not save."); }
+      cl.saving[cid] = false; rerender();
+      return;
+    }
+    const crm = t.closest("[data-clone-rm]");
+    if (crm) {
+      const cid = crm.dataset.cloneRm;
+      if (cl.armed !== cid) { cl.armed = cid; rerender(); root.querySelector(`[data-clone-rm="${cid}"]`)?.focus(); return; }
+      cl.armed = null;
+      try {
+        await liveWrite("ads.clone.remove", { id: cid });
+        cl.list = (cl.list || []).filter((x) => x.id !== cid);
+        window.__toast?.("Copy removed from the page.");
+      } catch (err) { window.__toast?.(MCP_FIX[err?.code] || err?.message || "Could not remove."); }
+      rerender();
       return;
     }
     if (t.closest("[data-cad-new]")) { u.editing = "new"; u.draft = {}; u.error = null; rerender(); root.querySelector("#adsForm [name=url]")?.focus(); return; }

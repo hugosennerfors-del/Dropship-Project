@@ -634,3 +634,31 @@ button.li { border: 0; border-bottom: 1px solid var(--border); background: none;
 .cad-store:hover b{text-decoration:underline}
 .hookd-top{border:1px solid var(--border);border-radius:10px}
 .hookd-off{opacity:.5}
+
+/* Product page: copied ads (views/ads.js, shopify/clone.js). */
+.clone-form { display: grid; gap: 10px; border-bottom: 1px solid var(--border); background: var(--surface-2); }
+.clone-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 10px 14px; }
+.clone-opts select { width: 100%; }
+.clone-form .row { flex-wrap: wrap; gap: 8px 10px; }
+.clone-list { display: grid; }
+.clone-card { display: grid; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--border); min-width: 0; }
+.clone-card:last-child { border-bottom: 0; }
+.clone-h { display: flex; gap: 10px; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
+.clone-h .body { display: grid; gap: 2px; min-width: 0; flex: 1 1 240px; }
+.clone-h .body small { color: var(--fg-2); }
+.clone-h .side { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.clone-h .spill .thinking { margin-right: 6px; }
+.clone-imgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+.clone-fig { margin: 0; display: grid; gap: 4px; min-width: 0; }
+.clone-fig img, .clone-ph { width: 100%; max-width: 100%; aspect-ratio: var(--ar, 1 / 1); object-fit: cover; border-radius: var(--r-md); border: 1px solid var(--border); background: var(--surface-3); }
+.clone-ph { display: grid; place-items: center; color: var(--fg-3); font-size: var(--t-xs); }
+.clone-fig:first-child img { outline: 2px dashed var(--border-strong); outline-offset: -2px; }
+.clone-fig figcaption { font-size: var(--t-xs); color: var(--fg-3); }
+.clone-fig figcaption a { color: var(--accent); text-decoration: none; }
+.clone-text { display: grid; gap: 10px; }
+.clone-text .field input, .clone-text .field textarea { width: 100%; }
+.clone-actions { flex-wrap: wrap; gap: 8px; }
+.tag.clone-rv-approved { background: var(--good-soft); color: var(--good); border-color: color-mix(in srgb, var(--good) 30%, transparent); }
+.tag.clone-rv-rejected { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
+.spill.clone-st-failed { color: var(--bad); }
+.spill.clone-st-done { color: var(--good); }

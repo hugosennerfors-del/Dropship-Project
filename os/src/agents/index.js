@@ -206,6 +206,31 @@ export async function runBrief(rowsNow, insightsNow, market, { signal, onText } 
   return { id: saved.id, output: { text } };
 }
 
+// Our own text for a competitor's ad that was copied with GetHookd: the
+// same angle, new words, nothing the product data does not support.
+export async function runAdCopy({ id, market, source, signal, onText }) {
+  const sv = market === "SE";
+  const out = await runJSON([
+    "You are a direct-response copywriter for a small independent online store. Below is a competitor's Meta ad that works for this product. Write our own ad for the same product in its spirit: the same kind of hook and angle, in new words.",
+    HONESTY,
+    "Do not reuse the competitor's sentences, brand name, product name, personal names or offer. Do not promise anything the product data does not support: no reviews, ratings, awards, certifications, discounts, delivery times or medical claims unless they are in the product data.",
+    sv ? "Write in Swedish, for shoppers in Sweden." : "Write in UK English, for shoppers in the UK.",
+    'Reply with only JSON: {"angle":"…","hooks":["…","…","…"],"primaryText":"…","headline":"…","description":"…","cta":"Shop now|Learn more|Order now|Get offer","videoScript":["…"],"changedFromOriginal":"…","checkBeforeUse":["…"]}',
+    "angle: one sentence on what the original does that we keep. hooks: 3 first lines, at most 12 words each. primaryText: at most 90 words. headline: at most 40 characters. description: at most 30 characters. videoScript: 4 to 6 short shots for a 15-second video, matching the hook. changedFromOriginal: what we changed so it is ours. checkBeforeUse: facts to confirm before running it.",
+    "Competitor's ad (copy only the idea):", JSON.stringify({ advertiser: source?.advertiser, hook: source?.hook, title: source?.title, body: source?.body, cta: source?.cta, linkDescription: source?.linkDescription, spoken: source?.transcript, format: source?.format }),
+    "Our product:", productContext(id, market) || "{}",
+  ].join("\n"), { signal, onText });
+  return sanitizeAdCopy(out);
+}
+const AD_CTAS = ["Shop now", "Learn more", "Order now", "Get offer"];
+export function sanitizeAdCopy(o = {}) {
+  return {
+    angle: str(o.angle, 300), hooks: list(o.hooks, 3, 120) || [], primaryText: str(o.primaryText, 900), headline: str(o.headline, 60),
+    description: str(o.description, 60), cta: AD_CTAS.includes(o.cta) ? o.cta : "Shop now", videoScript: list(o.videoScript, 6, 200) || [],
+    changedFromOriginal: str(o.changedFromOriginal, 400), checkBeforeUse: list(o.checkBeforeUse, 5, 200) || [],
+  };
+}
+
 // Inbox candidate → AI-analysed product (all values AI estimates).
 export async function runProfiler(candidate, { signal, onText } = {}) {
   const market = candidate.market === "SE" ? "SE" : "UK";

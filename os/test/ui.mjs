@@ -128,6 +128,23 @@ const browser = await chromium.launch();
           result = { ok: true, adStatsRun: { id: body.params.adStatsRun, status: "done", summary: { ads: 2, updated: 2, priced: 2, storesRead: 2, usedCredits: 0.2, failed: [] },
             ads: live.ads.filter((a) => a.productId === window.__enrich?.productId) } };
         }
+        // Copy ad: the copy is queued, and read back already done with two
+        // images and the original's words.
+        const px = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==";
+        if (body.op === "write" && body.action === "ads.clone") {
+          window.__clone = body.payload;
+          window.__clones = [{ id: "44444444-dddd-4ddd-8ddd-000000000001", productId: body.payload.productId, market: body.payload.market, adId: body.payload.adId, hookdAdId: "501",
+            model: body.payload.model, aspect: body.payload.aspect, variations: body.payload.variations, status: "done", cloneId: "20931", review: "new",
+            billing: { now: 0.01, atMost: 4.01 }, remainingCredits: 55.9, createdAt: "2026-10-26T22:00:00Z",
+            source: { advertiser: "Robe Co UK", hook: "Change in seconds on any beach", body: "Our robe keeps you warm.", cta: "Shop now", image: { mime: "image/png", data: px } },
+            images: [{ mediaId: 1, url: "https://static-gp.gethookd.ai/a1.png", image: { mime: "image/png", data: px } }, { mediaId: 2, url: "https://static-gp.gethookd.ai/a2.png", image: { mime: "image/png", data: px } }] }];
+          result = { ok: true, id: "44444444-dddd-4ddd-8ddd-000000000001" };
+        }
+        if (body.op === "write" && body.action === "ads.clone.save") { window.__cloneSaves = (window.__cloneSaves || []).concat([body.payload]); result = { ok: true, id: body.payload.id }; }
+        if (body.op === "read" && body.params?.adClones) {
+          result = { ok: true, adClones: (window.__clones || []).map(({ source, images, ...x }) => ({ ...x, source: { ...source, image: undefined }, images: images.map(({ image, ...i }) => ({ ...i, copied: !!image })) })) };
+        }
+        if (body.op === "read" && body.params?.adClone) result = { ok: true, adClone: (window.__clones || []).find((x) => x.id === body.params.adClone) || null };
         if (body.op === "read" && body.params?.gethookdSearch) {
           const savedAds = [savedRow(501, "Robe Co UK", "2026-09-01", "Change in seconds on any beach"), savedRow(502, "Dry Ltd", "2026-10-18", "The robe swimmers swear by")];
           live.ads = [...savedAds.filter((a) => !live.ads.some((x) => x.id === a.id)), ...live.ads];
@@ -154,7 +171,13 @@ const browser = await chromium.launch();
       return { text, truncated: false };
     };
     sample.limits = async () => ({ maxPromptBytes: 65536, tools: { maxCount: 16 } });
-    sample.json = async () => ({});
+    sample.json = async (prompt) => {
+      if (!/direct-response copywriter/.test(String(prompt))) return {};
+      window.__copyPrompt = String(prompt);
+      return { angle: "Warmth in seconds after a cold swim", hooks: ["Cold swim? Warm in ten seconds.", "The robe that ends towel dancing", "Change anywhere, stay dry"],
+        primaryText: "A fleece-lined robe you can change under.", headline: "Change anywhere", description: "Warm and dry", cta: "Shop now",
+        videoScript: ["Swimmer leaves the sea", "Robe goes on", "Changes under it"], changedFromOriginal: "New hooks, no competitor wording", checkBeforeUse: ["Fleece lining"] };
+    };
     window.claude = { use: async (name) => (name === "mcp" ? mcp : name === "sample" ? sample : null) };
   }, liveFixture);
   const page = await ctx.newPage();
@@ -286,6 +309,36 @@ const browser = await chromium.launch();
     if (process.env.SHOTS) await page.locator("#sec-ads [data-est]").screenshot({ path: `${process.env.SHOTS}/ads-estimate.png` });
     ok(!(await writes()).some((b) => b.action === "ads.save" && /gethookd/.test(b.payload?.url || "")) && await page.locator("#sec-ads [data-hookd-save], #sec-ads [data-hookd-ad]").count() === 0,
       "gethookd: the server saves them; the page sends no saves of its own and lists them once");
+    // Copy ad: the form says what it costs before anything is spent.
+    const robeAd = "22222222-bbbb-4bbb-8bbb-000000000501";
+    ok(await page.locator("#sec-ads [data-clones] .empty").count() === 1, "copy: Copied ads is empty to start with", await page.locator("#sec-ads [data-clones]").innerText());
+    await page.click(`#sec-ads [data-clone-open="${robeAd}"]`);
+    ok(/Copy for at most 2\.01 credits/.test(await page.locator(`#sec-ads [data-clone-go="${robeAd}"]`).innerText()) && !(await writes()).some((b) => b.action === "ads.clone"),
+      "copy: opening the form spends nothing and shows the most it costs");
+    await page.selectOption("#clone-model", "nano-banana-pro");
+    ok(/Copy for at most 4\.01 credits/.test(await page.locator(`#sec-ads [data-clone-go="${robeAd}"]`).innerText()), "copy: a dearer model shows its cost");
+    await page.click(`#sec-ads [data-clone-go="${robeAd}"]`);
+    await page.waitForSelector("#sec-ads [data-clone] .clone-text", { timeout: 10000 });
+    const cw = await page.evaluate(() => window.__clone);
+    ok(cw?.productId === "changing-robe" && cw.market === "UK" && cw.adId === robeAd && cw.model === "nano-banana-pro" && cw.aspect === "1:1" && cw.variations === 2 && !JSON.stringify(cw).includes("gh_"),
+      "copy: the server is asked to copy the saved ad with the chosen model, format and number, and no key", JSON.stringify(cw));
+    const card = page.locator("#sec-ads [data-clone]").first();
+    ok(await card.locator("img").count() === 3 && /Robe Co UK/.test(await card.innerText()) && /Ready to review/.test(await card.innerText()) && /at most 4\.01 credits/.test(await card.innerText()),
+      "copy: the original and both copies are shown, with what it cost", await card.innerText());
+    await card.locator("[data-copy-write]").click();
+    await page.waitForSelector("#sec-ads [data-clone] [data-copy-in][data-k=headline]", { timeout: 8000 });
+    const prompt = await page.evaluate(() => window.__copyPrompt);
+    ok(/Change in seconds on any beach/.test(prompt) && /Do not reuse the competitor's sentences/.test(prompt) && /UK English/.test(prompt), "copy: Claude gets the original's words and the rules");
+    const firstSave = (await page.evaluate(() => window.__cloneSaves || []))[0];
+    ok(firstSave?.copy?.headline === "Change anywhere" && firstSave.copy.hooks.length === 3 && firstSave.review === undefined, "copy: Claude's text is saved at once, not yet reviewed", JSON.stringify(firstSave));
+    await page.fill("#sec-ads [data-clone] [data-copy-in][data-k=headline]", "Warm in ten seconds");
+    await card.locator('[data-copy-save][data-rv="approved"]').click();
+    await page.waitForFunction(() => (window.__cloneSaves || []).length === 2, null, { timeout: 8000 });
+    const appr = (await page.evaluate(() => window.__cloneSaves))[1];
+    ok(appr.review === "approved" && appr.copy.headline === "Warm in ten seconds" && appr.copy.videoScript.length === 3, "copy: approving saves the edited text with the review", JSON.stringify(appr));
+    await page.waitForFunction(() => /Approved/.test(document.querySelector("#sec-ads [data-clone] .clone-h")?.innerText || ""), null, { timeout: 5000 }).catch(() => {});
+    ok(/Approved/.test(await card.locator(".clone-h").innerText()), "copy: the copy shows as approved");
+    if (process.env.SHOTS) await page.locator("#sec-ads [data-clones]").screenshot({ path: `${process.env.SHOTS}/ads-copied.png` });
     // Sweden: Swedish ads, the UK ones counted separately.
     await page.click('[data-market="SE"]');
     // The section is already on the page and redraws on the next frame.
