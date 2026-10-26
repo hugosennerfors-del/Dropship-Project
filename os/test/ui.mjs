@@ -111,13 +111,13 @@ const browser = await chromium.launch();
         // GetHookd: the search is queued, then read back done with two running
         // ads, which the server has saved as the product's ads.
         if (body.op === "write" && body.action === "ads.gethookd") window.__hookd = body.payload;
-        const hookdAd = (id, brand, days, hook) => ({ adId: String(id), advertiser: brand, brandId: id, brandActiveAds: 12, title: "Warm robe", hook, startedOn: "2026-09-01", daysActive: days,
-          stillRunning: true, performance: 83, performanceTitle: "Optimized", landingDomain: "robeco.example", landingPage: `https://robeco.example/products/robe-${id}`, shareUrl: `https://app.gethookd.ai/share/ad/${id}?signature=abc` });
+        const hookdAd = (id, brand, days, hook) => ({ adId: String(id), advertiser: brand, brandId: id, brandActiveAds: 12, title: "Dryrobe-style changing robe", hook, startedOn: "2026-09-01", daysActive: days,
+          stillRunning: true, performance: 83, performanceTitle: "Optimized", landingDomain: "robeco.example", landingPage: `https://robeco.example/products/robe-${id}`, shopId: 70 + id, shareUrl: `https://app.gethookd.ai/share/ad/${id}?signature=abc` });
         // 501 runs in the UK and Ireland (Meta reports its Irish reach); 502 only in the UK.
         const metricsOf = (id, store) => ({ source: "gethookd", adId: String(id), countries: id === 501 ? ["GB", "IE"] : ["GB"], euReach: id === 501 ? 1000 : null, daysActive: 51,
           checkedAt: "2026-10-22", price: 39.99, currency: "GBP", shopId: 70 + id, landingPage: `https://robeco.example/products/robe-${id}`, ...(store ? { store: { shopId: 70 + id, visits: 12000, month: "2026-09", checkedAt: "2026-10-22" } } : {}) });
         const savedRow = (id, brand, startedOn, hook) => ({ id: `22222222-bbbb-4bbb-8bbb-000000000${id}`, productId: window.__hookd?.productId, market: window.__hookd?.market, platform: "meta",
-          url: `https://app.gethookd.ai/share/ad/${id}?signature=abc`, advertiser: brand, startedOn, stillRunning: true, angle: hook, note: "GetHookd · performance Optimized (83)",
+          url: `https://app.gethookd.ai/share/ad/${id}?signature=abc`, advertiser: brand, startedOn, stillRunning: true, angle: hook, note: "GetHookd · performance Optimized (83) · Dryrobe-style changing robe",
           metrics: metricsOf(id), createdAt: "2026-10-22T13:40:00Z", updatedAt: "2026-10-22T13:40:00Z" });
         let result = body.op === "read" ? live : { ok: true };
         if (body.op === "write" && body.action === "ads.gethookd") result = { ok: true, id: "11111111-aaaa-4aaa-8aaa-000000000001" };
@@ -190,8 +190,8 @@ const browser = await chromium.launch();
     await page.goto(url + "#/p/changing-robe");
     await page.waitForSelector("#sec-ads");
     ok(await page.locator('.toc [data-toc="ads"]').count() === 1, "ads: the section is in the table of contents");
-    const row = page.locator("#sec-ads [data-ads-list] .ads-row").first();
-    ok(/Robe Co/.test(await row.innerText()) && await row.locator(".tag.ads-long").count() === 1, "ads: a saved ad from Supabase shows as long-running", await row.innerText());
+    const row = page.locator("#sec-ads [data-ads-list] .cad-row").first();
+    ok(/Robe Co/.test(await row.innerText()) && await row.locator(".tag.cad-long").count() === 1, "ads: a saved ad from Supabase shows as long-running", await row.innerText());
     ok(/running for 30\+ days/.test(await page.locator("[data-ads-signal]").innerText()), "ads: the summary reads the long-running ad as a profit sign");
     const meta = () => page.locator('[data-ads-link="meta"]').getAttribute("href");
     let href = await meta();
@@ -201,7 +201,7 @@ const browser = await chromium.launch();
     href = await meta();
     ok(/q=dryrobe%20alternative/.test(href), "ads: editing the search words updates the links", href);
     // An address that is not a link is explained, not sent.
-    await page.click("[data-ads-new]");
+    await page.click("[data-cad-new]");
     await page.fill("#adsForm [name=url]", "not a link");
     await page.click("#adsForm button[type=submit]");
     ok(/not a web address/i.test(await page.locator(".ads-err").innerText()) && (await writes()).length === 0, "ads: a bad link is explained next to the field and not saved");
@@ -217,10 +217,10 @@ const browser = await chromium.launch();
     ok(save && save.payload.productId === "changing-robe" && save.payload.market === "UK" && save.payload.platform === "meta"
       && save.payload.url === "https://facebook.com/ads/library/?id=222" && save.payload.startedOn === "2026-09-30" && /^[0-9a-f-]{36}$/.test(save.payload.id),
     "ads: a saved ad is written to Supabase via n8n", JSON.stringify(save));
-    await page.waitForFunction(() => document.querySelectorAll("#sec-ads [data-ads-list] .ads-row").length === 2, null, { timeout: 5000 }).catch(() => {});
-    ok(await page.locator("#sec-ads [data-ads-list] .ads-row").count() === 2 && /Swim Shop/.test(await page.locator("#sec-ads .list").innerText()), "ads: the new ad is listed");
+    await page.waitForFunction(() => document.querySelectorAll("#sec-ads [data-ads-list] .cad-row").length === 2, null, { timeout: 5000 }).catch(() => {});
+    ok(await page.locator("#sec-ads [data-ads-list] .cad-row").count() === 2 && /Swim Shop/.test(await page.locator("#sec-ads .list").innerText()), "ads: the new ad is listed");
     // The same link twice on one product is refused on the page.
-    await page.click("[data-ads-new]");
+    await page.click("[data-cad-new]");
     await page.fill("#adsForm [name=url]", "https://facebook.com/ads/library/?id=222");
     await page.click("#adsForm button[type=submit]");
     ok(/already saved/i.test(await page.locator(".ads-err").innerText()), "ads: a duplicate link is refused");
@@ -234,36 +234,36 @@ const browser = await chromium.launch();
     const rmw = (await writes()).find((b) => b.action === "ads.remove");
     ok(rmw?.payload?.id === save.payload.id, "ads: the second click removes it through n8n", JSON.stringify(rmw));
     await page.waitForTimeout(200);
-    ok(await page.locator("#sec-ads [data-ads-list] .ads-row").count() === 1, "ads: the removed ad leaves the list");
+    ok(await page.locator("#sec-ads [data-ads-list] .cad-row").count() === 1, "ads: the removed ad leaves the list");
     // GetHookd: the server finds the running ads and saves them; they join the saved list.
     // An empty "Save an ad" form is open, as if the owner meant to paste one by hand.
-    await page.click("[data-ads-new]");
+    await page.click("[data-cad-new]");
     await page.click("#sec-ads [data-hookd-go]");
     await page.waitForSelector("#sec-ads [data-hookd-sum]", { timeout: 10000 });
     const hk = (await writes()).find((b) => b.action === "ads.gethookd");
-    ok(hk?.payload?.productId === "changing-robe" && hk.payload.market === "UK" && hk.payload.query === "dryrobe alternative" && hk.payload.limit === 10 && !JSON.stringify(hk).includes("gh_"),
-      "gethookd: the search goes to the server with the product, market and search words, and no key", JSON.stringify(hk));
+    ok(hk?.payload?.productId === "changing-robe" && hk.payload.market === "UK" && hk.payload.query === "dryrobe" && hk.payload.limit === 10 && !JSON.stringify(hk).includes("gh_"),
+      "gethookd: the search goes to the server with the product, market and the search words without \"alternative\", and no key", JSON.stringify(hk));
     const hsum = await page.locator("[data-hookd-sum]").innerText();
-    ok(/34 running ads in the UK match “dryrobe alternative”/.test(hsum) && /2 advertisers/.test(hsum) && /2 new saved under Saved ads/.test(hsum) && /credits left: 59.96/.test(hsum),
+    ok(/34 running ads in the UK match “dryrobe”/.test(hsum) && /2 advertisers/.test(hsum) && /2 new saved under Saved ads/.test(hsum) && /credits left: 59.96/.test(hsum),
       "gethookd: the result says how many ads run, from how many advertisers, how many were saved, and the credits left", hsum);
-    await page.waitForFunction(() => document.querySelectorAll("#sec-ads [data-ads-list] .ads-row").length === 3, null, { timeout: 5000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelectorAll("#sec-ads [data-ads-list] .cad-row").length === 3, null, { timeout: 5000 }).catch(() => {});
     const listed = await page.locator("#sec-ads [data-ads-list]").innerText();
-    const hookdLink = await page.locator('#sec-ads [data-ad="22222222-bbbb-4bbb-8bbb-000000000501"] a.btn').getAttribute("href").catch(() => null);
-    ok(await page.locator("#sec-ads [data-ads-list] .ads-row").count() === 3 && /Robe Co UK/.test(listed) && /Dry Ltd/.test(listed) && hookdLink === "https://app.gethookd.ai/share/ad/501?signature=abc",
+    const hookdLink = await page.locator('#sec-ads [data-cad="22222222-bbbb-4bbb-8bbb-000000000501"] a.btn').getAttribute("href").catch(() => null);
+    ok(await page.locator("#sec-ads [data-ads-list] .cad-row").count() === 3 && /Robe Co UK/.test(listed) && /Dry Ltd/.test(listed) && hookdLink === "https://app.gethookd.ai/share/ad/501?signature=abc",
       "gethookd: the ads found are listed under saved ads, each with its GetHookd link", listed);
-    ok(await page.locator('#sec-ads [data-ad="22222222-bbbb-4bbb-8bbb-000000000501"] .tag.ads-long').count() === 1, "gethookd: a saved ad that has run long is marked");
-    ok(await page.locator("#adsForm").count() === 0 && await page.locator("#sec-ads [data-ads-list] .ads-row.ads-fresh .tag.ads-new").count() === 2
-      && await page.locator("#sec-ads [data-ads-list] .ads-row.ads-fresh").first().isVisible(),
+    ok(await page.locator('#sec-ads [data-cad="22222222-bbbb-4bbb-8bbb-000000000501"] .tag.cad-long').count() === 1, "gethookd: a saved ad that has run long is marked");
+    ok(await page.locator("#adsForm").count() === 0 && await page.locator("#sec-ads [data-ads-list] .cad-row.cad-fresh .tag.cad-new").count() === 2
+      && await page.locator("#sec-ads [data-ads-list] .cad-row.cad-fresh").first().isVisible(),
       "gethookd: the empty form closes, and the new ads are in view and marked new");
     if (process.env.SHOTS) await page.locator("#sec-ads").screenshot({ path: `${process.env.SHOTS}/ads-gethookd.png` });
     // The panel lists the ads found, each linked to GetHookd and to the store page it leads to.
-    const top = page.locator("#sec-ads [data-hookd-list] .ads-row");
+    const top = page.locator("#sec-ads [data-hookd-list] .cad-row");
     const topAd = await top.first().locator("a.btn").getAttribute("href");
-    const topStore = await top.first().locator("a.ads-store").getAttribute("href");
-    ok(await top.count() === 2 && /^https:\/\/app\.gethookd\.ai\/share\/ad\/50[12]/.test(topAd) && /^https:\/\/robeco\.example\/products\/robe-50[12]$/.test(topStore),
-      "gethookd: the ads found are listed in the panel with a link to each ad and to the store", `${await top.count()} ${topAd} ${topStore}`);
-    const estStore = await page.locator("#sec-ads [data-est-out] tr[data-est-row] a.ads-store").first().getAttribute("href").catch(() => null);
-    ok(/^https:\/\/robeco\.example\/products\/robe-50[12]$/.test(estStore || ""), "estimate: each advertiser links to its store", estStore);    // What their ads bring in: Irish reach scaled to the UK and Ireland, then the funnel.
+    const topStore = await top.first().locator("a.cad-store").getAttribute("href");
+    ok(await top.count() === 2 && /^https:\/\/app\.gethookd\.ai\/share\/ad\/50[12]/.test(topAd) && /^https:\/\/app\.gethookd\.ai\/shops\/57[12]$/.test(topStore),
+      "gethookd: the ads found are listed in the panel with a link to each ad and to its store on GetHookd", `${await top.count()} ${topAd} ${topStore}`);
+    const estStore = await page.locator("#sec-ads [data-est-out] tr[data-est-row] a.cad-store").first().getAttribute("href").catch(() => null);
+    ok(/^https:\/\/app\.gethookd\.ai\/shops\/57[12]$/.test(estStore || ""), "estimate: each advertiser links to its store on GetHookd", estStore);    // What their ads bring in: Irish reach scaled to the UK and Ireland, then the funnel.
     const estRows = () => page.locator("#sec-ads [data-est-out] tr[data-est-row]").allInnerTexts();
     let est = await estRows();
     ok(est.length === 2 && /Robe Co UK/.test(est[0]) && /£39\.99/.test(est[0]) && /£130/.test(est[0]) && /Dry Ltd/.test(est[1]) && /only outside the EU/.test(est[1]),

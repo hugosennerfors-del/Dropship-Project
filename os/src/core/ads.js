@@ -36,6 +36,41 @@ export function defaultAdQuery(name) {
     .slice(0, 80);
 }
 
+// Does an ad sell what the search words describe? GetHookd matches loosely
+// ("retro camera" also finds retro watches), so an ad counts only when its
+// own text (hook, title, the store's product name, the address it leads
+// to) has the product's head noun, the last word before "for"/"with", and
+// one more of the search words when there are any. Size and marketing
+// words do not count. Returns null when the search words say nothing.
+const GENERIC = new Set(["a", "an", "the", "and", "or", "of", "in", "to", "on", "for", "with", "that", "which", "large", "small", "big", "mini", "capacity", "new", "best", "premium",
+  "portable", "compact", "style", "styled", "set", "kit", "pack", "piece", "pcs", "multi", "multipurpose", "upgraded", "quality", "home", "homes",
+  "alternative", "alternatives", "dupe", "cheap", "cheaper", "like", "similar", "top", "buy"]);
+const stem = (w) => (w.length > 4 && /ies$/.test(w) ? w.slice(0, -3) + "y" : w.length > 4 && /(ch|sh|x|ss)es$/.test(w) ? w.slice(0, -2) : w.length > 3 && /[^s]s$/.test(w) ? w.slice(0, -1) : w);
+const words = (t) => String(t || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").split(/[^a-z0-9]+/).filter(Boolean).map(stem);
+// What to send GetHookd: the product without size and marketing words or
+// what follows "for"/"with" ("large capacity self-cleaning litter box for
+// multi-cat homes" → "self-cleaning litter box"). GetHookd matches any of
+// the words, so "large capacity" alone brings bags and storage boxes.
+export function hookdQuery(query) {
+  const head = String(query || "").replace(/\s+/g, " ").trim().split(/\s(?:for|with|to|that|which)\s/i)[0];
+  const kept = head.split(" ").filter((w) => { const ws = words(w); return ws.length && ws.some((x) => !GENERIC.has(x)); });
+  return (kept.length ? kept.join(" ") : head).slice(0, 80);
+}
+
+export function adMatcher(query) {
+  const core = words(String(query || "").toLowerCase().split(/\s(?:for|with|to|that|which)\s/)[0]).filter((w) => w.length > 1 && !GENERIC.has(w));
+  if (!core.length) return null;
+  const head = core[core.length - 1], others = [...new Set(core.slice(0, -1))].filter((w) => w !== head);
+  return {
+    head, others,
+    label: core.slice(-2).join(" "),
+    test(...texts) {
+      const have = new Set(texts.flatMap(words));
+      return have.has(head) && (!others.length || others.some((w) => have.has(w)));
+    },
+  };
+}
+
 // Where to look. `prefilled` says whether the search arrives filled in;
 // otherwise the page offers the words to copy.
 export function adLibraryLinks(query, market) {

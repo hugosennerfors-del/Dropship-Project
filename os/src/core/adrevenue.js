@@ -126,7 +126,7 @@ export function estimateByAdvertiser(ads, a = ESTIMATE_DEFAULTS, marketCode = "U
     groups.set(key, g);
     g.ads++;
     const m = ad.metrics || {};
-    g.landingPage ||= m.landingPage || null;
+    g.shopId ??= m.shopId ?? null;
     if (g.price == null && n(m.price) != null) { g.price = n(m.price); g.currency = m.currency || market(marketCode).currency; g.priceFrom = m.priceFrom || "product"; }
     if (m.store?.visits != null && (!g.store || String(m.store.checkedAt || "") > String(g.store.checkedAt || ""))) g.store = m.store;
     const e = estimateAd(ad, a, marketCode);

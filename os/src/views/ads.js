@@ -6,7 +6,7 @@
 import { store, adsFor, saveAd, removeAd, addSavedAds, upsertSavedAds, loadPref, savePref } from "../state.js";
 import { esc, attr, icon, money, int } from "../ui/dom.js";
 import { MARKETS } from "../core/markets.js";
-import { AD_PLATFORMS, LONG_RUNNING_DAYS, adLibraryLinks, defaultAdQuery, normaliseAd, platformOf, runningDays, sortAds, adSignal } from "../core/ads.js";
+import { AD_PLATFORMS, LONG_RUNNING_DAYS, adLibraryLinks, adMatcher, hookdQuery, defaultAdQuery, normaliseAd, platformOf, runningDays, sortAds, adSignal } from "../core/ads.js";
 import { ESTIMATE_RANGE, assumptions, estimateAd, estimateByAdvertiser } from "../core/adrevenue.js";
 import { burstAt } from "../fx.js";
 import { liveRead, liveWrite, MCP_FIX } from "../live.js";
@@ -52,7 +52,7 @@ export function adsSection(p, m) {
     ${hookdPanel(m, u, q, here.filter(isHookd))}
     ${estPanel(m, u, here)}
     <div class="panel"><div class="panel-h"><h3>Saved ads</h3><span class="sub">${here.length ? `${sig.active} running · ${sig.long} for ${LONG_RUNNING_DAYS}+ days` : "none yet"}</span>
-      ${u.editing ? "" : `<button class="btn sm" type="button" data-ads-new>${icon("plus", 13)}Save an ad</button>`}</div>
+      ${u.editing ? "" : `<button class="btn sm" type="button" data-cad-new>${icon("plus", 13)}Save an ad</button>`}</div>
       ${u.editing ? adForm(u, here.find((a) => a.id === u.editing)) : ""}
       <div class="list" data-ads-list>${here.map((a) => adRow(a, u, m)).join("") || (u.editing ? "" : '<div class="empty">No ads saved for this market yet.</div>')}</div>
       ${elsewhere ? `<div class="panel-b xs muted" style="border-top:1px solid var(--border)">${elsewhere} more saved for ${esc(MARKETS[m === "UK" ? "SE" : "UK"]?.name || "the other market")}. Switch market at the top to see them.</div>` : ""}
@@ -73,7 +73,7 @@ function hookdPanel(m, u, q, saved = []) {
   const known = sum.alreadySaved || 0;
   return `<div class="panel" data-hookd><div class="panel-h"><h3>GetHookd</h3><span class="sub">Meta ads running now in ${esc(where)}</span></div>
     <div class="panel-b stack">
-      <div class="row"><button class="btn sm primary" type="button" data-hookd-go${live && !h.busy && String(q).trim().length >= 2 ? "" : " disabled"}>${icon("search", 13)}${h.busy ? "Searching…" : `Search GetHookd for “${esc(String(q).trim().slice(0, 40))}”`}</button>
+      <div class="row"><button class="btn sm primary" type="button" data-hookd-go${live && !h.busy && hookdQuery(q).length >= 2 ? "" : " disabled"} title="GetHookd gets the product itself, without size words or what follows for/with: it matches any of the words">${icon("search", 13)}${h.busy ? "Searching…" : `Search GetHookd for “${esc(hookdQuery(q).slice(0, 40))}”`}</button>
         <span class="xs muted">${live ? `saves up to ${HOOKD_LIMIT} ads to the list below, at most 2 per advertiser · about 0.01 credit per ad` : "Needs the live database (n8n)."}</span></div>
       ${h.busy ? `<div class="row"><span class="thinking"><i></i><i></i><i></i></span><span class="small">${esc(h.status)}</span></div>` : ""}
       ${h.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(h.error)}</span></div>` : ""}
@@ -81,30 +81,49 @@ function hookdPanel(m, u, q, saved = []) {
           ${!r.ads.length ? "None are running now."
             : `Found ${r.ads.length} from ${sum.brands} advertiser${sum.brands === 1 ? "" : "s"}: <b>${added} new</b> saved under Saved ads below${added ? ", marked new" : ""}${known ? `; ${known} already in the list or removed earlier` : ""}.`}
           ${sum.remainingCredits != null ? `<span class="xs muted">GetHookd credits left: ${esc(String(Math.round(sum.remainingCredits * 100) / 100))}.</span>` : ""}</p>` : ""}
-      ${hookdList(r, saved)}
-      <p class="xs muted">Each ad opens on GetHookd; the advertiser's name opens the store page the ad leads to. An ad you remove from Saved ads is not saved again by a later search.</p>
+      ${hookdList(r, saved, h, q)}
+      <p class="xs muted">Each ad opens on GetHookd, and so does the advertiser's name: its store page there, with the store's traffic, a link to the store and its Meta Ad Library. An ad you remove from Saved ads is not saved again by a later search.</p>
     </div></div>`;
 }
 
-// A link to the store page an ad leads to (https only), or the plain name.
+// The advertiser's store page on GetHookd (traffic, a link to the store, its
+// Meta Ad Library), or else its brand page there; the plain name without either.
+const hookdShopUrl = (shopId, brandId) => (/^\d{1,12}$/.test(String(shopId ?? "")) ? `https://app.gethookd.ai/shops/${shopId}`
+  : /^\d{1,12}$/.test(String(brandId ?? "")) ? `https://app.gethookd.ai/brands/${brandId}` : null);
 function storeLink(name, url) {
-  return /^https:\/\//i.test(url || "") ? `<a class="ads-store" href="${attr(url)}" target="_blank" rel="noopener noreferrer" title="Open the store page this ad leads to"><b>${esc(name)}</b> ${icon("ext", 10)}</a>` : `<b>${esc(name)}</b>`;
+  return url ? `<a class="cad-store" href="${attr(url)}" target="_blank" rel="noopener noreferrer" title="Open this store on GetHookd"><b>${esc(name)}</b> ${icon("ext", 10)}</a>` : `<b>${esc(name)}</b>`;
 }
+// The words of a saved ad that say what it sells.
+const adText = (a) => [a.angle, a.note, a.metrics?.productTitle, a.metrics?.landingPage];
+// Saved ads that sell what the search words describe (all of them when the words say nothing).
+const matching = (ads, q) => { const mt = adMatcher(q); return mt ? ads.filter((a) => mt.test(...adText(a))) : ads; };
 
 // The top ads: the last search's, or else the product's saved GetHookd ads,
-// best performing first, each with a link to the ad and to the store.
-function hookdList(r, saved) {
-  const rows = (r ? r.ads.map((x) => ({ advertiser: x.advertiser, hook: x.hook || x.title, adUrl: x.shareUrl, store: x.landingPage, perf: x.performance, perfTitle: x.performanceTitle, days: x.daysActive }))
-    : saved.map((a) => ({ advertiser: a.advertiser, hook: a.angle, adUrl: a.url, store: a.metrics?.landingPage, perf: a.metrics?.performance, perfTitle: a.metrics?.performanceTitle, days: a.metrics?.daysActive ?? runningDays(a) })))
+// best performing first, each linked to the ad and to its store on GetHookd.
+// Ads whose own text never names the product are set aside: GetHookd
+// matches loosely, and those stores do not sell it.
+function hookdList(r, saved, h, q) {
+  const savedBy = new Map(saved.map((a) => [a.url, a]));
+  const all = (r ? r.ads.map((x) => { const s = savedBy.get(x.shareUrl); return { advertiser: x.advertiser, hook: x.hook || x.title, adUrl: x.shareUrl, shop: hookdShopUrl(x.shopId, x.brandId),
+      perf: x.performance, perfTitle: x.performanceTitle, days: x.daysActive, text: [x.hook, x.title, x.landingPage, ...(s ? adText(s) : [])] }; })
+    : saved.map((a) => ({ advertiser: a.advertiser, hook: a.angle, adUrl: a.url, shop: hookdShopUrl(a.metrics?.shopId), perf: a.metrics?.performance, perfTitle: a.metrics?.performanceTitle,
+      days: a.metrics?.daysActive ?? runningDays(a), text: adText(a) })))
     .filter((x) => /^https:\/\/app\.gethookd\.ai\//.test(x.adUrl || ""))
     .sort((x, y) => (y.perf ?? -1) - (x.perf ?? -1) || (y.days ?? 0) - (x.days ?? 0));
-  if (!rows.length) return "";
-  return `<div class="list hookd-top" data-hookd-list>${rows.map((x) => `<div class="li ads-row">
-      <span class="body">${storeLink(x.advertiser || "Advertiser", x.store)}<small>${esc(x.hook || "")}</small></span>
+  if (!all.length) return "";
+  const mt = adMatcher(r ? r.query : q);
+  const fits = mt ? all.filter((x) => mt.test(...x.text)) : all;
+  const off = all.length - fits.length;
+  const shown = h.showAll ? all : fits;
+  const row = (x) => `<div class="li cad-row${mt && !fits.includes(x) ? " hookd-off" : ""}">
+      <span class="body">${storeLink(x.advertiser || "Advertiser", x.shop)}<small>${esc(x.hook || "")}</small></span>
       <span class="side">${x.perfTitle ? `<span class="spill" title="GetHookd's performance score">${esc(x.perfTitle)}${x.perf != null ? ` ${esc(String(x.perf))}` : ""}</span>` : ""}${x.days != null ? `<span class="spill">${esc(String(x.days))} days</span>` : ""}
-        <a class="btn sm" href="${attr(x.adUrl)}" target="_blank" rel="noopener noreferrer">Ad ${icon("ext", 11)}</a></span></div>`).join("")}</div>`;
+        <a class="btn sm" href="${attr(x.adUrl)}" target="_blank" rel="noopener noreferrer">Ad ${icon("ext", 11)}</a></span></div>`;
+  return `${shown.length ? `<div class="list hookd-top" data-hookd-list>${shown.map(row).join("")}</div>`
+      : `<div class="empty" data-hookd-list>None of the ${all.length} ads mention “${esc(mt.label)}”: GetHookd matched them loosely. Try other search words, such as what the product is called in ads.</div>`}
+    ${off ? `<p class="xs muted" data-hookd-off>${h.showAll ? `Showing all ${all.length}, the ${off} greyed out do not mention “${esc(mt.label)}”.` : `${off} more ${off === 1 ? "ad does" : "ads do"} not mention “${esc(mt.label)}” anywhere (text, product, address), so ${off === 1 ? "that store probably does" : "those stores probably do"} not sell it.`}
+      <button class="btn sm ghost" type="button" data-hookd-all>${h.showAll ? "Hide them" : "Show them"}</button></p>` : ""}`;
 }
-
 async function hookdSearch(productId, market, query, onStatus, { wait = 60000, every = 1500 } = {}) {
   const w = await liveWrite("ads.gethookd", { productId, market, query, limit: HOOKD_LIMIT });
   for (let t = 0; t < wait; t += every) {
@@ -144,18 +163,24 @@ function estPanel(m, u, ads) {
       ${e.busy ? `<div class="row"><span class="thinking"><i></i><i></i><i></i></span><span class="small">${esc(e.status)}</span></div>` : ""}
       ${e.error ? `<div class="callout bad" role="alert">${icon("warn", 16)}<span>${esc(e.error)}</span></div>` : ""}
       ${s ? `<p class="xs muted" data-est-sum>Updated ${s.updated} of ${s.ads} ads and ${s.priced} prices${s.storesRead ? `, read ${s.storesRead} store${s.storesRead === 1 ? "" : "s"}' traffic (${s.usedCredits} credits)` : ""}.${s.failed?.length ? ` Not read: ${esc(s.failed[0])}` : ""}</p>` : ""}
-      <div data-est-out>${estOut(ads, a, m)}</div>
+      <div data-est-out>${estOut(ads, a, m, u.query)}</div>
       <p class="xs muted">How: Meta publishes reach only for the part of an ad shown in the EU. An ad shown in the UK and Ireland has its Irish reach scaled up by population; an ad shown only in the UK has no reach to start from. Reach × views per person × click rate × conversion = sales, × the store's price = revenue. What is left takes off the supplier price (price ÷ the slider) and card fees; ad cost uses the market's CPM of ${esc(money(cfg.cpm, cfg.currency))} per 1,000 views.</p>
     </div></div>`;
 }
 
-function estOut(ads, a, m) {
-  const mine = ads.filter(isHookd);
-  if (!mine.length) return '<div class="empty">Search GetHookd above: the ads it saves carry the reach and price this needs. Ads saved by hand have none.</div>';
+// Only the ads that name the product count: a store selling something else
+// says nothing about what this product brings in.
+function estOut(ads, a, m, q) {
+  const hookd = ads.filter(isHookd);
+  if (!hookd.length) return '<div class="empty">Search GetHookd above: the ads it saves carry the reach and price this needs. Ads saved by hand have none.</div>';
+  const mine = matching(hookd, q), mt = adMatcher(q);
+  const left = [...new Set(hookd.filter((x) => !mine.includes(x)).map((x) => x.advertiser).filter(Boolean))];
+  const note = left.length ? `<p class="xs muted" data-est-left>Left out: ${esc(left.join(", "))}. Their ads do not mention “${esc(mt.label)}”, so they probably sell something else.</p>` : "";
+  if (!mine.length) return `<div class="empty">None of the saved GetHookd ads mention “${esc(mt.label)}”.</div>${note}`;
   const groups = estimateByAdvertiser(mine, a, m);
   const rows = groups.map((g) => {
     const c = g.currency;
-    const head = `<td>${storeLink(g.advertiser || "Advertiser", g.landingPage)}<small class="xs muted" style="display:block">${g.ads} ad${g.ads === 1 ? "" : "s"}${g.longest ? `, longest ${g.longest} days` : ""}</small></td>
+    const head = `<td>${storeLink(g.advertiser || "Advertiser", hookdShopUrl(g.shopId))}<small class="xs muted" style="display:block">${g.ads} ad${g.ads === 1 ? "" : "s"}${g.longest ? `, longest ${g.longest} days` : ""}</small></td>
       <td class="r">${g.price != null ? `${esc(cur(g.price, c, 2))}${g.priceFrom === "collection" ? '<small class="xs muted" style="display:block" title="The ad links to a collection: the price of its first product, in the store\'s own order">first in collection</small>' : ""}` : "—"}</td>`;
     const store = g.storeEstimate ? `<tr class="est-store"><td colspan="7" class="xs muted">Whole store: ${esc(int(g.storeEstimate.visits))} visits in ${esc(g.store.month || "the latest month")} → about ${esc(int(g.storeEstimate.sales))} sales${g.storeEstimate.revenue != null ? ` ≈ ${esc(cur(g.storeEstimate.revenue, c))}` : ""} a month (GetHookd's traffic estimate, every product)</td></tr>` : "";
     if (!g.estimated) {
@@ -171,7 +196,7 @@ function estOut(ads, a, m) {
       <td class="r${after != null && after < 0 ? " neg" : ""}">${after != null ? esc(cur(after, c)) : "—"}</td></tr>${store}`;
   }).join("");
   return `<div class="tbl-wrap"><table class="tbl est-tbl"><thead><tr><th>Advertiser</th><th class="r">Price</th><th class="r">Sales a month</th><th class="r">Revenue</th><th class="r">After supplier and fees</th><th class="r">Ad cost</th><th class="r">After ads</th></tr></thead>
-    <tbody>${rows}</tbody></table></div>`;
+    <tbody>${rows}</tbody></table></div>${note}`;
 }
 
 // One saved ad's line in the list.
@@ -186,7 +211,7 @@ function paintEstimates(root, productId, m) {
   const a = estPrefs();
   const ads = sortAds(adsFor(productId).filter((x) => x.market === m));
   const out = root.querySelector("#sec-ads [data-est-out]");
-  if (out) out.innerHTML = estOut(ads, a, m);
+  if (out) out.innerHTML = estOut(ads, a, m, uiFor(productId, m).query);
   for (const el of root.querySelectorAll("#sec-ads [data-est-ad]")) {
     const ad = ads.find((x) => x.id === el.dataset.estAd);
     el.textContent = ad ? estAdLine(ad, a, m) : "";
@@ -209,17 +234,19 @@ function adRow(a, u, m) {
   const days = runningDays(a);
   const when = a.stillRunning === false ? '<span class="spill">stopped</span>'
     : days == null ? '<span class="spill">start date not saved</span>'
-    : days >= LONG_RUNNING_DAYS ? `<span class="tag ads-long" title="Started ${attr(a.startedOn)}">${days} days</span>`
+    : days >= LONG_RUNNING_DAYS ? `<span class="tag cad-long" title="Started ${attr(a.startedOn)}">${days} days</span>`
     : `<span class="spill" title="Started ${attr(a.startedOn)}">${days} day${days === 1 ? "" : "s"}</span>`;
   let host = "";
   try { host = new URL(a.url).hostname.replace(/^www\./, ""); } catch { /* shown as is */ }
   const detail = [a.angle && `“${a.angle}”`, a.note].filter(Boolean).join(" · ");
   const armed = u.armed === a.id;
   const fresh = u.hookd.fresh.includes(a.id);
-  return `<div class="li ads-row${fresh ? " ads-fresh" : ""}" data-ad="${attr(a.id)}">
-    <span class="ads-plat ads-${attr(a.platform)}" title="${attr(AD_PLATFORMS[a.platform] || a.platform)}">${esc(SHORT[a.platform] || a.platform)}</span>
-    <span class="body">${storeLink(a.advertiser || host || "Ad", a.metrics?.landingPage)}<small>${esc(detail || host)}</small>${isHookd(a) ? `<small class="est-ad" data-est-ad="${attr(a.id)}">${esc(estAdLine(a, estPrefs(), m))}</small>` : ""}</span>
-    <span class="side">${fresh ? '<span class="tag ads-new" title="Added by the last GetHookd search">new</span>' : ""}${when}
+  const mt = isHookd(a) ? adMatcher(u.query) : null;
+  const off = mt && !mt.test(...adText(a)) ? mt.label : "";
+  return `<div class="li cad-row${fresh ? " cad-fresh" : ""}" data-cad="${attr(a.id)}">
+    <span class="cad-plat ads-${attr(a.platform)}" title="${attr(AD_PLATFORMS[a.platform] || a.platform)}">${esc(SHORT[a.platform] || a.platform)}</span>
+    <span class="body">${storeLink(a.advertiser || host || "Ad", isHookd(a) ? hookdShopUrl(a.metrics?.shopId) : null)}<small>${esc(detail || host)}</small>${isHookd(a) ? `<small class="est-ad" data-est-ad="${attr(a.id)}">${esc(estAdLine(a, estPrefs(), m))}</small>` : ""}</span>
+    <span class="side">${off ? `<span class="spill" title="Its text, product and address never name it, so the store probably sells something else">not “${esc(off)}”</span>` : ""}${fresh ? '<span class="tag cad-new" title="Added by the last GetHookd search">new</span>' : ""}${when}
       <a class="btn sm" href="${attr(a.url)}" target="_blank" rel="noopener noreferrer">Open ${icon("ext", 11)}</a>
       <button class="btn sm ghost" type="button" data-ads-edit="${attr(a.id)}">Edit</button>
       <button class="btn sm ${armed ? "bb-btn-danger" : "ghost"}" type="button" data-ads-rm="${attr(a.id)}">${armed ? "Remove?" : "Remove"}</button></span>
@@ -327,7 +354,7 @@ export function bindAds(root, { id, rerender }) {
     const saved = await saveAd(res.ad);
     window.__toast?.(saved.ok ? (saved.note || "Ad saved.") : saved.reason);
     rerender();
-    if (saved.ok) burstAt(root.querySelector(`[data-ad="${res.ad.id}"]`), 60);
+    if (saved.ok) burstAt(root.querySelector(`[data-cad="${res.ad.id}"]`), 60);
   });
 
   root.addEventListener("click", async (e) => {
@@ -339,12 +366,14 @@ export function bindAds(root, { id, rerender }) {
       u.armed = null;
       if (!t.closest("button, a, input, select, textarea, label")) { rerender(); return; }
     }
+    if (t.closest("[data-hookd-all]")) { u.hookd.showAll = !u.hookd.showAll; rerender(); return; }
     if (t.closest("[data-hookd-go]")) {
       const h = u.hookd;
+      h.showAll = false;
       h.busy = true; h.error = ""; h.status = "Sending the search…"; rerender();
       let fresh = [];
       try {
-        h.result = await hookdSearch(id, m(), u.query ?? "", (x) => { h.status = x; rerender(); });
+        h.result = await hookdSearch(id, m(), hookdQuery(u.query ?? ""), (x) => { h.status = x; rerender(); });
         fresh = h.result.savedAds;
         h.fresh = fresh.map((a) => a.id);
         addSavedAds(fresh);
@@ -368,7 +397,7 @@ export function bindAds(root, { id, rerender }) {
       est.busy = false; rerender();
       return;
     }
-    if (t.closest("[data-ads-new]")) { u.editing = "new"; u.draft = {}; u.error = null; rerender(); root.querySelector("#adsForm [name=url]")?.focus(); return; }
+    if (t.closest("[data-cad-new]")) { u.editing = "new"; u.draft = {}; u.error = null; rerender(); root.querySelector("#adsForm [name=url]")?.focus(); return; }
     const ed = t.closest("[data-ads-edit]");
     if (ed) { u.editing = ed.dataset.adsEdit; u.draft = {}; u.error = null; rerender(); root.querySelector("#adsForm [name=url]")?.focus(); return; }
     if (t.closest("[data-ads-cancel]")) { u.editing = null; u.draft = {}; u.error = null; rerender(); return; }

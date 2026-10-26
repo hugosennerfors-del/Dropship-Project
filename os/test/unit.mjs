@@ -128,6 +128,17 @@ const near = (a, b, eps = 0.02) => Math.abs(a - b) <= eps;
 {
   const A = await import("../src/core/ads.js");
   const today = new Date("2026-10-09T12:00:00Z");
+  {
+    const lb = A.adMatcher("large capacity self-cleaning litter box for multi-cat homes");
+    ok(lb.head === "box" && lb.others.join() === "self,cleaning,litter" && lb.label === "litter box", "ad match: the head noun and the words before it, not the size words or what follows \"for\"", JSON.stringify(lb));
+    ok(lb.test("Self-cleaning litter box, no scooping") && lb.test("", "https://shop.example/products/automatic-litter-boxes") && !lb.test("Cat toy storage box") && !lb.test("Litter tray liners"),
+      "ad match: an ad naming the product counts, one selling another box or litter does not");
+    const cam = A.adMatcher("retro camera");
+    ok(cam.test("CS-PRO retro inspired camera") && !cam.test("Deepwater Arctic watch, retro styling") && !cam.test("Retro phone handset"), "ad match: \"retro\" alone is not a camera");
+    ok(A.hookdQuery("Large capacity self-cleaning litter box for multi-cat homes") === "self-cleaning litter box" && A.hookdQuery("retro camera") === "retro camera" && A.hookdQuery("for the") === "for the",
+      "GetHookd gets the product, not the size words or what follows \"for\"", A.hookdQuery("Large capacity self-cleaning litter box for multi-cat homes"));
+    ok(A.adMatcher("dryrobe alternative").head === "dryrobe" && A.adMatcher("for the") === null, "ad match: search words such as alternative do not count; no words, no filter");
+  }
   ok(A.defaultAdQuery("Posture corrector: adjustable (unisex)") === "posture corrector", "ad search drops the subtitle and brackets", A.defaultAdQuery("Posture corrector: adjustable (unisex)"));
   const [meta, lib, top, search] = A.adLibraryLinks("robe & towel", "UK");
   ok(meta.url === "https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=GB&q=robe%20%26%20towel&search_type=keyword_unordered&media_type=all", "Meta Ad Library link: UK is GB, the search is encoded", meta.url);
