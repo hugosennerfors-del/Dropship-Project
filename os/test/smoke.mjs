@@ -1,6 +1,6 @@
 // Browser smoke test: every route renders without console errors.
 //   node test/smoke.mjs [--shots]
-import { chromium } from "/opt/node22/lib/node_modules/playwright/index.mjs";
+import { chromium } from "./browser.mjs";
 import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";

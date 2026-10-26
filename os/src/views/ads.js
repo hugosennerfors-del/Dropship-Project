@@ -49,12 +49,12 @@ export function adsSection(p, m) {
           <b>${esc(l.label)} ${icon("ext", 11)}</b><small>${esc(l.sub)}</small>${l.prefilled ? "" : '<span class="tag">paste the search</span>'}</a>`).join("")}</div>
         <p class="xs muted">Meta and TikTok do not let other pages show their ads, so they open on their own sites. In Meta's Ad Library each ad shows the date it started running; open its details to copy the link, then save it here.</p>
       </div></div>
-    ${hookdPanel(m, u, q)}
+    ${hookdPanel(m, u, q, here.filter(isHookd))}
     ${estPanel(m, u, here)}
     <div class="panel"><div class="panel-h"><h3>Saved ads</h3><span class="sub">${here.length ? `${sig.active} running · ${sig.long} for ${LONG_RUNNING_DAYS}+ days` : "none yet"}</span>
       ${u.editing ? "" : `<button class="btn sm" type="button" data-ads-new>${icon("plus", 13)}Save an ad</button>`}</div>
       ${u.editing ? adForm(u, here.find((a) => a.id === u.editing)) : ""}
-      <div class="list">${here.map((a) => adRow(a, u, m)).join("") || (u.editing ? "" : '<div class="empty">No ads saved for this market yet.</div>')}</div>
+      <div class="list" data-ads-list>${here.map((a) => adRow(a, u, m)).join("") || (u.editing ? "" : '<div class="empty">No ads saved for this market yet.</div>')}</div>
       ${elsewhere ? `<div class="panel-b xs muted" style="border-top:1px solid var(--border)">${elsewhere} more saved for ${esc(MARKETS[m === "UK" ? "SE" : "UK"]?.name || "the other market")}. Switch market at the top to see them.</div>` : ""}
     </div>
   </section>`;
@@ -63,7 +63,7 @@ export function adsSection(p, m) {
 // GetHookd: the Meta ads running now for the search words. The server finds
 // them (the API key stays there) and saves each one, with its link, to the
 // saved ads below; links the product already has are skipped.
-function hookdPanel(m, u, q) {
+function hookdPanel(m, u, q, saved = []) {
   const h = u.hookd;
   const live = store.live.state === "ready";
   const where = m === "SE" ? "Sweden" : "the UK";
@@ -81,8 +81,28 @@ function hookdPanel(m, u, q) {
           ${!r.ads.length ? "None are running now."
             : `Found ${r.ads.length} from ${sum.brands} advertiser${sum.brands === 1 ? "" : "s"}: <b>${added} new</b> saved under Saved ads below${added ? ", marked new" : ""}${known ? `; ${known} already in the list or removed earlier` : ""}.`}
           ${sum.remainingCredits != null ? `<span class="xs muted">GetHookd credits left: ${esc(String(Math.round(sum.remainingCredits * 100) / 100))}.</span>` : ""}</p>` : ""}
-      <p class="xs muted">Each saved ad opens on GetHookd. An ad you remove from the list is not saved again by a later search.</p>
+      ${hookdList(r, saved)}
+      <p class="xs muted">Each ad opens on GetHookd; the advertiser's name opens the store page the ad leads to. An ad you remove from Saved ads is not saved again by a later search.</p>
     </div></div>`;
+}
+
+// A link to the store page an ad leads to (https only), or the plain name.
+function storeLink(name, url) {
+  return /^https:\/\//i.test(url || "") ? `<a class="ads-store" href="${attr(url)}" target="_blank" rel="noopener noreferrer" title="Open the store page this ad leads to"><b>${esc(name)}</b> ${icon("ext", 10)}</a>` : `<b>${esc(name)}</b>`;
+}
+
+// The top ads: the last search's, or else the product's saved GetHookd ads,
+// best performing first, each with a link to the ad and to the store.
+function hookdList(r, saved) {
+  const rows = (r ? r.ads.map((x) => ({ advertiser: x.advertiser, hook: x.hook || x.title, adUrl: x.shareUrl, store: x.landingPage, perf: x.performance, perfTitle: x.performanceTitle, days: x.daysActive }))
+    : saved.map((a) => ({ advertiser: a.advertiser, hook: a.angle, adUrl: a.url, store: a.metrics?.landingPage, perf: a.metrics?.performance, perfTitle: a.metrics?.performanceTitle, days: a.metrics?.daysActive ?? runningDays(a) })))
+    .filter((x) => /^https:\/\/app\.gethookd\.ai\//.test(x.adUrl || ""))
+    .sort((x, y) => (y.perf ?? -1) - (x.perf ?? -1) || (y.days ?? 0) - (x.days ?? 0));
+  if (!rows.length) return "";
+  return `<div class="list hookd-top" data-hookd-list>${rows.map((x) => `<div class="li ads-row">
+      <span class="body">${storeLink(x.advertiser || "Advertiser", x.store)}<small>${esc(x.hook || "")}</small></span>
+      <span class="side">${x.perfTitle ? `<span class="spill" title="GetHookd's performance score">${esc(x.perfTitle)}${x.perf != null ? ` ${esc(String(x.perf))}` : ""}</span>` : ""}${x.days != null ? `<span class="spill">${esc(String(x.days))} days</span>` : ""}
+        <a class="btn sm" href="${attr(x.adUrl)}" target="_blank" rel="noopener noreferrer">Ad ${icon("ext", 11)}</a></span></div>`).join("")}</div>`;
 }
 
 async function hookdSearch(productId, market, query, onStatus, { wait = 60000, every = 1500 } = {}) {
@@ -135,7 +155,7 @@ function estOut(ads, a, m) {
   const groups = estimateByAdvertiser(mine, a, m);
   const rows = groups.map((g) => {
     const c = g.currency;
-    const head = `<td><b>${esc(g.advertiser || "Advertiser")}</b><small class="xs muted" style="display:block">${g.ads} ad${g.ads === 1 ? "" : "s"}${g.longest ? `, longest ${g.longest} days` : ""}</small></td>
+    const head = `<td>${storeLink(g.advertiser || "Advertiser", g.landingPage)}<small class="xs muted" style="display:block">${g.ads} ad${g.ads === 1 ? "" : "s"}${g.longest ? `, longest ${g.longest} days` : ""}</small></td>
       <td class="r">${g.price != null ? `${esc(cur(g.price, c, 2))}${g.priceFrom === "collection" ? '<small class="xs muted" style="display:block" title="The ad links to a collection: the price of its first product, in the store\'s own order">first in collection</small>' : ""}` : "—"}</td>`;
     const store = g.storeEstimate ? `<tr class="est-store"><td colspan="7" class="xs muted">Whole store: ${esc(int(g.storeEstimate.visits))} visits in ${esc(g.store.month || "the latest month")} → about ${esc(int(g.storeEstimate.sales))} sales${g.storeEstimate.revenue != null ? ` ≈ ${esc(cur(g.storeEstimate.revenue, c))}` : ""} a month (GetHookd's traffic estimate, every product)</td></tr>` : "";
     if (!g.estimated) {
@@ -198,7 +218,7 @@ function adRow(a, u, m) {
   const fresh = u.hookd.fresh.includes(a.id);
   return `<div class="li ads-row${fresh ? " ads-fresh" : ""}" data-ad="${attr(a.id)}">
     <span class="ads-plat ads-${attr(a.platform)}" title="${attr(AD_PLATFORMS[a.platform] || a.platform)}">${esc(SHORT[a.platform] || a.platform)}</span>
-    <span class="body"><b>${esc(a.advertiser || host || "Ad")}</b><small>${esc(detail || host)}</small>${isHookd(a) ? `<small class="est-ad" data-est-ad="${attr(a.id)}">${esc(estAdLine(a, estPrefs(), m))}</small>` : ""}</span>
+    <span class="body">${storeLink(a.advertiser || host || "Ad", a.metrics?.landingPage)}<small>${esc(detail || host)}</small>${isHookd(a) ? `<small class="est-ad" data-est-ad="${attr(a.id)}">${esc(estAdLine(a, estPrefs(), m))}</small>` : ""}</span>
     <span class="side">${fresh ? '<span class="tag ads-new" title="Added by the last GetHookd search">new</span>' : ""}${when}
       <a class="btn sm" href="${attr(a.url)}" target="_blank" rel="noopener noreferrer">Open ${icon("ext", 11)}</a>
       <button class="btn sm ghost" type="button" data-ads-edit="${attr(a.id)}">Edit</button>
@@ -332,8 +352,9 @@ export function bindAds(root, { id, rerender }) {
         if (fresh.length && u.editing === "new" && !String(u.draft?.url || "").trim()) { u.editing = null; u.draft = {}; u.error = null; }
       } catch (err) { h.error = MCP_FIX[err?.code] || err?.message || "The search failed."; }
       h.busy = false; rerender();
-      const first = fresh.length ? root.querySelector("#sec-ads .ads-row.ads-fresh") : null;
-      if (first) { first.scrollIntoView?.({ block: "nearest" }); burstAt(first, 60); }
+      // The ads found are listed in the panel, linked, even when all were saved before.
+      const first = h.result?.ads?.length ? root.querySelector("#sec-ads [data-hookd-list]") : null;
+      if (first) { first.scrollIntoView?.({ block: "nearest" }); if (fresh.length) burstAt(first, 60); }
       return;
     }
     if (t.closest("[data-est-refresh]")) {

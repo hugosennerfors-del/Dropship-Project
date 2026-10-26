@@ -629,3 +629,7 @@ button.li { border: 0; border-bottom: 1px solid var(--border); background: none;
 .tag.src-likely { background: var(--good-soft); color: var(--good); border-color: color-mix(in srgb, var(--good) 30%, transparent); }
 .tag.src-possible { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 30%, transparent); }
 .li .body small.src-why { white-space: normal; color: var(--fg-2); margin-top: 2px; }
+.ads-store{color:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:4px;align-self:flex-start}
+.ads-store b{display:inline}
+.ads-store:hover b{text-decoration:underline}
+.hookd-top{border:1px solid var(--border);border-radius:10px}

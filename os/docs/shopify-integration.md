@@ -256,6 +256,7 @@ The product page's *Ads* tab has a **GetHookd** panel. It searches GetHookd, an 
   - The link is GetHookd's share page. It carries a signature that is the same on every search, so the same ad is recognised.
   - A link the product already has is skipped, whether it is saved or was removed, so an ad you remove does not come back with the next search.
   - The panel says how many were new and how many were already there.
+  - The panel lists the ads found, best performing first: each links to its GetHookd page, and the advertiser's name links to the store page the ad leads to. Before a search it lists the product's saved GetHookd ads the same way. The estimate table and Saved ads link each advertiser to its store too.
 - **Survey.** GetHookd asks every new connection to answer or skip a short survey before it will search. It was skipped for this account. Otherwise the panel says so.
 
 ### What their ads bring in
